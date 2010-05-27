@@ -76,7 +76,7 @@ alb.res <- fmle(alb,start=start,lower=lower,upper=upper,seq.iter=FALSE)
 params(alb.res)
 
 # now try with grad
-alb@grad <- function(x) {
+alb@gr <- function(x) {
     
   B0 <- x[1]
   sigma2 <- x[2]
