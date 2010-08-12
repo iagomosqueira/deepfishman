@@ -87,6 +87,7 @@ alb <- FLaspm(catch=alb.catch,
   M=M,hh=hh,sel=sflq, mat=mflq, wght=mw, fpm=1, amax=amax, amin=amin)
 
 model(alb) <- aspm()
+
 # initial guess for B0 and sigma2
 B0 <- 120000/1e3
 sigma2 <- 0.1
@@ -96,3 +97,5 @@ upper <- rep(1e10,2)
 # Fit
 alb.res <- fmle(alb,start=start, lower=lower,upper=upper)
 params(alb.res)
+
+# problem with predict at end of fmle

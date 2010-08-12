@@ -128,6 +128,8 @@ aspm.index <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
   # Strip out the FLQuant to speed it up
   mat <- c(mat)
   sel <- c(sel)
+  hh  <- c(hh)
+  M   <- c(M)
   
   bexp <- aspm.pdyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
   
@@ -147,6 +149,9 @@ aspm <- function() {
     #bexp<-ASPM.pdyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
     #hr<-catch/bexp
     #penalty<-100*length(which(hr >= 0.99))
+
+#browser()
+
     sum(dnorm(log(index),window(log(aspm.index(catch,index,B0,hh,M,mat,sel,wght,amin,amax)),start=dims(index)$minyear,end=dims(index)$maxyear), sqrt(sigma2), TRUE), na.rm=TRUE)#-penalty
   }
   

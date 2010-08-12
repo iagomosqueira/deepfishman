@@ -114,6 +114,16 @@ aspm.pdyn <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
 
 aspm.index <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
 
+# Problem
+# When this is called from the logl function index is an FLQuant
+# When called from predict index is all indices in an FLQuants
+
+# Need fitted slot to also be FLQuants
+
+# Do index loop in this function, and return FLQuants, not in the logl function.
+
+browser()
+
   yr <- as.numeric(dimnames(catch)[['year']])
   iyr <- as.numeric(dimnames(index)[['year']])
   dm <- dimnames(catch)
@@ -128,6 +138,8 @@ aspm.index <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
   # Strip out the FLQuant to speed it up
   mat <- c(mat)
   sel <- c(sel)
+  hh   <- c(hh)
+  M   <- c(M)
   
   bexp <- aspm.pdyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
   
