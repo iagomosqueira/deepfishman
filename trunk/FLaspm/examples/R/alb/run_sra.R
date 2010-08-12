@@ -1,5 +1,6 @@
 
 library(FLCore)
+setwd("C:\\Projects\\Deepfishman\\deepfishman\\FLaspm\\examples\\R\\alb")
 load("IO_ctot.RData")
 
 source("../../../code/R/FLaspm.R")
