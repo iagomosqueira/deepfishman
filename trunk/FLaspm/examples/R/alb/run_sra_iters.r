@@ -1,5 +1,6 @@
 # Examples with iterations
-setwd("c:/Projects/Deepfishman/deepfishman/FLaspm/examples/R/alb")
+#setwd("c:/Projects/Deepfishman/deepfishman/FLaspm/examples/R/alb")
+setwd("~/Work/deepfishman/FLaspm/examples/R/alb")
 library(FLCore)
 load("IO_ctot.RData")
 

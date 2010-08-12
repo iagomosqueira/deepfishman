@@ -122,16 +122,10 @@ aspm.index <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
 
 # Do index loop in this function, and return FLQuants, not in the logl function.
 
-browser()
+    #browser()
 
   yr <- as.numeric(dimnames(catch)[['year']])
-  iyr <- as.numeric(dimnames(index)[['year']])
   dm <- dimnames(catch)
-  ind <- as.vector(index)
-  ys <- iyr[1]
-  yf <- iyr[length(iyr)]
-  y1 <- (ys-yr[1])+1
-  y2 <- (yf-yr[1])+1
 
 #browser()
 
@@ -140,13 +134,26 @@ browser()
   sel <- c(sel)
   hh   <- c(hh)
   M   <- c(M)
-  
-  bexp <- aspm.pdyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+
+  index.hat <- FLQuants()
+
+ for (index.count in 1:length(index))
+ { 
+  bexp <- aspm.pdyn(catch,index[[index.count]],B0,hh,M,mat,sel,wght,amin,amax)
   
   # nuisance q
+  ind <- as.vector(index[[index.count]])
+  iyr <- as.numeric(dimnames(index[[index.count]])[['year']])
+  ys <- iyr[1]
+  yf <- iyr[length(iyr)]
+  y1 <- (ys-yr[1])+1
+  y2 <- (yf-yr[1])+1
   q <- exp(mean(log(ind[y1:y2]/as.vector(bexp[,y1:y2])),na.rm=T))
+  index.hat[[index.count]] <- FLQuant(q*bexp,dimnames=dm)
   # return predicted index
-  return(FLQuant(q*bexp,dimnames=dm))
+  }
+  #return(FLQuant(q*bexp,dimnames=dm))
+  return(index.hat)
 }
 
 
@@ -160,20 +167,16 @@ aspm <- function() {
     #hr<-catch/bexp
     #penalty<-100*length(which(hr >= 0.99))
 #browser()
-#    sum(dnorm(log(index),window(log(aspm.index(catch,index,B0,hh,M,mat,sel,wght,amin,amax)),start=dims(index)$minyear,end=dims(index)$maxyear), sqrt(sigma2), TRUE), na.rm=TRUE)#-penalty
-#    sum(dnorm(log(index[[1]]),window(log(aspm.index(catch,index[[1]],B0,hh,M,mat,sel,wght,amin,amax)),start=dims(index[[1]])$minyear,end=dims(index[[1]])$maxyear), sqrt(sigma2), TRUE), na.rm=TRUE)#-penalty
 
-
-    total_logl <- 0
-    for (index_count in 1:length(index))
-      total_logl <- total_logl +
-      sum(dnorm(log(index[[index_count]]),
-            window(log(aspm.index(catch,index[[index_count]],B0,hh,M,mat,sel,wght,amin,amax)),
-              start=dims(index[[index_count]])$minyear,
-              end=dims(index[[index_count]])$maxyear),
-            sqrt(sigma2), TRUE), na.rm=TRUE)#-penalty
-
-    return(total_logl)
+      #sum(dnorm(log(index),window(log(aspm.index(catch,index,B0,hh,M,mat,sel,wght,amin,amax)),start=dims(index)$minyear,end=dims(index)$maxyear), sqrt(sigma2), TRUE), na.rm=TRUE)#-penalty
+      #browser()
+    # Get the FLQuants object with the estimated indices
+    indexhat.quants <- aspm.index(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+    log.indexhat.quants <- lapply(indexhat.quants,function(index) window(log(index),start=dims(index)$minyear,end=dims(index)$maxyear))
+    total.logl <- 0
+    for (index.count in 1:length(index))
+	total.logl <- total.logl + sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
+    return(total.logl)
   }
   
    # initial parameter values

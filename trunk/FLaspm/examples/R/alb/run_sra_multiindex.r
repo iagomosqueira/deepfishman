@@ -1,5 +1,6 @@
 # Example with multiple indices
-setwd("c:/Projects/Deepfishman/deepfishman/FLaspm/examples/R/alb")
+#setwd("c:/Projects/Deepfishman/deepfishman/FLaspm/examples/R/alb")
+setwd("~/Work/deepfishman/FLaspm/examples/R/alb")
 library(FLCore)
 load("IO_ctot.RData")
 
@@ -80,7 +81,6 @@ alb.indices <- mcf(FLQuants(index1 = alb.index1,index2 = alb.index2))
 # data <- lapply(dummy, iter, 1) # seems to work though...
 
 #*******************************************************************************
-# Single index as an FLQuants
 
 alb <- FLaspm(catch=alb.catch,
   index=alb.indices,
@@ -97,5 +97,11 @@ upper <- rep(1e10,2)
 # Fit
 alb.res <- fmle(alb,start=start, lower=lower,upper=upper)
 params(alb.res)
+
+
+# make an fmle special for aspm
+# cut out the fitted <- predict bit
+# add new slot, FLQUants, fitted_indices
+# write a new predict that doesn't use @fitted, but fitted_indices
 
 # problem with predict at end of fmle
