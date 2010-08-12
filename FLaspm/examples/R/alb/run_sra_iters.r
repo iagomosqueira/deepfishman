@@ -1,5 +1,5 @@
 # Examples with iterations
-setwd("m:/Projects/Deepfishman/deepfishman/FLaspm/examples/R/alb")
+setwd("c:/Projects/Deepfishman/deepfishman/FLaspm/examples/R/alb")
 library(FLCore)
 load("IO_ctot.RData")
 
@@ -13,10 +13,10 @@ amin <- 1
 nag <- amax - amin + 1
 
 # steepness
-hh <- 0.75
+hh <- FLQuant(0.75)
 
 # natural mortality
-M <- 0.34
+M <- FLQuant(0.34)
 
 # mean weight
 mw <- 0.014/1e3
@@ -223,5 +223,44 @@ alb.boot <- fmle(alb.boot,start=start, lower=lower,upper=upper)
 
 # Plot some exciting things
 
+#****************************************************************************
+# Multiple iters on hh
+niters <- 3
+#hhflq <- FLQuant(hh,iter=niters)
+hh <- propagate(hh,niters)
+hh <- hh *rlnorm(niters,0,0.1)
+
+C <- subset(io_catch,Species=='ALB')[['Catch']]/1000
+yr <- subset(io_catch,Species=='ALB')[['Year']]
+alb.catch <- FLQuant(as.vector(C),dimnames=list(year=yr))
+
+# abundance index
+cpue_tw <- scan("cpue.dat"); ys <- 1980; yf <- 2006
+names(cpue_tw) <- yr.i <- ys:yf
+alb.index <- FLQuant(as.vector(cpue_tw),dimnames=list(year=ys:yf))
+alb.index <- mcf(FLQuants(index=alb.index,catch=alb.catch))[['index']]  # align dimensions
+
+
+alb <- FLaspm(catch=alb.catch,
+  index=alb.index,
+  M=M,hh=hh,sel=sflq, mat=mflq, wght=mw, fpm=1, amax=amax, amin=amin)
+
+model(alb) <- aspm()
+
+# check index slot has lots of iters
+
+# initial guess for B0 and sigma2
+
+B0 <- 120000/1e3
+sigma2 <- 0.1
+
+start <- list(B0 = B0, sigma2 = sigma2)
+lower <- rep(1e-9,2)
+upper <- rep(1e10,2)
+
+#alb.res <- fmle(alb,start=start, lower=lower,upper=upper,seq.iter=FALSE)
+# Fit all at once - might take a while
+alb.res <- fmle(alb,start=start, lower=lower,upper=upper)
+params(alb.res)
 
 

@@ -8,7 +8,7 @@ library(FLCore)
 setClass('FLaspm', representation(
   'FLModel',
   catch='FLQuant',
-  index='FLQuant',
+  index='FLQuants',
 #  M='numeric',
 M = 'FLQuant', # So we can use multiple iterations.
 # Maybe an FLPar would be more appropriate
@@ -147,7 +147,21 @@ aspm <- function() {
     #bexp<-ASPM.pdyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
     #hr<-catch/bexp
     #penalty<-100*length(which(hr >= 0.99))
-    sum(dnorm(log(index),window(log(aspm.index(catch,index,B0,hh,M,mat,sel,wght,amin,amax)),start=dims(index)$minyear,end=dims(index)$maxyear), sqrt(sigma2), TRUE), na.rm=TRUE)#-penalty
+#browser()
+#    sum(dnorm(log(index),window(log(aspm.index(catch,index,B0,hh,M,mat,sel,wght,amin,amax)),start=dims(index)$minyear,end=dims(index)$maxyear), sqrt(sigma2), TRUE), na.rm=TRUE)#-penalty
+#    sum(dnorm(log(index[[1]]),window(log(aspm.index(catch,index[[1]],B0,hh,M,mat,sel,wght,amin,amax)),start=dims(index[[1]])$minyear,end=dims(index[[1]])$maxyear), sqrt(sigma2), TRUE), na.rm=TRUE)#-penalty
+
+
+    total_logl <- 0
+    for (index_count in 1:length(index))
+      total_logl <- total_logl +
+      sum(dnorm(log(index[[index_count]]),
+            window(log(aspm.index(catch,index[[index_count]],B0,hh,M,mat,sel,wght,amin,amax)),
+              start=dims(index[[index_count]])$minyear,
+              end=dims(index[[index_count]])$maxyear),
+            sqrt(sigma2), TRUE), na.rm=TRUE)#-penalty
+
+    return(total_logl)
   }
   
    # initial parameter values
