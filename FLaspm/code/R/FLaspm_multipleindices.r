@@ -1,6 +1,5 @@
 
 library(FLCore)
-
 # Age structured parameters like sel and mat need to be FLQuant
 # Shouldn't affect the model
 # (also opens the possibility of year effects like sel changing over time which will require model changes)
@@ -20,7 +19,9 @@ hh = 'FLQuant',
   mat='FLQuant',
   fpm='numeric',
   amax='numeric',
-  amin='numeric'
+  amin='numeric',
+  fitted_index = 'FLQuants',
+  residuals_index = 'FLQuants'
   )
 )
 
@@ -199,44 +200,44 @@ aspm <- function() {
 # post-fitting accessors for biomass etc.
 
 # exploitable biomass {{{
-if (!isGeneric("exp.biomass"))
-	setGeneric("exp.biomass", function(object, ...)
-    	standardGeneric("exp.biomass"))
-setMethod('exp.biomass', signature(object='FLaspm'),
-  function(object) {
-    #return(fitted(object) / as.numeric(params(object)['q',]))
-    return(aspm.pdyn(object@catch,object@index,params(object)['B0'],object@hh,object@M,object@mat,object@sel,object@wght,object@amin,object@amax))
-    })
-# }}}
+#if (!isGeneric("exp.biomass"))
+#	setGeneric("exp.biomass", function(object, ...)
+#    	standardGeneric("exp.biomass"))
+#setMethod('exp.biomass', signature(object='FLaspm'),
+#  function(object) {
+#    #return(fitted(object) / as.numeric(params(object)['q',]))
+#    return(aspm.pdyn(object@catch,object@index,params(object)['B0'],object@hh,object@M,object@mat,object@sel,object@wght,object@amin,object@amax))
+#    })
+## }}}
 
 # harvest rate {{{
-if (!isGeneric("harvest.rate"))
-	setGeneric("harvest.rate", function(object, ...)
-    	standardGeneric("harvest.rate"))
-setMethod('harvest.rate', signature(object='FLaspm'),
-  function(object) {
-    return(object@catch / exp.biomass(object))})
-# }}}
+#if (!isGeneric("harvest.rate"))
+#	setGeneric("harvest.rate", function(object, ...)
+#    	standardGeneric("harvest.rate"))
+#setMethod('harvest.rate', signature(object='FLaspm'),
+#  function(object) {
+#    return(object@catch / exp.biomass(object))})
+## }}}
 
 
 # methods
-setMethod('index', signature(object='FLaspm'),
-  function(object)
-    return(object@index)
-)
+#setMethod('index', signature(object='FLaspm'),
+#  function(object)
+#    return(object@index)
+#)
 
-if (!isGeneric("plot.fit"))
-	setGeneric("plot.fit", function(object, ...)
-    	standardGeneric("plot.fit"))
-setMethod('plot.fit', signature(object='FLaspm'),
-  function(object, ...) {
-    windows(width=18)
-    par(mfrow=c(1,3))
-    plot(dimnames(object@index)$year,object@index,main='Fit to index',xlab='Year',ylab=paste('Index (',units(object@index),')',sep=''), ...)
-    lines(dimnames(object@index)$year,object@fitted,lty=2, ...)
-    plot(object@fitted,object@residuals,main='Residuals',ylab='Residuals',xlab=paste('Fitted Values (',units(object@index),')',sep=''), ...)
-    abline(h=0,lty=2)
-    qqnorm(as.vector(object@residuals),main='QQ plot of residuals', ...)
-    qqline(as.vector(object@residuals),lty=2, ...)
-  }
-)
+#if (!isGeneric("plot.fit"))
+#	setGeneric("plot.fit", function(object, ...)
+#    	standardGeneric("plot.fit"))
+#setMethod('plot.fit', signature(object='FLaspm'),
+#  function(object, ...) {
+#    windows(width=18)
+#    par(mfrow=c(1,3))
+#    plot(dimnames(object@index)$year,object@index,main='Fit to index',xlab='Year',ylab=paste('Index (',units(object@index),')',sep=''), ...)
+#    lines(dimnames(object@index)$year,object@fitted,lty=2, ...)
+#    plot(object@fitted,object@residuals,main='Residuals',ylab='Residuals',xlab=paste('Fitted Values (',units(object@index),')',sep=''), ...)
+#    abline(h=0,lty=2)
+#    qqnorm(as.vector(object@residuals),main='QQ plot of residuals', ...)
+#    qqline(as.vector(object@residuals),lty=2, ...)
+#  }
+#)
