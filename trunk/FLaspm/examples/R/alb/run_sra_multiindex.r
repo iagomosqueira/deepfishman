@@ -1,10 +1,15 @@
 # Example with multiple indices
-#setwd("c:/Projects/Deepfishman/deepfishman/FLaspm/examples/R/alb")
-setwd("~/Work/deepfishman/FLaspm/examples/R/alb")
+setwd("m:/Projects/Deepfishman/deepfishman/FLaspm/examples/R/alb")
+#setwd("~/Work/deepfishman/FLaspm/examples/R/alb")
 library(FLCore)
 load("IO_ctot.RData")
 
+# Need to source FLAccesors from FLCore to allow us to write method for fmle and predict
+# If we had a package we wouldn't need to do this
+source("m:/Sandbox/flr/pkg/FLCore/R/FLAccesors.R")
 source("../../../code/R/FLaspm_multipleindices.r")
+source("../../../code/R/FLmodel_overloads.r")
+
 
 # input required life history parameters
 
@@ -98,10 +103,31 @@ upper <- rep(1e10,2)
 alb.res <- fmle(alb,start=start, lower=lower,upper=upper)
 params(alb.res)
 
+# seems to work
 
-# make an fmle special for aspm
-# cut out the fitted <- predict bit
-# add new slot, FLQUants, fitted_indices
-# write a new predict that doesn't use @fitted, but fitted_indices
+#******************************************************************************
+#Multiple iters and indices
+iters <- 5
+hh_iters <- propagate(alb@hh,iters)
+hh_iters[] <- c(alb@hh) * rlnorm(iters,0,0.2)
 
-# problem with predict at end of fmle
+alb_iters <- FLaspm(catch=alb.catch,
+  index=alb.indices,
+  M=M,hh=hh_iters,sel=sflq, mat=mflq, wght=mw, fpm=1, amax=amax, amin=amin)
+
+model(alb_iters) <- aspm()
+
+# initial guess for B0 and sigma2
+B0 <- 120000/1e3
+sigma2 <- 0.1
+start <- list(B0 = B0, sigma2 = sigma2)
+lower <- rep(1e-9,2)
+upper <- rep(1e10,2)
+# Fit
+alb_iters <- fmle(alb_iters,start=start, lower=lower,upper=upper)
+
+params(alb_iters)
+alb_iters@fitted_index
+alb_iters@residuals_index
+
+# seems to work too.
