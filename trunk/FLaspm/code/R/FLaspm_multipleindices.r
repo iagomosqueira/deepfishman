@@ -91,6 +91,8 @@ aspm.pdyn <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
 
   # Loop through the years
 
+#browser()
+
   for(y in 2:nyr) {
 
     # recruitment
