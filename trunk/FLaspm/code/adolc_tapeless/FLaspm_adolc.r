@@ -6,11 +6,11 @@ setClass('FLaspm', representation(
   'FLModel',
   catch='FLQuant',
   index='FLQuant',
-  M='numeric',
-  hh='numeric',
-  sel='numeric',
+  M='FLQuant',
+  hh='FLQuant',
+  sel='FLQuant',
+  mat='FLQuant',
   wght='numeric',
-  mat='numeric',
   fpm='numeric',
   amax='numeric',
   amin='numeric'
@@ -50,7 +50,7 @@ pdyn <- function(B0,sigma2,catch,index,hh,M,mat,sel,wght,amin,amax) {
   ymax     <- dims(catch)$maxyear
   ymin_obj <- dims(index)$minyear
   ymax_obj <- dims(index)$maxyear
-  
+  #browser()
   B0     <- as.numeric(B0)
   sigma2 <- as.numeric(sigma2)
   catch  <- as.vector(catch)
@@ -62,7 +62,7 @@ pdyn <- function(B0,sigma2,catch,index,hh,M,mat,sel,wght,amin,amax) {
   wght   <- as.vector(wght)
   amin   <- as.numeric(amin)
   amax   <- as.numeric(amax)
-  
+  #browser()
   out <- .Call('fit',B0,sigma2,catch,index,hh,M,m,sel,wght,amin,amax,ymin,ymax,ymin_obj,ymax_obj)
 }
 
@@ -80,7 +80,7 @@ aspm <- function() {
   }
   
   # initial parameter values
-  initial <- structure(function(catch) return(100*max(catch)),lower=c(1,1e-8), upper=c(Inf, Inf))
+  initial <- structure(function(catch) return(FLPar(B0=100*max(catch), sigma2=1)),lower=c(1, 1e-8),upper=c(Inf, Inf))
 
   model <- index ~ pdyn.index(B0,sigma2,catch,index,hh,M,mat,sel,wght,amin,amax)
   
