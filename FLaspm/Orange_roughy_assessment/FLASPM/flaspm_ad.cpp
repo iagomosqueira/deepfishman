@@ -3,7 +3,6 @@ Functions to calculate likelihood, gradient of likelihood,
 SSB, Bexp (biomass available to fishing), Recruitment etc.
 
 Functions from R (.Call):
-  getLogl - returns logl and gradient of logl
 
 
 */
@@ -48,15 +47,23 @@ void project_b(adouble* bexp, adouble* b, adouble* h, adouble** n,
                 double* sel, double* wght, int amin, int amax, int nyrs);
 
 
-void index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
+void calc_index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 		adouble** index_hat, double* Catch, double** index, adouble B0,
                 double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs, int nindices);
 
 // index here has 2D, multiple indices
-void logl(adouble* logl, double* Catch, double** index, adouble B0, adouble sigma2,
+adouble get_logl(adouble* bexp, adouble* b, adouble* h, adouble** n,
+		adouble** index_hat, double* Catch, double** index, adouble B0,adouble sigma2,
                 double steepness, double M, double* mat,
-                double* sel, double* wght, int amin, int amax, int nyrs);
+                double* sel, double* wght, int amin, int amax, int nyrs, int nindices);
+
+
+//sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
+// dnorm(x,mean,sd)
+// dn = (1 / (sqrt(2*pi*sigma^2))) * (exp(-(x-mean)^2/(2*sigma^2)))
+
+adouble dnorm(double x,adouble mean,adouble sigma);
 
 //******************************************************************************
 // bexp
@@ -176,13 +183,13 @@ for (fp=0; fp<nyrs;fp++)
 }
 
 
-void index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
+void calc_index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 		adouble** index_hat, double* Catch, double** index, adouble B0,
                 double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs, int nindices)
 {
 
-    int i, j;
+    int i, j, nonnanyrs;
 //    adouble* log_ind_over_bexp = new adouble[nyrs];
 //    for (j=0;j<nyrs;j++)
 //	log_ind_over_bexp[j] = 0; // necessary?
@@ -197,46 +204,95 @@ void index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 	//ind_over_bexp[yr] = index[i][yr] / bexp[yr] for non nan years
 	// log_ind_over_bexp = log of ind_over_bexp for non nan years
 
+	    nonnanyrs = 0;
 	for (j=0;j<nyrs;j++)
 	{
 	    //log_ind_over_bexp[j] = log(index[i][j] / bexp[j]);
 	    // test for nan
-	    if (!isnan(index[i][j]) || !isnan(bexp[j].getValue()))
+	    if (!isnan(index[i][j]) & !isnan(bexp[j].getValue()))
+	    {
+		nonnanyrs++;
 		mean_log_ind_over_bexp = mean_log_ind_over_bexp + log(index[i][j] / bexp[j]);
+	    }
 
 	}
 	// mean_log_ind_over_bexp = mean(log_ind_over_bexp) for non nan years
-	mean_log_ind_over_bexp = mean_log_ind_over_bexp / nyrs;
+	mean_log_ind_over_bexp = mean_log_ind_over_bexp / nonnanyrs;
+	//Rprintf("mean_log_ind_over_bexp: %f\n", mean_log_ind_over_bexp.getValue());
 	q = exp(mean_log_ind_over_bexp);
+	//Rprintf("q: %f\n", q.getValue());
+	for (j=0;j<nyrs;j++)
+	    index_hat[i][j] = bexp[j] * q;
 	// q = exp(mean...)
+	//for (j=0;j<nyrs;j++)
+	//    Rprintf("index_hat: %f\n", index_hat[i][j].getValue()); // looks OK
+
+	//for (j=0;j<nyrs;j++)
+	//    Rprintf("bexp: %f\n", bexp[j].getValue()); // looks OK
+	//bexp looks OK,
+	//q and index_hat are different
   //q <- exp(mean(log(ind[y1:y2]/as.vector(bexp[,y1:y2])),na.rm=T))
 //  index.hat[[index.count]] <- FLQuant(q*bexp,dimnames=dm)
     }
-
-
 }
 
-//
-//aspm.index <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
-//
-//# Do index loop in this function, and return FLQuants, not in the logl function.
-// for (index.count in 1:length(index))
-// { 
-//  bexp <- aspm.pdyn(catch,index[[index.count]],B0,hh,M,mat,sel,wght,amin,amax)
-//  
-//  # nuisance q
-//  ind <- as.vector(index[[index.count]])
-//  iyr <- as.numeric(dimnames(index[[index.count]])[['year']])
-//  ys <- iyr[1]
-//  yf <- iyr[length(iyr)]
-//  y1 <- (ys-yr[1])+1
-//  y2 <- (yf-yr[1])+1
-//  q <- exp(mean(log(ind[y1:y2]/as.vector(bexp[,y1:y2])),na.rm=T))
-//  index.hat[[index.count]] <- FLQuant(q*bexp,dimnames=dm)
-//  }
-//  return(index.hat)
-//}
-//
+//sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
+// dnorm(x,mean,sd)
+// dn = (1 / (sqrt(2*pi*sigma^2))) * (exp(-(x-mean)^2/(2*sigma^2)))
+
+adouble dnorm(double x,adouble mean,adouble sigma)
+{
+     return ((1 / sqrt(2*M_PI*sigma*sigma)) * (exp(-((x-mean)*(x-mean))/(2 * sigma*sigma))));
+}
+
+adouble get_logl(adouble* bexp, adouble* b, adouble* h, adouble** n,
+		adouble** index_hat, double* Catch, double** index, adouble B0,adouble sigma2,
+                double steepness, double M, double* mat,
+                double* sel, double* wght, int amin, int amax, int nyrs, int nindices)
+{
+    int i, j, k;
+    adouble total_logl=0;
+    adouble index_logl_yr=0;
+    calc_index_hat(bexp, b, h, n, index_hat, Catch, index, B0, steepness, M, mat, sel, wght, amin, amax, nyrs, nindices);
+
+    // log the index_hat quants
+//for (i = 0; i<nindices; i++)
+ //   for(j=0; j<nyrs; j++)
+    // log_index_hat[i][j] = log(index_hat[i][j])
+// Or just log as we go along - otherwise we have to make a new var
+
+for (i = 0; i<nindices; i++)
+{
+	index_logl_yr = 0;
+    for (j=0; j<nyrs; j++)
+    {
+	// check for isnan again
+	if (!isnan(index[i][j]))
+	    index_logl_yr = index_logl_yr + log(dnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2)));
+    }
+    // index_logl = 
+	//sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
+    total_logl = total_logl + index_logl_yr;
+// dnorm(x,mean,sd)
+// dn = (1 / (sqrt(2*pi*sigma^2))) * (exp(-(x-mean)^2/(2*sigma^2)))
+//adouble dnorm(double x,adouble mean,adouble sigma)
+}
+return total_logl;
+}
+/*
+  logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+  {
+
+    # Get the FLQuants object with the estimated indices
+    indexhat.quants <- aspm.index(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+
+    log.indexhat.quants <- lapply(indexhat.quants,function(index) window(log(index),start=dims(index)$minyear,end=dims(index)$maxyear))
+    total.logl <- 0
+    for (index.count in 1:length(index))
+	total.logl <- total.logl + sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
+    return(total.logl)
+  }
+  */
 //******************************************************************************
 // Entry function
 //******************************************************************************
@@ -246,7 +302,7 @@ extern "C" SEXPDLLExport aspm(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP 
                 SEXP wghtSEXP, SEXP aminSEXP, SEXP amaxSEXP, SEXP nyrsSEXP)
 {
   // loop and other junk vars
-  int i, j;
+  int i, j, k;
 
   // turn all the SEXP into something more useful
   // Do the ints
@@ -313,6 +369,14 @@ extern "C" SEXPDLLExport aspm(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP 
   for (i=0; i<nages; i++)
     n[i] = new adouble[nyrs];
 
+  adouble** index_hat = new adouble*[nindices];
+  for (i=0;i<nindices;i++)
+    index_hat[i] = new adouble[nyrs];
+
+  //for (i=0; i<nindices; i++)
+  //  for (j=0; j<nyrs; j++)
+  //    index_hat[i][j] = 0;
+  
   // return logl and gradient of log
   // and a bunch of other stuff
 
@@ -322,12 +386,37 @@ extern "C" SEXPDLLExport aspm(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP 
 // test with first index
     project_b(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
 
+calc_index_hat(bexp, b, h, n,
+		index_hat, Catch, index, B0,
+                steepness, M, mat,
+                sel, wght, amin, amax, nyrs, nindices);
+adouble total_logl = 0;
+
+total_logl = get_logl(bexp, b, h, n,
+		index_hat, Catch, index, B0, sigma2,
+                steepness, M, mat,
+                sel, wght, amin, amax, nyrs, nindices);
+
+Rprintf("total_logl: %f\n", total_logl.getValue());
+
 // Getting bexp back
 SEXP bexpSEXP, bSEXP, hSEXP;
 PROTECT(bexpSEXP = allocVector(REALSXP,nyrs));
 for (i=0; i<nyrs; i++)
     REAL(bexpSEXP)[i] = bexp[i].getValue();
 
+SEXP index_hatSEXP;
+SEXP index_dim;
+PROTECT(index_dim     = allocVector(INTSXP, 2));       
+INTEGER(index_dim)[0] = nindices;
+INTEGER(index_dim)[1] = nyrs;
+
+
+PROTECT(index_hatSEXP = Rf_allocArray(REALSXP, index_dim)); 
+i = 0;
+for (j = 0; j<nyrs; j++)
+    for (k = 0; k <nindices; k++)
+	REAL(index_hatSEXP)[i++] = index_hat[k][j].getValue();
 // gradient bits
 
 // do some deleting and tidying up of arrays
@@ -335,8 +424,9 @@ for (i=0; i<nyrs; i++)
 // To get the gradient of a variable use getADValue(), e.g.
 // logl.getADValue()
 
-UNPROTECT(1);
- return bexpSEXP; 
+UNPROTECT(3);
+return index_hatSEXP;
+ //return bexpSEXP; 
   //return CatchSEXP;
 
 }
