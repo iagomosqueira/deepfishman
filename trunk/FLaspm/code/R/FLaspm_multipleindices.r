@@ -152,7 +152,10 @@ aspm.index <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
   y1 <- (ys-yr[1])+1
   y2 <- (yf-yr[1])+1
   q <- exp(mean(log(ind[y1:y2]/as.vector(bexp[,y1:y2])),na.rm=T))
+  cat("q: ", q, "\n")
   index.hat[[index.count]] <- FLQuant(q*bexp,dimnames=dm)
+  cat("index hat: ", c(index.hat[[index.count]]), "\n")
+  cat("bexp: ", c(bexp), "\n")
   # return predicted index
   }
   #return(FLQuant(q*bexp,dimnames=dm))
