@@ -84,6 +84,13 @@ aspm.pdyn <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
   h[1] <- max(h[1],0)
   h[1] <- min(h[1],0.999)
 
+  #cat("rho: ", rho, "\n")
+  #cat("R0: ", R0, "\n")
+  #cat("n[,1]", n[1:10,1], "\n")
+  #cat("p[]", p[1:10], "\n")
+  #cat("bexp pre year loop: ", bexp, "\n")
+  #cat("h :", h, "\n")
+
   # set up S-R parameters
 
   alp <- (4*hh*R0)/(5*hh-1)
@@ -111,6 +118,7 @@ aspm.pdyn <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
     bexp[y] <- C[y] / h[y]
     b[y] <- sum(n[,y] * mat * wght)
   }
+  #cat("n rec ", n[1,], "\n")
   # return predicted index
   return(FLQuant(bexp,dimnames=dm))
 }
@@ -152,10 +160,10 @@ aspm.index <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
   y1 <- (ys-yr[1])+1
   y2 <- (yf-yr[1])+1
   q <- exp(mean(log(ind[y1:y2]/as.vector(bexp[,y1:y2])),na.rm=T))
-  cat("q: ", q, "\n")
+  #cat("q: ", q, "\n")
   index.hat[[index.count]] <- FLQuant(q*bexp,dimnames=dm)
-  cat("index hat: ", c(index.hat[[index.count]]), "\n")
-  cat("bexp: ", c(bexp), "\n")
+  #cat("index hat: ", c(index.hat[[index.count]]), "\n")
+  #cat("bexp: ", c(bexp), "\n")
   # return predicted index
   }
   #return(FLQuant(q*bexp,dimnames=dm))
