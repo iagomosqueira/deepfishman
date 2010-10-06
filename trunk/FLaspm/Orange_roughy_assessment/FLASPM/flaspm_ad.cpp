@@ -4,7 +4,6 @@ SSB, Bexp (biomass available to fishing), Recruitment etc.
 
 Functions from R (.Call):
 
-
 */
 
 // Includes
@@ -22,7 +21,8 @@ using namespace std;
 // tapeless - means first derivative only - not a problem here
 //#include "adolc.h"
 #define ADOLC_TAPELESS // Going to use the tapeless method
-#include "adouble.h" // only this is neede for tapeless
+//#define NUMBER_DIRECTIONS 2 // B0 and sigma2
+#include "adouble.h" // only this is needed for tapeless
 typedef adtl::adouble adouble; // necessary for tapeless - see manual
 
 // junk?
@@ -49,19 +49,14 @@ void project_b(adouble* bexp, adouble* b, adouble* h, adouble** n,
 
 void calc_index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 		adouble** index_hat, double* Catch, double** index, adouble B0,
-                double steepness, double M, double* mat,
+                adouble* q,double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs, int nindices);
 
 // index here has 2D, multiple indices
 adouble get_logl(adouble* bexp, adouble* b, adouble* h, adouble** n,
 		adouble** index_hat, double* Catch, double** index, adouble B0,adouble sigma2,
-                double steepness, double M, double* mat,
+                adouble* q, double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs, int nindices);
-
-
-//sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
-// dnorm(x,mean,sd)
-// dn = (1 / (sqrt(2*pi*sigma^2))) * (exp(-(x-mean)^2/(2*sigma^2)))
 
 adouble dnorm(double x,adouble mean,adouble sigma);
 
@@ -81,69 +76,38 @@ void project_b(adouble* bexp, adouble* b, adouble* h, adouble** n,
   double* p = new double[nages];
   double rho = 0;
   // As R0 is calced using B0, it also has to be adouble
-  // right?
   adouble R0 = 0;
   adouble alpha, beta;
-
 
   // Set up equib pop
   p[0] = 1;
   for (i=1; i<nages; i++)
-  {
     p[i] = p[i-1]*exp(-M);
-//    Rprintf("p -1: %f\n", p[i-1]);
-//    Rprintf("M -1: %f\n", M);
-  }
 
   p[nages-1] = p[nages-1] / (1-exp(-M));
   
   for (i=0; i<nages; i++)
-  {
     rho = rho + (p[i] * mat[i] * wght[i]);
-//    Rprintf("p: %f\n", p[i]);
-//    Rprintf("mat: %f\n", mat[i]);
-//    Rprintf("wght: %f\n", wght[i]);
-  }
-
-//    Rprintf("rho: %f\n", rho);
 
   R0 = B0 / rho;
 
+    // Initial population vector in year 0
   for (i = 0; i<nages; i++)
-  {
     n[i][0] = R0 * p[i];
 
-  //  Rprintf("R0: %f\n", R0.getValue());
-  //  Rprintf("p: %f\n", p[i]);
-  //  Rprintf("n: %f\n\n", n[i][0].getValue());
-  }
-
-  // initialise
+    // initialise bexp and b
   for (i=0;i<nyrs;i++)
   {
     b[i] = 0;
     bexp[i] = 0;
-//  Rprintf("bexp: %f\n", bexp[i].getValue());
-//  Rprintf("bexp AD: %f\n", bexp[i].getADValue());
   }
-
-// bexp seems OK here above
 
   for (i=0; i<nages; i++)
   {
     b[0] = b[0] + (n[i][0] * mat[i] * wght[i]);
     bexp[0] = bexp[0] + (n[i][0] * sel[i] * wght[i]);
-//    Rprintf("sel: %f\n", sel[i]);
-//    Rprintf("wght: %f\n", wght[i]);
-//    Rprintf("n: %f\n\n", n[i][0].getValue());
   }
-  
-for (fp=0; fp<nyrs;fp++)
-{
-//  Rprintf("bexp: %f\n", bexp[fp].getValue());
-//  Rprintf("bexp AD: %f\n", bexp[fp].getADValue());
-}
-
+ 
   h[0] = Catch[0] / bexp[0];
   if (h[0] < 0)
     h[0] = 0;
@@ -161,23 +125,21 @@ for (fp=0; fp<nyrs;fp++)
     n[0][yrcount] = alpha * b[yrcount-1] / (beta + b[yrcount-1]);
     // adult dynamics
     for (i=1; i<nages; i++)
-      n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1]) * h[yrcount-1];
-    n[nages-1][yrcount] = n[nages-1][yrcount] + n[nages-1][yrcount-1] * exp(-M) * (1-sel[nages-1]) * h[yrcount-1];
+      n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1] * h[yrcount-1]);
+    n[nages-1][yrcount] = n[nages-1][yrcount] + n[nages-1][yrcount-1] * exp(-M) * (1-sel[nages-1] * h[yrcount-1]);
     for (i=0; i<nages; i++)
       bexp[yrcount] = bexp[yrcount] + (n[i][yrcount] * sel[i] * wght[i]);
     h[yrcount] = Catch[yrcount] / bexp[yrcount];
-  if (h[yrcount] < 0)
+    if (h[yrcount] < 0)
     h[yrcount] = 0;
-  if (h[yrcount] > 0.999)
+    if (h[yrcount] > 0.999)
     h[yrcount] = 0.999;
-  bexp[yrcount] = Catch[yrcount] / h[yrcount];
-
-  //Rprintf("bexp: %f\n", bexp[yrcount].getValue());
+    bexp[yrcount] = Catch[yrcount] / h[yrcount];
 
   for (i=0;i<nages;i++)
     b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
   }
-  
+
   //double* p = new double[nages];
   delete [] p;
 }
@@ -185,7 +147,7 @@ for (fp=0; fp<nyrs;fp++)
 
 void calc_index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 		adouble** index_hat, double* Catch, double** index, adouble B0,
-                double steepness, double M, double* mat,
+                adouble* q, double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs, int nindices)
 {
 
@@ -194,7 +156,8 @@ void calc_index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 //    for (j=0;j<nyrs;j++)
 //	log_ind_over_bexp[j] = 0; // necessary?
     adouble mean_log_ind_over_bexp;
-    adouble q = 0;
+    //adouble q = 0;
+    q[0] = 0;
 
     // loop over each index
     for (i=0;i<nindices;i++)
@@ -219,10 +182,10 @@ void calc_index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 	// mean_log_ind_over_bexp = mean(log_ind_over_bexp) for non nan years
 	mean_log_ind_over_bexp = mean_log_ind_over_bexp / nonnanyrs;
 	//Rprintf("mean_log_ind_over_bexp: %f\n", mean_log_ind_over_bexp.getValue());
-	q = exp(mean_log_ind_over_bexp);
+	q[0] = exp(mean_log_ind_over_bexp);
 	//Rprintf("q: %f\n", q.getValue());
 	for (j=0;j<nyrs;j++)
-	    index_hat[i][j] = bexp[j] * q;
+	    index_hat[i][j] = bexp[j] * q[0];
 	// q = exp(mean...)
 	//for (j=0;j<nyrs;j++)
 	//    Rprintf("index_hat: %f\n", index_hat[i][j].getValue()); // looks OK
@@ -247,13 +210,15 @@ adouble dnorm(double x,adouble mean,adouble sigma)
 
 adouble get_logl(adouble* bexp, adouble* b, adouble* h, adouble** n,
 		adouble** index_hat, double* Catch, double** index, adouble B0,adouble sigma2,
-                double steepness, double M, double* mat,
+                adouble* q, double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs, int nindices)
 {
     int i, j, k;
+//  Rprintf("In get_logl B0: %f\n", B0.getValue());
+//  Rprintf("In get_logl B0 AD: %f\n", B0.getADValue());
     adouble total_logl=0;
     adouble index_logl_yr=0;
-    calc_index_hat(bexp, b, h, n, index_hat, Catch, index, B0, steepness, M, mat, sel, wght, amin, amax, nyrs, nindices);
+    calc_index_hat(bexp, b, h, n, index_hat, Catch, index, B0, q, steepness, M, mat, sel, wght, amin, amax, nyrs, nindices);
 
     // log the index_hat quants
 //for (i = 0; i<nindices; i++)
@@ -355,6 +320,8 @@ extern "C" SEXPDLLExport aspm(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP 
   // Or can use x.setADValue(1) to set AD value
   adouble B0 = asReal(B0SEXP);
   adouble sigma2 = asReal(sigma2SEXP);
+
+  adouble* q = new adouble[1];
   adouble* bexp = new adouble[nyrs];
   adouble* b = new adouble[nyrs];
   adouble* h = new adouble[nyrs];
@@ -384,39 +351,117 @@ extern "C" SEXPDLLExport aspm(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP 
 
 // Call the functions
 // test with first index
-    project_b(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
-
-calc_index_hat(bexp, b, h, n,
-		index_hat, Catch, index, B0,
-                steepness, M, mat,
-                sel, wght, amin, amax, nyrs, nindices);
+//project_b(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
+//
+//calc_index_hat(bexp, b, h, n,
+//		index_hat, Catch, index, B0,
+//                q, steepness, M, mat,
+//                sel, wght, amin, amax, nyrs, nindices);
 adouble total_logl = 0;
 
+// Deactivate all
+  B0.setADValue(0);
+  sigma2.setADValue(0);
+// Activate B0
+// what is value of B0
+  B0.setADValue(1);
+//  Rprintf("B0: %f\n", B0.getValue());
+//  Rprintf("B0 AD: %f\n", B0.getADValue());
+
+
+total_logl = 0;
 total_logl = get_logl(bexp, b, h, n,
 		index_hat, Catch, index, B0, sigma2,
-                steepness, M, mat,
+                q, steepness, M, mat,
                 sel, wght, amin, amax, nyrs, nindices);
 
-Rprintf("total_logl: %f\n", total_logl.getValue());
+double B0_grad = total_logl.getADValue();
+//Rprintf("total_logl: %f\n", total_logl.getValue());
+//Rprintf("total_logl AD: %f\n", total_logl.getADValue());
 
-// Getting bexp back
-SEXP bexpSEXP, bSEXP, hSEXP;
+// Deactivate all
+  B0.setADValue(0);
+  sigma2.setADValue(0);
+// Activate sigma2
+  sigma2.setADValue(1);
+
+total_logl = 0;
+total_logl = get_logl(bexp, b, h, n,
+		index_hat, Catch, index, B0, sigma2,
+                q, steepness, M, mat,
+                sel, wght, amin, amax, nyrs, nindices);
+
+double sigma2_grad = total_logl.getADValue();
+//Rprintf("total_logl: %f\n", total_logl.getValue());
+//Rprintf("total_logl AD: %f\n", total_logl.getADValue());
+
+// OUPUTS
+// Need to return:
+// bexp
+// b
+// h
+// q
+// logl
+// logl grad
+//
+// Make a list
+
+SEXP bexpSEXP, bSEXP, hSEXP, qSEXP, loglSEXP, out, outnames, loglnames;
+// bexp b
 PROTECT(bexpSEXP = allocVector(REALSXP,nyrs));
+PROTECT(bSEXP = allocVector(REALSXP,nyrs));
+PROTECT(hSEXP = allocVector(REALSXP,nyrs));
 for (i=0; i<nyrs; i++)
+{
     REAL(bexpSEXP)[i] = bexp[i].getValue();
+    REAL(bSEXP)[i] = b[i].getValue();
+    REAL(hSEXP)[i] = h[i].getValue();
 
-SEXP index_hatSEXP;
-SEXP index_dim;
-PROTECT(index_dim     = allocVector(INTSXP, 2));       
-INTEGER(index_dim)[0] = nindices;
-INTEGER(index_dim)[1] = nyrs;
+}
 
+PROTECT(qSEXP = allocVector(REALSXP,1));
+REAL(qSEXP)[0] = q[0].getValue();
+PROTECT(loglSEXP = allocVector(REALSXP,3));
+REAL(loglSEXP)[0] = total_logl.getValue();
+//REAL(loglSEXP)[1] = total_logl.getADValue(0);
+//REAL(loglSEXP)[2] = total_logl.getADValue(1); // the other grad
+REAL(loglSEXP)[1] = B0_grad;
+REAL(loglSEXP)[2] = sigma2_grad;
 
-PROTECT(index_hatSEXP = Rf_allocArray(REALSXP, index_dim)); 
-i = 0;
-for (j = 0; j<nyrs; j++)
-    for (k = 0; k <nindices; k++)
-	REAL(index_hatSEXP)[i++] = index_hat[k][j].getValue();
+PROTECT(loglnames = NEW_CHARACTER(3));
+SET_STRING_ELT(loglnames,0,mkChar("logl"));
+SET_STRING_ELT(loglnames,1,mkChar("logl_grad_B0"));
+SET_STRING_ELT(loglnames,2,mkChar("logl_grad_sigma2"));
+SET_NAMES(loglSEXP,loglnames);
+
+// Set up the actual list to be outputted
+PROTECT(out = NEW_LIST(5));
+SET_ELEMENT(out,0,bexpSEXP);
+SET_ELEMENT(out,1,bSEXP);
+SET_ELEMENT(out,2,hSEXP);
+SET_ELEMENT(out,3,qSEXP);
+SET_ELEMENT(out,4,loglSEXP);
+
+// And give it some dimnames
+PROTECT(outnames = NEW_CHARACTER(5));
+SET_STRING_ELT(outnames,0,mkChar("Bexp"));
+SET_STRING_ELT(outnames,1,mkChar("B"));
+SET_STRING_ELT(outnames,2,mkChar("h"));
+SET_STRING_ELT(outnames,3,mkChar("q"));
+SET_STRING_ELT(outnames,4,mkChar("logl"));
+SET_NAMES(out,outnames);
+
+//SEXP index_hatSEXP;
+//SEXP index_dim;
+//PROTECT(index_dim     = allocVector(INTSXP, 2));       
+//INTEGER(index_dim)[0] = nindices;
+//INTEGER(index_dim)[1] = nyrs;
+//
+//PROTECT(index_hatSEXP = Rf_allocArray(REALSXP, index_dim)); 
+//i = 0;
+//for (j = 0; j<nyrs; j++)
+//    for (k = 0; k <nindices; k++)
+//	REAL(index_hatSEXP)[i++] = index_hat[k][j].getValue();
 // gradient bits
 
 // do some deleting and tidying up of arrays
@@ -424,9 +469,10 @@ for (j = 0; j<nyrs; j++)
 // To get the gradient of a variable use getADValue(), e.g.
 // logl.getADValue()
 
-UNPROTECT(3);
-return index_hatSEXP;
- //return bexpSEXP; 
+UNPROTECT(8);
+return(out);
+//return index_hatSEXP;
+// return bexpSEXP; 
   //return CatchSEXP;
 
 }
@@ -435,27 +481,3 @@ return index_hatSEXP;
 
 
 
-/*
-extern "C" SEXPDLLExport testindex(SEXP indexSEXP)
-{
-
-int i, j;
-int nyrs = 11;
-
-  int nindices = length(indexSEXP);
-  Rprintf("nindices: %i\n\n", nindices);
-  double** index = new double*[nindices];
-  for (i=0;i<nindices;i++)
-    index[i] = new double[nyrs];
-
-  for (i=0; i<nindices; i++)
-    for (j=0; j<nyrs; j++)
-    {
-      index[i][j] = REAL(VECTOR_ELT(indexSEXP,i))[j]; // Not sure about this one...
-      Rprintf("index[i][j]: %f\n", index[i][j]);
-    }
-
-return indexSEXP;
-
-}
-*/
