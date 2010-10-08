@@ -59,6 +59,7 @@ adouble get_logl(adouble* bexp, adouble* b, adouble* h, adouble** n,
                 double* sel, double* wght, int amin, int amax, int nyrs, int nindices);
 
 adouble dnorm(double x,adouble mean,adouble sigma);
+adouble logdnorm(double x,adouble mean,adouble sigma);
 
 //******************************************************************************
 // bexp
@@ -205,7 +206,18 @@ void calc_index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 
 adouble dnorm(double x,adouble mean,adouble sigma)
 {
+    //Rprintf("1/sqrt() %f\n", (1 / sqrt(2*M_PI*sigma*sigma)).getValue());
+    //Rprintf("(x-mean)^2/2sig^2 %f\n",(-((x-mean)*(x-mean))/(2 * sigma*sigma)).getValue() );
+    //Rprintf("out: %f\n\n",((1 / sqrt(2*M_PI*sigma*sigma)) * (exp(-((x-mean)*(x-mean))/(2 * sigma*sigma)))).getValue() );
      return ((1 / sqrt(2*M_PI*sigma*sigma)) * (exp(-((x-mean)*(x-mean))/(2 * sigma*sigma))));
+}
+
+adouble logdnorm(double x,adouble mean,adouble sigma)
+{
+    //Rprintf("1/sqrt() %f\n", (1 / sqrt(2*M_PI*sigma*sigma)).getValue());
+    //Rprintf("(x-mean)^2/2sig^2 %f\n",(-((x-mean)*(x-mean))/(2 * sigma*sigma)).getValue() );
+    //Rprintf("out: %f\n\n",((1 / sqrt(2*M_PI*sigma*sigma)) * (exp(-((x-mean)*(x-mean))/(2 * sigma*sigma)))).getValue() );
+     return(log(1 / sqrt(2*M_PI*sigma*sigma)) - (((x-mean)*(x-mean))/(2 * sigma*sigma)));
 }
 
 adouble get_logl(adouble* bexp, adouble* b, adouble* h, adouble** n,
@@ -231,9 +243,17 @@ for (i = 0; i<nindices; i++)
 	index_logl_yr = 0;
     for (j=0; j<nyrs; j++)
     {
+//	Rprintf("sigma2: %f\n", sigma2.getValue());
+//	Rprintf("index: %f\n", index[i][j]);
+//	Rprintf("index_hat: %f\n", index_hat[i][j].getValue());
+	//Rprintf("dnorm bit: %f\n\n",log(dnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2))).getValue() );
+	//Rprintf("dnorm bit: %f\n\n",(logdnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2))).getValue() );
+
+
 	// check for isnan again
 	if (!isnan(index[i][j]))
-	    index_logl_yr = index_logl_yr + log(dnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2)));
+	    //index_logl_yr = index_logl_yr + log(dnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2)));
+	    index_logl_yr = index_logl_yr + (logdnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2)));
     }
     // index_logl = 
 	//sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
@@ -242,6 +262,7 @@ for (i = 0; i<nindices; i++)
 // dn = (1 / (sqrt(2*pi*sigma^2))) * (exp(-(x-mean)^2/(2*sigma^2)))
 //adouble dnorm(double x,adouble mean,adouble sigma)
 }
+//Rprintf("total_logl: %f\n", total_logl.getValue());
 return total_logl;
 }
 /*
@@ -434,34 +455,38 @@ SET_STRING_ELT(loglnames,1,mkChar("logl_grad_B0"));
 SET_STRING_ELT(loglnames,2,mkChar("logl_grad_sigma2"));
 SET_NAMES(loglSEXP,loglnames);
 
+SEXP index_hatSEXP;
+SEXP index_dim;
+PROTECT(index_dim     = allocVector(INTSXP, 2));       
+INTEGER(index_dim)[0] = nindices;
+INTEGER(index_dim)[1] = nyrs;
+
+PROTECT(index_hatSEXP = Rf_allocArray(REALSXP, index_dim)); 
+i = 0;
+for (j = 0; j<nyrs; j++)
+    for (k = 0; k <nindices; k++)
+	REAL(index_hatSEXP)[i++] = index_hat[k][j].getValue();
+
+
 // Set up the actual list to be outputted
-PROTECT(out = NEW_LIST(5));
+PROTECT(out = NEW_LIST(6));
 SET_ELEMENT(out,0,bexpSEXP);
 SET_ELEMENT(out,1,bSEXP);
 SET_ELEMENT(out,2,hSEXP);
 SET_ELEMENT(out,3,qSEXP);
 SET_ELEMENT(out,4,loglSEXP);
+SET_ELEMENT(out,5,index_hatSEXP);
 
 // And give it some dimnames
-PROTECT(outnames = NEW_CHARACTER(5));
+PROTECT(outnames = NEW_CHARACTER(6));
 SET_STRING_ELT(outnames,0,mkChar("Bexp"));
 SET_STRING_ELT(outnames,1,mkChar("B"));
 SET_STRING_ELT(outnames,2,mkChar("h"));
 SET_STRING_ELT(outnames,3,mkChar("q"));
 SET_STRING_ELT(outnames,4,mkChar("logl"));
+SET_STRING_ELT(outnames,5,mkChar("indexhat"));
 SET_NAMES(out,outnames);
 
-//SEXP index_hatSEXP;
-//SEXP index_dim;
-//PROTECT(index_dim     = allocVector(INTSXP, 2));       
-//INTEGER(index_dim)[0] = nindices;
-//INTEGER(index_dim)[1] = nyrs;
-//
-//PROTECT(index_hatSEXP = Rf_allocArray(REALSXP, index_dim)); 
-//i = 0;
-//for (j = 0; j<nyrs; j++)
-//    for (k = 0; k <nindices; k++)
-//	REAL(index_hatSEXP)[i++] = index_hat[k][j].getValue();
 // gradient bits
 
 // do some deleting and tidying up of arrays
@@ -469,7 +494,7 @@ SET_NAMES(out,outnames);
 // To get the gradient of a variable use getADValue(), e.g.
 // logl.getADValue()
 
-UNPROTECT(8);
+UNPROTECT(10);
 return(out);
 //return index_hatSEXP;
 // return bexpSEXP; 

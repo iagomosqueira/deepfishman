@@ -84,6 +84,17 @@ setMethod('fmle',
       return(-1*(do.call(logl, args=c(pars, data))))
     }
 
+    # Hack that gradient function!
+    if(is.null(gr))
+	grfoo <- NULL
+    else
+	grfoo <- function(par) {
+	  pars <- as.list(par)
+	  names(pars) <- names(start)
+	  pars[fixnm] <- lapply(fixed, iter, it)
+	  return((do.call(gr, args=c(pars, data))))
+	}
+
     # input data
     alldata <- list()
     for (i in datanm)
@@ -235,7 +246,8 @@ for (index.count in 1:length(object@index))
 
       # TODO protect environment
       out <- do.call('optim', c(list(par=unlist(start), fn=loglfoo, method=method,
-        hessian=TRUE, control=control, lower=lower, upper=upper, gr=gr)))
+			      #hessian=TRUE, control=control, lower=lower, upper=upper, gr=gr)))
+        hessian=TRUE, control=control, lower=lower, upper=upper, gr=grfoo)))
 
 #browser()
 
