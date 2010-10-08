@@ -56,7 +56,6 @@ m[(am - amin + 2):nag] <- 1
 # make into FLQuant
 mflq <- FLQuant(m,dimnames=list(age=amin:amax))
 
-
 # input data
 # catch
 C <- subset(io_catch,Species=='ALB')[['Catch']]/1000
@@ -76,19 +75,29 @@ alb.index2 <- window(alb.index,start = 1995, end = 2007)
 alb.indices <- mcf(FLQuants(index1 = alb.index1,index2 = alb.index2))
 #alb.indices <- FLQuants(alb.index1,alb.index2)
 
+#*******************************************************************************
+# Pure R version
+# Single index
 
+alb <- FLaspm(catch=alb.catch,
+  index=FLQuants(alb.indices[[1]]),
+  M=M,hh=hh,sel=sflq, mat=mflq, wght=wght, fpm=1, amax=amax, amin=amin)
 
-# fmle needs to include a line similar to
-#    datanm <- c(datanm, getSlotNamesClass(object, 'numeric'))
-# to include FLQuants objects
-#getSlotNamesClass(alb, 'FLQuants')
-# next problem is pulling out iters of a list
-# e.g. data <- lapply(alldata, iter, it) if element all of alldata is itself a list
-# might have to overload fmle for aspm
-#dummy <- list(alb.indices)
-# data <- lapply(dummy, iter, 1) # seems to work though...
+model(alb) <- aspm()
+
+# initial guess for B0 and sigma2
+B0 <- 120000/1e3
+sigma2 <- 0.1
+start <- list(B0 = B0, sigma2 = sigma2)
+lower <- rep(1e-9,2)
+upper <- rep(1e10,2)
+# Fit
+alb.res <- fmle(alb,start=start, lower=lower,upper=upper)
+params(alb.res)
 
 #*******************************************************************************
+# Pure R version
+# Multiple indices
 
 alb <- FLaspm(catch=alb.catch,
   index=alb.indices,
@@ -106,9 +115,8 @@ upper <- rep(1e10,2)
 alb.res <- fmle(alb,start=start, lower=lower,upper=upper)
 params(alb.res)
 
-# seems to work
-
 #******************************************************************************
+# Pure R version
 #Multiple iters and indices
 iters <- 5
 hh_iters <- propagate(alb@hh,iters)
@@ -136,7 +144,85 @@ alb_iters@residuals_index
 # seems to work too.
 
 #*******************************************************************************
-# Using AD
+# Using C code, no gradient
+# single iter
+alb_ad <- FLaspm(catch=alb.catch,
+    index=alb.indices,
+    M=M,hh=hh,sel=sflq, mat=mflq, wght=wght, fpm=1, amax=amax, amin=amin)
+
+model(alb_ad) <- aspm_ad()
+# initial guess for B0 and sigma2
+B0 <- 120000/1e3
+sigma2 <- 0.1
+start <- list(B0 = B0, sigma2 = sigma2)
+lower <- rep(1e-9,2)
+upper <- rep(1e10,2)
+
+# Fit - need to load so
+so_dir <- "~/Work/deepfishman/FLaspm/Orange_roughy_assessment/FLASPM"
+dyn.load(paste(so_dir,"flaspm_ad.so",sep="/"))
+alb_ad_res <- fmle(alb_ad,start=start, lower=lower,upper=upper)
+dyn.unload(paste(so_dir,"flaspm_ad.so",sep="/"))
+alb_ad_res@params
+
+
+#**************************************************************************
+# Using AD to supply gradient
+# single iter
+alb_ad <- FLaspm(catch=alb.catch,
+    index=alb.indices,
+    M=M,hh=hh,sel=sflq, mat=mflq, wght=wght, fpm=1, amax=amax, amin=amin)
+
+model(alb_ad) <- aspm_ad()
+alb_ad@gr <- get_gradient
+
+# initial guess for B0 and sigma2
+B0 <- 120000/1e3
+sigma2 <- 0.1
+start <- list(B0 = B0, sigma2 = sigma2)
+lower <- rep(1e-9,2)
+upper <- rep(1e10,2)
+
+# Fit - need to load so
+so_dir <- "~/Work/deepfishman/FLaspm/Orange_roughy_assessment/FLASPM"
+dyn.load(paste(so_dir,"flaspm_ad.so",sep="/"))
+alb_ad_res <- fmle(alb_ad,start=start, lower=lower,upper=upper)
+dyn.unload(paste(so_dir,"flaspm_ad.so",sep="/"))
+alb_ad_res@params
+
+
+#**************************************************************************
+# Using AD to supply gradient
+# multiple iters on steepness
+iters <- 5
+hh_iters <- propagate(hh,iters)
+hh_iters[] <- c(hh) * rlnorm(iters,0,0.2)
+
+alb_ad <- FLaspm(catch=alb.catch,
+    index=alb.indices,
+    M=M,hh=hh_iters,sel=sflq, mat=mflq, wght=wght, fpm=1, amax=amax, amin=amin)
+
+model(alb_ad) <- aspm_ad()
+alb_ad@gr <- get_gradient
+
+# initial guess for B0 and sigma2
+B0 <- 120000/1e3
+sigma2 <- 0.1
+start <- list(B0 = B0, sigma2 = sigma2)
+lower <- rep(1e-9,2)
+upper <- rep(1e10,2)
+
+# Fit - need to load so
+so_dir <- "~/Work/deepfishman/FLaspm/Orange_roughy_assessment/FLASPM"
+dyn.load(paste(so_dir,"flaspm_ad.so",sep="/"))
+alb_ad_res <- fmle(alb_ad,start=start, lower=lower,upper=upper)
+dyn.unload(paste(so_dir,"flaspm_ad.so",sep="/"))
+alb_ad_res@params
+alb_ad_res@hessian
+
+
+#**************************************************************************
+# Ignore below here
 
 
 aspm_ad <- function() {

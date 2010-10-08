@@ -211,6 +211,59 @@ aspm <- function() {
   return(list(logl=logl,model=model,initial=initial))
 } # }}}
 
+#***************************************************************************************
+# Functions for using the AD version
+#***************************************************************************************
+aspm_ad <- function() {
+    # logl
+    logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+    {
+	nyrs <- length(c(catch))
+	out <- .Call("aspm",(c(catch)),index,B0,sigma2,(c(hh)),(c(M)),(c(mat)),(c(sel)),(c(wght)),amin,amax,nyrs)
+	total.logl <- out[["logl"]][["logl"]]
+	return(total.logl)
+    }
+  
+    # initial parameter values
+    initial <- structure(
+	function(catch) {
+	return(FLPar(B0=100*max(catch), sigma2=1))
+	},
+	# lower and upper limits for optim()
+	lower=c(1, 1e-8),
+	upper=c(Inf, Inf)
+    )
+
+    # The model function returns index_hat
+    model <- index ~ get_indexhat(catch,index,B0,sigma2,hh,M,mat,sel,wght,amin,amax)
+
+    return(list(logl=logl,model=model,initial=initial))
+} # }}}
+
+get_indexhat <- function(catch,index,B0,sigma2,hh,M,mat,sel,wght,amin,amax)
+{
+    #browser()
+    out <-  .Call("aspm",(c(catch)),index,B0,sigma2,(c(hh)),(c(M)),(c(mat)),(c(sel)),(c(wght)),amin,amax,length(c(catch)))[["indexhat"]]
+    indexhat <- FLQuants()
+    dnms <- dimnames(index[[1]])
+    for (i in 1:length(index))
+	indexhat[[i]] <- FLQuant(out[i,],dimnames=dnms)
+    return(indexhat)
+}
+
+# Must have same args as logl
+#logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+get_gradient <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+{
+    out <-  .Call("aspm",(c(catch)),index,B0,sigma2,(c(hh)),(c(M)),(c(mat)),(c(sel)),(c(wght)),amin,amax,length(c(catch)))[["logl"]]
+    # Return * -1 because 
+    return(-1*c(out[["logl_grad_B0"]],out[["logl_grad_sigma2"]]))
+}
+
+
+
+#***************************************************************************************
+
 # post-fitting accessors for biomass etc.
 
 # exploitable biomass {{{

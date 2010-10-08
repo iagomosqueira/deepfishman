@@ -25,13 +25,6 @@ using namespace std;
 #include "adouble.h" // only this is needed for tapeless
 typedef adtl::adouble adouble; // necessary for tapeless - see manual
 
-// junk?
-//#include <iostream>
-//#include <fstream>
-//#include <R.h>
-
-using namespace std;
-
 // Preliminaries
 #ifdef WIN32
    #define SEXPDLLExport __declspec(dllexport) SEXP __cdecl
@@ -58,13 +51,14 @@ adouble get_logl(adouble* bexp, adouble* b, adouble* h, adouble** n,
                 adouble* q, double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs, int nindices);
 
-adouble dnorm(double x,adouble mean,adouble sigma);
 adouble logdnorm(double x,adouble mean,adouble sigma);
+
+// Not actually used
+adouble dnorm(double x,adouble mean,adouble sigma);
 
 //******************************************************************************
 // bexp
 //******************************************************************************
-
 void project_b(adouble* bexp, adouble* b, adouble* h, adouble** n,
                 double* Catch, adouble B0,
                 double steepness, double M, double* mat,
@@ -132,374 +126,284 @@ void project_b(adouble* bexp, adouble* b, adouble* h, adouble** n,
       bexp[yrcount] = bexp[yrcount] + (n[i][yrcount] * sel[i] * wght[i]);
     h[yrcount] = Catch[yrcount] / bexp[yrcount];
     if (h[yrcount] < 0)
-    h[yrcount] = 0;
+	h[yrcount] = 0;
     if (h[yrcount] > 0.999)
-    h[yrcount] = 0.999;
+	h[yrcount] = 0.999;
     bexp[yrcount] = Catch[yrcount] / h[yrcount];
 
   for (i=0;i<nages;i++)
     b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
   }
 
-  //double* p = new double[nages];
   delete [] p;
 }
 
 
+//******************************************************************************
+// Function to calculate the index hat
+//******************************************************************************
 void calc_index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 		adouble** index_hat, double* Catch, double** index, adouble B0,
                 adouble* q, double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs, int nindices)
 {
-
     int i, j, nonnanyrs;
-//    adouble* log_ind_over_bexp = new adouble[nyrs];
-//    for (j=0;j<nyrs;j++)
-//	log_ind_over_bexp[j] = 0; // necessary?
     adouble mean_log_ind_over_bexp;
-    //adouble q = 0;
     q[0] = 0;
 
     // loop over each index
     for (i=0;i<nindices;i++)
     {
 	mean_log_ind_over_bexp = 0;
+	// Get bexp
 	project_b(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
-	//ind_over_bexp[yr] = index[i][yr] / bexp[yr] for non nan years
-	// log_ind_over_bexp = log of ind_over_bexp for non nan years
-
-	    nonnanyrs = 0;
+	nonnanyrs = 0;
+	// loop over years to then calc the mean
 	for (j=0;j<nyrs;j++)
 	{
-	    //log_ind_over_bexp[j] = log(index[i][j] / bexp[j]);
-	    // test for nan
+	    // test for nan years in index (i.e. empty years)
 	    if (!isnan(index[i][j]) & !isnan(bexp[j].getValue()))
 	    {
 		nonnanyrs++;
 		mean_log_ind_over_bexp = mean_log_ind_over_bexp + log(index[i][j] / bexp[j]);
 	    }
-
 	}
-	// mean_log_ind_over_bexp = mean(log_ind_over_bexp) for non nan years
+	// get mean
 	mean_log_ind_over_bexp = mean_log_ind_over_bexp / nonnanyrs;
-	//Rprintf("mean_log_ind_over_bexp: %f\n", mean_log_ind_over_bexp.getValue());
 	q[0] = exp(mean_log_ind_over_bexp);
-	//Rprintf("q: %f\n", q.getValue());
 	for (j=0;j<nyrs;j++)
 	    index_hat[i][j] = bexp[j] * q[0];
-	// q = exp(mean...)
-	//for (j=0;j<nyrs;j++)
-	//    Rprintf("index_hat: %f\n", index_hat[i][j].getValue()); // looks OK
-
-	//for (j=0;j<nyrs;j++)
-	//    Rprintf("bexp: %f\n", bexp[j].getValue()); // looks OK
-	//bexp looks OK,
-	//q and index_hat are different
-  //q <- exp(mean(log(ind[y1:y2]/as.vector(bexp[,y1:y2])),na.rm=T))
-//  index.hat[[index.count]] <- FLQuant(q*bexp,dimnames=dm)
     }
 }
 
-//sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
-// dnorm(x,mean,sd)
-// dn = (1 / (sqrt(2*pi*sigma^2))) * (exp(-(x-mean)^2/(2*sigma^2)))
-
+// Not actually called
 adouble dnorm(double x,adouble mean,adouble sigma)
 {
-    //Rprintf("1/sqrt() %f\n", (1 / sqrt(2*M_PI*sigma*sigma)).getValue());
-    //Rprintf("(x-mean)^2/2sig^2 %f\n",(-((x-mean)*(x-mean))/(2 * sigma*sigma)).getValue() );
-    //Rprintf("out: %f\n\n",((1 / sqrt(2*M_PI*sigma*sigma)) * (exp(-((x-mean)*(x-mean))/(2 * sigma*sigma)))).getValue() );
      return ((1 / sqrt(2*M_PI*sigma*sigma)) * (exp(-((x-mean)*(x-mean))/(2 * sigma*sigma))));
 }
 
 adouble logdnorm(double x,adouble mean,adouble sigma)
 {
-    //Rprintf("1/sqrt() %f\n", (1 / sqrt(2*M_PI*sigma*sigma)).getValue());
-    //Rprintf("(x-mean)^2/2sig^2 %f\n",(-((x-mean)*(x-mean))/(2 * sigma*sigma)).getValue() );
-    //Rprintf("out: %f\n\n",((1 / sqrt(2*M_PI*sigma*sigma)) * (exp(-((x-mean)*(x-mean))/(2 * sigma*sigma)))).getValue() );
      return(log(1 / sqrt(2*M_PI*sigma*sigma)) - (((x-mean)*(x-mean))/(2 * sigma*sigma)));
 }
 
+//******************************************************************************
+// Functino to calculate the logl
+//******************************************************************************
 adouble get_logl(adouble* bexp, adouble* b, adouble* h, adouble** n,
 		adouble** index_hat, double* Catch, double** index, adouble B0,adouble sigma2,
                 adouble* q, double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs, int nindices)
 {
     int i, j, k;
-//  Rprintf("In get_logl B0: %f\n", B0.getValue());
-//  Rprintf("In get_logl B0 AD: %f\n", B0.getADValue());
     adouble total_logl=0;
     adouble index_logl_yr=0;
     calc_index_hat(bexp, b, h, n, index_hat, Catch, index, B0, q, steepness, M, mat, sel, wght, amin, amax, nyrs, nindices);
-
-    // log the index_hat quants
-//for (i = 0; i<nindices; i++)
- //   for(j=0; j<nyrs; j++)
-    // log_index_hat[i][j] = log(index_hat[i][j])
-// Or just log as we go along - otherwise we have to make a new var
-
-for (i = 0; i<nindices; i++)
-{
-	index_logl_yr = 0;
-    for (j=0; j<nyrs; j++)
+    // Loop over indices to get the total_logl
+    for (i = 0; i<nindices; i++)
     {
-//	Rprintf("sigma2: %f\n", sigma2.getValue());
-//	Rprintf("index: %f\n", index[i][j]);
-//	Rprintf("index_hat: %f\n", index_hat[i][j].getValue());
-	//Rprintf("dnorm bit: %f\n\n",log(dnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2))).getValue() );
-	//Rprintf("dnorm bit: %f\n\n",(logdnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2))).getValue() );
-
-
-	// check for isnan again
-	if (!isnan(index[i][j]))
-	    //index_logl_yr = index_logl_yr + log(dnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2)));
-	    index_logl_yr = index_logl_yr + (logdnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2)));
+	index_logl_yr = 0;
+	for (j=0; j<nyrs; j++)
+	{
+	// check for NAN in index, i.e. not all years have index data
+	    if (!isnan(index[i][j]))
+		index_logl_yr = index_logl_yr + (logdnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2)));
+	}
+	total_logl = total_logl + index_logl_yr;
     }
-    // index_logl = 
-	//sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
-    total_logl = total_logl + index_logl_yr;
-// dnorm(x,mean,sd)
-// dn = (1 / (sqrt(2*pi*sigma^2))) * (exp(-(x-mean)^2/(2*sigma^2)))
-//adouble dnorm(double x,adouble mean,adouble sigma)
+    return total_logl;
 }
-//Rprintf("total_logl: %f\n", total_logl.getValue());
-return total_logl;
-}
-/*
-  logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
-  {
 
-    # Get the FLQuants object with the estimated indices
-    indexhat.quants <- aspm.index(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
-
-    log.indexhat.quants <- lapply(indexhat.quants,function(index) window(log(index),start=dims(index)$minyear,end=dims(index)$maxyear))
-    total.logl <- 0
-    for (index.count in 1:length(index))
-	total.logl <- total.logl + sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
-    return(total.logl)
-  }
-  */
 //******************************************************************************
 // Entry function
 //******************************************************************************
-// Could just have one entry function which returns everything
 extern "C" SEXPDLLExport aspm(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP sigma2SEXP,
                 SEXP steepnessSEXP, SEXP MSEXP, SEXP matSEXP, SEXP selSEXP,
                 SEXP wghtSEXP, SEXP aminSEXP, SEXP amaxSEXP, SEXP nyrsSEXP)
 {
-  // loop and other junk vars
-  int i, j, k;
+    // loop and other junk vars
+    int i, j, k;
 
-  // turn all the SEXP into something more useful
-  // Do the ints
-  int amin = asInteger(aminSEXP);
-  int amax = asInteger(amaxSEXP);
-  int nyrs = asInteger(nyrsSEXP);
-  int nages = amax-amin+1;
-  
-  // the scalar doubles
-  double steepness = asReal(steepnessSEXP);
+    // turn all the SEXP into something more useful
+    // Do the ints
+    int amin = asInteger(aminSEXP);
+    int amax = asInteger(amaxSEXP);
+    int nyrs = asInteger(nyrsSEXP);
+    int nages = amax-amin+1;
 
-  // Actually, can we not just set up a pointer to the SEXP?
-  // 1D vector of doubles
-  // set them up
-  double* Catch = new double[nyrs];
-  //double* M = new double[nages];
+    // the scalar doubles
+    double steepness = asReal(steepnessSEXP);
+
+    // Actually, can we not just set up a pointer to the SEXP?
+    // 1D vector of doubles
+    // set them up
+    double* Catch = new double[nyrs];
     double M = asReal(MSEXP);
-  double* mat = new double[nages];
-  double* sel = new double[nages];
-  double* wght = new double[nages];
-  // fill them in
-  for (i = 0; i<nages; i++)
-  {
-   // M[i] = REAL(MSEXP)[i];
-    mat[i] = REAL(matSEXP)[i];
-    sel[i] = REAL(selSEXP)[i];
-    wght[i] = REAL(wghtSEXP)[i];
-  }
+    double* mat = new double[nages];
+    double* sel = new double[nages];
+    double* wght = new double[nages];
+    // fill them in
+    for (i = 0; i<nages; i++)
+    {
+	mat[i] = REAL(matSEXP)[i];
+	sel[i] = REAL(selSEXP)[i];
+	wght[i] = REAL(wghtSEXP)[i];
+    }
 
-  for (i=0; i<nyrs; i++)
-  {
-    Catch[i] = REAL(CatchSEXP)[i];
-  }
+    for (i=0; i<nyrs; i++)
+	Catch[i] = REAL(CatchSEXP)[i];
 
-  // Set up index as 2D array
-  // coming in as an FLQuants object which extends a list
-  int nindices = length(indexSEXP);
-  double** index = new double*[nindices];
-  for (i=0;i<nindices;i++)
-    index[i] = new double[nyrs];
+    // Set up index as 2D array
+    // coming in as an FLQuants object which extends a list
+    int nindices = length(indexSEXP);
+    double** index = new double*[nindices];
+    for (i=0;i<nindices;i++)
+	index[i] = new double[nyrs];
 
-  for (i=0; i<nindices; i++)
+    for (i=0; i<nindices; i++)
     for (j=0; j<nyrs; j++)
-      index[i][j] = REAL(VECTOR_ELT(indexSEXP,i))[j]; // Not sure about this one...
+	index[i][j] = REAL(VECTOR_ELT(indexSEXP,i))[j];
 
-  // Set up the AD variables
-  // Can just the assignment which initialises gradient to 0
-  // Or can use x.setValue to just set the non-AD part
-  // Or can use adouble x(1,2) to see non-AD to 1 and AD to 2
-  // Or can use x.setADValue(1) to set AD value
-  adouble B0 = asReal(B0SEXP);
-  adouble sigma2 = asReal(sigma2SEXP);
+    // Set up the AD variables
+    // Can just the assignment which initialises gradient to 0
+    // Or can use x.setValue to just set the non-AD part
+    // Or can use adouble x(1,2) to see non-AD to 1 and AD to 2
+    // Or can use x.setADValue(1) to set AD value
+    adouble B0 = asReal(B0SEXP);
+    adouble sigma2 = asReal(sigma2SEXP);
 
-  adouble* q = new adouble[1];
-  adouble* bexp = new adouble[nyrs];
-  adouble* b = new adouble[nyrs];
-  adouble* h = new adouble[nyrs];
+    adouble* q = new adouble[1];
+    adouble* bexp = new adouble[nyrs];
+    adouble* b = new adouble[nyrs];
+    adouble* h = new adouble[nyrs];
 
-  for (i=0;i<nyrs;i++)
-  {
-    bexp[i] = 0;
-    b[i] = 0;
-    h[i] = 0;
-  }
-  adouble** n = new adouble*[nages];
-  for (i=0; i<nages; i++)
-    n[i] = new adouble[nyrs];
+    for (i=0;i<nyrs;i++)
+	{
+	bexp[i] = 0;
+	b[i] = 0;
+	h[i] = 0;
+    }
 
-  adouble** index_hat = new adouble*[nindices];
-  for (i=0;i<nindices;i++)
-    index_hat[i] = new adouble[nyrs];
+    adouble** n = new adouble*[nages];
+    for (i=0; i<nages; i++)
+	n[i] = new adouble[nyrs];
 
-  //for (i=0; i<nindices; i++)
-  //  for (j=0; j<nyrs; j++)
-  //    index_hat[i][j] = 0;
-  
-  // return logl and gradient of log
-  // and a bunch of other stuff
+    adouble** index_hat = new adouble*[nindices];
+    for (i=0;i<nindices;i++)
+	index_hat[i] = new adouble[nyrs];
 
-// set up adouble bits
+    adouble total_logl = 0;
 
-// Call the functions
-// test with first index
-//project_b(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
-//
-//calc_index_hat(bexp, b, h, n,
-//		index_hat, Catch, index, B0,
-//                q, steepness, M, mat,
-//                sel, wght, amin, amax, nyrs, nindices);
-adouble total_logl = 0;
+//*********** Start evaluating gradients ***********************
 
-// Deactivate all
-  B0.setADValue(0);
-  sigma2.setADValue(0);
-// Activate B0
-// what is value of B0
-  B0.setADValue(1);
-//  Rprintf("B0: %f\n", B0.getValue());
-//  Rprintf("B0 AD: %f\n", B0.getADValue());
+    // Deactivate all independent adoubles
+    B0.setADValue(0);
+    sigma2.setADValue(0);
+    // Activate B0
+    B0.setADValue(1);
 
-
-total_logl = 0;
-total_logl = get_logl(bexp, b, h, n,
+    total_logl = get_logl(bexp, b, h, n,
 		index_hat, Catch, index, B0, sigma2,
-                q, steepness, M, mat,
-                sel, wght, amin, amax, nyrs, nindices);
+		q, steepness, M, mat,
+		sel, wght, amin, amax, nyrs, nindices);
 
-double B0_grad = total_logl.getADValue();
-//Rprintf("total_logl: %f\n", total_logl.getValue());
-//Rprintf("total_logl AD: %f\n", total_logl.getADValue());
+    double B0_grad = total_logl.getADValue();
 
-// Deactivate all
-  B0.setADValue(0);
-  sigma2.setADValue(0);
-// Activate sigma2
-  sigma2.setADValue(1);
+    // Deactivate all
+    B0.setADValue(0);
+    sigma2.setADValue(0);
+    // Activate sigma2
+    sigma2.setADValue(1);
 
-total_logl = 0;
-total_logl = get_logl(bexp, b, h, n,
+    total_logl = 0;
+    total_logl = get_logl(bexp, b, h, n,
 		index_hat, Catch, index, B0, sigma2,
-                q, steepness, M, mat,
-                sel, wght, amin, amax, nyrs, nindices);
+		q, steepness, M, mat,
+		sel, wght, amin, amax, nyrs, nindices);
 
-double sigma2_grad = total_logl.getADValue();
-//Rprintf("total_logl: %f\n", total_logl.getValue());
-//Rprintf("total_logl AD: %f\n", total_logl.getADValue());
+    double sigma2_grad = total_logl.getADValue();
 
-// OUPUTS
-// Need to return:
-// bexp
-// b
-// h
-// q
-// logl
-// logl grad
-//
-// Make a list
+//******************** Return all the bits we want *********************************
 
-SEXP bexpSEXP, bSEXP, hSEXP, qSEXP, loglSEXP, out, outnames, loglnames;
-// bexp b
-PROTECT(bexpSEXP = allocVector(REALSXP,nyrs));
-PROTECT(bSEXP = allocVector(REALSXP,nyrs));
-PROTECT(hSEXP = allocVector(REALSXP,nyrs));
-for (i=0; i<nyrs; i++)
-{
-    REAL(bexpSEXP)[i] = bexp[i].getValue();
-    REAL(bSEXP)[i] = b[i].getValue();
-    REAL(hSEXP)[i] = h[i].getValue();
+    SEXP bexpSEXP, bSEXP, hSEXP, qSEXP, loglSEXP, out, outnames, loglnames, index_hatSEXP, index_dim;
 
-}
+    // bexp b
+    PROTECT(bexpSEXP = allocVector(REALSXP,nyrs));
+    PROTECT(bSEXP = allocVector(REALSXP,nyrs));
+    PROTECT(hSEXP = allocVector(REALSXP,nyrs));
+    for (i=0; i<nyrs; i++)
+    {
+	REAL(bexpSEXP)[i] = bexp[i].getValue();
+	REAL(bSEXP)[i] = b[i].getValue();
+	REAL(hSEXP)[i] = h[i].getValue();
+    }
 
-PROTECT(qSEXP = allocVector(REALSXP,1));
-REAL(qSEXP)[0] = q[0].getValue();
-PROTECT(loglSEXP = allocVector(REALSXP,3));
-REAL(loglSEXP)[0] = total_logl.getValue();
-//REAL(loglSEXP)[1] = total_logl.getADValue(0);
-//REAL(loglSEXP)[2] = total_logl.getADValue(1); // the other grad
-REAL(loglSEXP)[1] = B0_grad;
-REAL(loglSEXP)[2] = sigma2_grad;
+    // q
+    PROTECT(qSEXP = allocVector(REALSXP,1));
+    REAL(qSEXP)[0] = q[0].getValue();
 
-PROTECT(loglnames = NEW_CHARACTER(3));
-SET_STRING_ELT(loglnames,0,mkChar("logl"));
-SET_STRING_ELT(loglnames,1,mkChar("logl_grad_B0"));
-SET_STRING_ELT(loglnames,2,mkChar("logl_grad_sigma2"));
-SET_NAMES(loglSEXP,loglnames);
+    // logl - value and gradients
+    PROTECT(loglSEXP = allocVector(REALSXP,3));
+    REAL(loglSEXP)[0] = total_logl.getValue();
+    REAL(loglSEXP)[1] = B0_grad;
+    REAL(loglSEXP)[2] = sigma2_grad;
 
-SEXP index_hatSEXP;
-SEXP index_dim;
-PROTECT(index_dim     = allocVector(INTSXP, 2));       
-INTEGER(index_dim)[0] = nindices;
-INTEGER(index_dim)[1] = nyrs;
+    PROTECT(loglnames = NEW_CHARACTER(3));
+    SET_STRING_ELT(loglnames,0,mkChar("logl"));
+    SET_STRING_ELT(loglnames,1,mkChar("logl_grad_B0"));
+    SET_STRING_ELT(loglnames,2,mkChar("logl_grad_sigma2"));
+    SET_NAMES(loglSEXP,loglnames);
 
-PROTECT(index_hatSEXP = Rf_allocArray(REALSXP, index_dim)); 
-i = 0;
-for (j = 0; j<nyrs; j++)
-    for (k = 0; k <nindices; k++)
-	REAL(index_hatSEXP)[i++] = index_hat[k][j].getValue();
+    // index_hat
+    PROTECT(index_dim     = allocVector(INTSXP, 2));       
+    INTEGER(index_dim)[0] = nindices;
+    INTEGER(index_dim)[1] = nyrs;
+
+    PROTECT(index_hatSEXP = Rf_allocArray(REALSXP, index_dim)); 
+    i = 0;
+    for (j = 0; j<nyrs; j++)
+	for (k = 0; k <nindices; k++)
+	    REAL(index_hatSEXP)[i++] = index_hat[k][j].getValue();
 
 
-// Set up the actual list to be outputted
-PROTECT(out = NEW_LIST(6));
-SET_ELEMENT(out,0,bexpSEXP);
-SET_ELEMENT(out,1,bSEXP);
-SET_ELEMENT(out,2,hSEXP);
-SET_ELEMENT(out,3,qSEXP);
-SET_ELEMENT(out,4,loglSEXP);
-SET_ELEMENT(out,5,index_hatSEXP);
+    // Set up the actual list to be outputted
+    PROTECT(out = NEW_LIST(6));
+    SET_ELEMENT(out,0,bexpSEXP);
+    SET_ELEMENT(out,1,bSEXP);
+    SET_ELEMENT(out,2,hSEXP);
+    SET_ELEMENT(out,3,qSEXP);
+    SET_ELEMENT(out,4,loglSEXP);
+    SET_ELEMENT(out,5,index_hatSEXP);
 
-// And give it some dimnames
-PROTECT(outnames = NEW_CHARACTER(6));
-SET_STRING_ELT(outnames,0,mkChar("Bexp"));
-SET_STRING_ELT(outnames,1,mkChar("B"));
-SET_STRING_ELT(outnames,2,mkChar("h"));
-SET_STRING_ELT(outnames,3,mkChar("q"));
-SET_STRING_ELT(outnames,4,mkChar("logl"));
-SET_STRING_ELT(outnames,5,mkChar("indexhat"));
-SET_NAMES(out,outnames);
+    // And give it some dimnames
+    PROTECT(outnames = NEW_CHARACTER(6));
+    SET_STRING_ELT(outnames,0,mkChar("Bexp"));
+    SET_STRING_ELT(outnames,1,mkChar("B"));
+    SET_STRING_ELT(outnames,2,mkChar("h"));
+    SET_STRING_ELT(outnames,3,mkChar("q"));
+    SET_STRING_ELT(outnames,4,mkChar("logl"));
+    SET_STRING_ELT(outnames,5,mkChar("indexhat"));
+    SET_NAMES(out,outnames);
 
-// gradient bits
 
-// do some deleting and tidying up of arrays
+    // Cleaning up and freeing memory
+    delete [] Catch;
+    delete [] mat;
+    delete [] sel;
+    delete [] wght;
+    delete [] q;
+    delete [] bexp;
+    delete [] b;
+    delete [] h;
 
-// To get the gradient of a variable use getADValue(), e.g.
-// logl.getADValue()
+    for(i=0; i<nages; i++)
+	delete [] n[i];
 
-UNPROTECT(10);
-return(out);
-//return index_hatSEXP;
-// return bexpSEXP; 
-  //return CatchSEXP;
+    for(i=0; i<nindices; i++)
+	delete [] index_hat[i];
 
+    UNPROTECT(10);
+    return(out);
 }
 
 
