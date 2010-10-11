@@ -194,7 +194,7 @@ alb_ad_res@params
 #**************************************************************************
 # Using AD to supply gradient
 # multiple iters on steepness
-iters <- 5
+iters <-20 
 hh_iters <- propagate(hh,iters)
 hh_iters[] <- c(hh) * rlnorm(iters,0,0.2)
 
