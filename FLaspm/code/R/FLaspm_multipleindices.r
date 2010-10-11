@@ -261,6 +261,19 @@ get_gradient <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
 }
 
 
+#get_aspm <- function(catch,index,B0,sigma2,hh,M,mat,sel,wght,amin,amax)
+get_aspm <- function(object)
+{
+    #browser()
+    out <-  .Call("aspm",(c(object@catch)),object@index,object@params["B0"],object@params["sigma2"],(c(object@hh)),(c(object@M)),(c(object@mat)),(c(object@sel)),(c(object@wght)),object@amin,object@amax,length(c(object@catch)))
+    #    indexhat <- FLQuants()
+    #    dnms <- dimnames(index[[1]])
+    #    for (i in 1:length(index))
+    #	indexhat[[i]] <- FLQuant(out[i,],dimnames=dnms)
+    #    return(indexhat)
+        return(out)
+}
+
 
 #***************************************************************************************
 
