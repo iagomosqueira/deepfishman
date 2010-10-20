@@ -3,7 +3,6 @@ Functions to calculate likelihood, gradient of likelihood,
 SSB, Bexp (biomass available to fishing), Recruitment etc.
 
 Functions from R (.Call):
-
 */
 
 // Includes
@@ -82,15 +81,16 @@ void project_b(adouble* bexp, adouble* b, adouble* h, adouble** n,
   p[nages-1] = p[nages-1] / (1-exp(-M));
   
   for (i=0; i<nages; i++)
-    rho = rho + (p[i] * mat[i] * wght[i]);
+    //rho = rho + (p[i] * mat[i] * wght[i]);
+    rho = rho + (p[i] * sel[i] * wght[i]);
 
   R0 = B0 / rho;
 
-    // Initial population vector in year 0
+  // Initial population vector in year 0
   for (i = 0; i<nages; i++)
     n[i][0] = R0 * p[i];
 
-    // initialise bexp and b
+  // initialise bexp and b
   for (i=0;i<nyrs;i++)
   {
     b[i] = 0;
@@ -102,40 +102,42 @@ void project_b(adouble* bexp, adouble* b, adouble* h, adouble** n,
     b[0] = b[0] + (n[i][0] * mat[i] * wght[i]);
     bexp[0] = bexp[0] + (n[i][0] * sel[i] * wght[i]);
   }
- 
-  h[0] = Catch[0] / bexp[0];
-  if (h[0] < 0)
-    h[0] = 0;
-  if (h[0] > 0.999)
-    h[0] = 0.999;
 
-  // Set up SRR parameters
-  alpha = (4*steepness*R0) / (5*steepness-1);
-  beta = B0*(1-steepness) / (5*steepness-1);
+    // Is this safe...?
+    h[0] = Catch[0] / bexp[0];
+    if (h[0] < 0)
+	h[0] = 0;
+    // If catch > bexp, should crash out 
+    if (h[0] > 0.999)
+	h[0] = 0.999;
 
-  // Loop through years
-  for (yrcount = 1; yrcount < nyrs; yrcount++)
-  {
-    // recruitment
-    n[0][yrcount] = alpha * b[yrcount-1] / (beta + b[yrcount-1]);
-    // adult dynamics
-    for (i=1; i<nages; i++)
-      n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1] * h[yrcount-1]);
-    n[nages-1][yrcount] = n[nages-1][yrcount] + n[nages-1][yrcount-1] * exp(-M) * (1-sel[nages-1] * h[yrcount-1]);
-    for (i=0; i<nages; i++)
-      bexp[yrcount] = bexp[yrcount] + (n[i][yrcount] * sel[i] * wght[i]);
-    h[yrcount] = Catch[yrcount] / bexp[yrcount];
-    if (h[yrcount] < 0)
-	h[yrcount] = 0;
-    if (h[yrcount] > 0.999)
-	h[yrcount] = 0.999;
-    bexp[yrcount] = Catch[yrcount] / h[yrcount];
+    // Set up SRR parameters
+    alpha = (4*steepness*R0) / (5*steepness-1);
+    beta = B0*(1-steepness) / (5*steepness-1);
 
-  for (i=0;i<nages;i++)
-    b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
-  }
+    // Loop through years
+    for (yrcount = 1; yrcount < nyrs; yrcount++)
+    {
+	// recruitment
+	n[0][yrcount] = alpha * b[yrcount-1] / (beta + b[yrcount-1]);
+	// adult dynamics
+	for (i=1; i<nages; i++)
+	    n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1] * h[yrcount-1]);
+	n[nages-1][yrcount] = n[nages-1][yrcount] + n[nages-1][yrcount-1] * exp(-M) * (1-sel[nages-1] * h[yrcount-1]);
+	for (i=0; i<nages; i++)
+	    bexp[yrcount] = bexp[yrcount] + (n[i][yrcount] * sel[i] * wght[i]);
+	h[yrcount] = Catch[yrcount] / bexp[yrcount];
+	if (h[yrcount] < 0)
+	    h[yrcount] = 0;
+	if (h[yrcount] > 0.999)
+	    h[yrcount] = 0.999;
+	bexp[yrcount] = Catch[yrcount] / h[yrcount];
 
-  delete [] p;
+	for (i=0;i<nages;i++)
+	    b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
+    }
+
+delete [] p;
 }
 
 
@@ -149,11 +151,11 @@ void calc_index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 {
     int i, j, nonnanyrs;
     adouble mean_log_ind_over_bexp;
-    q[0] = 0;
 
     // loop over each index
     for (i=0;i<nindices;i++)
     {
+	//q[i] = 0;
 	mean_log_ind_over_bexp = 0;
 	// Get bexp
 	project_b(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
@@ -170,9 +172,9 @@ void calc_index_hat(adouble* bexp, adouble* b, adouble* h, adouble** n,
 	}
 	// get mean
 	mean_log_ind_over_bexp = mean_log_ind_over_bexp / nonnanyrs;
-	q[0] = exp(mean_log_ind_over_bexp);
+	q[i] = exp(mean_log_ind_over_bexp);
 	for (j=0;j<nyrs;j++)
-	    index_hat[i][j] = bexp[j] * q[0];
+	    index_hat[i][j] = bexp[j] * q[i];
     }
 }
 
@@ -272,7 +274,8 @@ extern "C" SEXPDLLExport aspm(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP 
     adouble B0 = asReal(B0SEXP);
     adouble sigma2 = asReal(sigma2SEXP);
 
-    adouble* q = new adouble[1];
+    adouble* q = new adouble[nindices];
+    //adouble* q = new adouble[1];
     adouble* bexp = new adouble[nyrs];
     adouble* b = new adouble[nyrs];
     adouble* h = new adouble[nyrs];
@@ -338,9 +341,11 @@ extern "C" SEXPDLLExport aspm(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP 
 	REAL(hSEXP)[i] = h[i].getValue();
     }
 
+    // Should be one q for every index
     // q
-    PROTECT(qSEXP = allocVector(REALSXP,1));
-    REAL(qSEXP)[0] = q[0].getValue();
+    PROTECT(qSEXP = allocVector(REALSXP,nindices));
+    for (i=0; i<nindices; i++)
+	REAL(qSEXP)[i] = q[i].getValue();
 
     // logl - value and gradients
     PROTECT(loglSEXP = allocVector(REALSXP,3));
