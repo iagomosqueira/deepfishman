@@ -53,7 +53,7 @@ setMethod('FLaspm', signature(model='missing'),
 # Population dynamics
 
 aspm.pdyn <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
-#browser()
+    #browser()
   C <- as.vector(catch)
   nyr <- length(C)
   nag <- amax-amin+1
@@ -76,14 +76,17 @@ aspm.pdyn <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
   for(a in 2:nag)
     p[a] <- p[a-1]*exp(-M)
   p[nag] <- p[nag]/(1-exp(-M))
-  rho <- sum(p * mat * wght)
+  #rho <- sum(p * mat * wght)
+  rho <- sum(p * sel * wght) # B0 is virgin exploitable biomass
   R0 <- B0 / rho
   n[,1] <- R0 * p
   b[1] <- sum(n[,1] * mat * wght)
   bexp[1] <- sum(n[,1] * sel * wght)
   h[1] <- C[1] / bexp[1]
-  h[1] <- max(h[1],0)
+  #h[1] <- max(h[1],0)
+  h[1] <- max(h[1],1e-10)
   h[1] <- min(h[1],0.999)
+  #  h[1] <- min(h[1],0.999999999)
 
   #cat("rho: ", rho, "\n")
   #cat("R0: ", R0, "\n")
@@ -99,7 +102,7 @@ aspm.pdyn <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
 
   # Loop through the years
 
-#browser()
+  #browser()
 
   for(y in 2:nyr) {
 
@@ -114,11 +117,14 @@ aspm.pdyn <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
     n[nag,y] <- n[nag,y] + n[nag,y-1]*exp(-M)*(1-sel[nag]*h[y-1])
     bexp[y] <- sum(n[,y] * sel * wght)
     h[y] <- C[y] / bexp[y]
-    h[y] <- max(h[y],0)
-    h[y] <- min(h[y],0.999)
+    #h[y] <- max(h[y],0)
+    h[y] <- max(h[y],1e-10)
+      h[y] <- min(h[y],0.999)
+    #  h[y] <- min(h[y],0.999999999)
     bexp[y] <- C[y] / h[y]
     b[y] <- sum(n[,y] * mat * wght)
   }
+  browser()
   #cat("n rec ", n[1,], "\n")
   # return predicted index
   return(FLQuant(bexp,dimnames=dm))
@@ -261,17 +267,20 @@ get_gradient <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
 }
 
 
-#get_aspm <- function(catch,index,B0,sigma2,hh,M,mat,sel,wght,amin,amax)
+# Runs the projection based on B0 in params slot and returns the output
 get_aspm <- function(object)
 {
     #browser()
-    out <-  .Call("aspm",(c(object@catch)),object@index,object@params["B0"],object@params["sigma2"],(c(object@hh)),(c(object@M)),(c(object@mat)),(c(object@sel)),(c(object@wght)),object@amin,object@amax,length(c(object@catch)))
-    #    indexhat <- FLQuants()
-    #    dnms <- dimnames(index[[1]])
-    #    for (i in 1:length(index))
-    #	indexhat[[i]] <- FLQuant(out[i,],dimnames=dnms)
-    #    return(indexhat)
-        return(out)
+    out_ad <-  .Call("aspm",(c(object@catch)),object@index,object@params["B0"],object@params["sigma2"],(c(object@hh)),(c(object@M)),(c(object@mat)),(c(object@sel)),(c(object@wght)),object@amin,object@amax,length(c(object@catch)))
+    dms <- dimnames(object@catch)
+    Bexp <- FLQuant(out_ad$Bexp,dimnames=dms)
+    B <- FLQuant(out_ad$B,dimnames=dms)
+    h <- FLQuant(out_ad$h,dimnames=dms)
+    indexhat <- FLQuants()
+    for (i in 1:length(object@index))
+	indexhat[[i]] <- FLQuant(out_ad$indexhat[i,],dimnames=dms)
+    out = list(Bexp = Bexp, B=B, h=h, q = out_ad$q, logl=out_ad$logl, indexhat=indexhat)
+    return(out)
 }
 
 
