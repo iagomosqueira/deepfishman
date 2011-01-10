@@ -1,3 +1,0 @@
-PKG_CFLAGS = -I/usr/include/adolc
-PKG_CXXFLAGS = -I/usr/include/adolc
-PKG_LIBS = /usr/lib/libadolc.so

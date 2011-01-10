@@ -1,0 +1,11 @@
+Package: FLaspm
+Title: Age Structured Production Models for FLR
+Version: 0.1
+Author: Charles Edwards <charles.edwards@imperial.ac.uk>, Finlay Scott <finlay.scott@cefas.co.uk>
+Description: Age Structured Production Models
+Depends: FLCore(>= 2.2)
+LinkingTo: FLCore
+Maintainer: Charles Edwards <charles.edwards@imperial.ac.uk>
+License: GPL 2.0
+lazyLoad: Yes
+lazyData: No
