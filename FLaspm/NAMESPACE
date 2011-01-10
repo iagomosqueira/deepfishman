@@ -1,7 +1,11 @@
 import("FLCore")
-export("vonB")
+export(
+  "age_to_length",
+  "length_to_weight",
+  "age_to_weight")
 exportClasses(
 	"FLaspm")
 exportMethods(
-  "+")
+  "FLaspm",
+  "pop.dyn")
 	
