@@ -15,14 +15,9 @@ setClass('FLaspm', representation(
   'FLModel',
   catch='FLQuant',
   index='FLQuants',
-#  M='numeric',
-M = 'FLQuant', # So we can use multiple iterations.
-# Maybe an FLPar would be more appropriate
-# Could put in a single FLPar for M and hh?
-#  hh='numeric',
-hh = 'FLQuant',
+  M = 'FLQuant',
+  hh = 'FLQuant',
   sel='FLQuant',
-  #  wght='numeric',
   wght='FLQuant',
   mat='FLQuant',
   fpm='numeric',
@@ -49,6 +44,7 @@ setMethod('FLaspm', signature(model='ANY'),
 setMethod('FLaspm', signature(model='missing'),
   function(...)
   {
+    #browser()
     res <- FLModel(..., class='FLaspm')
     return(res)
   }
