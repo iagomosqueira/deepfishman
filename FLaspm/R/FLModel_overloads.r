@@ -22,7 +22,7 @@ setMethod('fmle',
 
 #stop("Just checking that we are in fmle for FLasmp")
 
-#browser()
+      #browser()
 
     # TODO Check with FL
     args <- list(...)
@@ -156,7 +156,7 @@ setMethod('fmle',
     fitted(object) <- propagate(fitted(object), iter)
     residuals(object) <- propagate(residuals(object), iter)
 
-#browser()
+    #browser()
 
     # vcov
     object@vcov <- array(NA, dim=c(rep(length(parnm)-length(fixed),2), iter),
@@ -214,6 +214,8 @@ for (index.count in 1:length(object@index))
       if(is.null(start))
         stop("No starting values provided and no initial function available")
 
+    #browser()
+
       # autoParscale
       if(autoParscale && !'parscale' %in% names(control))
       {
@@ -234,12 +236,15 @@ for (index.count in 1:length(object@index))
           bump_params[[j]] <- bump_params[[j]] * (1 - tiny_number)
           logl_bump2[[j]] <- do.call(logl, args=c(data, bump_params, fixed))
         }
-          diff_logl <- 1 / (abs(logl_bump1) + abs(logl_bump2)) / (unlist(start) *
-            2 * tiny_number)
+	#          diff_logl <- 1 / (abs(logl_bump1) + abs(logl_bump2)) / (unlist(start) *
+	#    2 * tiny_number)
+
+diff_logl <-  abs(1/(((logl_bump1 - logl_bump2) / (2 * unlist(start) * tiny_number))))
 
         # relative
-        if(relAutoParscale)
-          diff_logl <- diff_logl / max(diff_logl)
+# This fails if only one parameter = 1
+#        if(relAutoParscale)
+#          diff_logl <- diff_logl / max(diff_logl)
 
         control <- c(control, list(parscale=diff_logl))
       }
@@ -250,6 +255,7 @@ for (index.count in 1:length(object@index))
         hessian=TRUE, control=control, lower=lower, upper=upper, gr=grfoo)))
 
 #browser()
+
 
       # output
       # place out$par in right iter dim
@@ -284,7 +290,7 @@ for (index.count in 1:length(object@index))
       object@logLik[it] <- -out$value
       attr(object@logLik, 'nobs') <- length(data[[1]])
 
-#browser()
+      #browser()
       # fitted & residuals
       for (index.count in 1:length(object@index))
       {
@@ -301,6 +307,7 @@ for (index.count in 1:length(object@index))
 setMethod('predict', signature(object='FLaspm'),
   function(object, ...)
   {
+      #browser()
 #stop("in predict for FLaspm")
     args <- list(...)
     if(length(args) > 0 && is.null(names(args)))
@@ -392,7 +399,7 @@ setMethod('predict', signature(object='FLaspm'),
         else
           dimnames <- dimnames(slot(obj, fittedSlot)[[index.count]])
 
-#    browser()
+      #          browser()
       # check inputs
         if(it == 1)
         {
