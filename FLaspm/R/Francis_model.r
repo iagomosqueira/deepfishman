@@ -157,6 +157,8 @@ aspm.Francis <- function()
     # set the likelihood function
     logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
     {
+    
+    
     mat <- c(mat)
     sel <- c(sel)
     hh   <- c(hh)
@@ -173,7 +175,16 @@ aspm.Francis <- function()
 	#browser()
 	bexp <- pdyn[["bexp"]]
 	bmid <- bexp*exp(-0.5*(M+pdyn[["harvest"]]))
-	total.logl <- 0
+	# if overfished bmid goes to 0 which kills qhat calculation later on.
+	# Set to something small
+  bmid[bmid==0] <- 1e-9
+  # But this doesn't work for the chat2 calc, because if only value of bmid is 0
+  # qhat is still massive, but bmid/qhat is tiny
+  # has weird effect that being just under min B0 gives worse logl than when B0 is very much less than minB0
+  # This is risky: if ANY bmid == 0, set all to 0
+  #if(any(bmid==0)) bmid[] <- 1e-9
+  # Gives a flat likelihood - impossible to solve over
+  total.logl <- 0
 	#browser()
 	for (index.count in 1:length(index))
 	{
@@ -182,7 +193,7 @@ aspm.Francis <- function()
 	    n <- dim(index[[index.count]][nonnaindexyears])[2]
 	    qhat <- apply(index[[index.count]]/bmid,c(1,6),sum,na.rm=T) / n
 	    chat2 <- apply((index[[index.count]] / sweep(bmid,1,qhat,"*") - 1)^2,c(1,6),sum,na.rm=T) / (n-2)
-	    total.logl <- total.logl + (-6*log(sqrt(chat2)) -6*log(qhat) -apply(log(bmid[nonnaindexyears]),c(1,6),sum))
+	    total.logl <- total.logl + (-n*log(sqrt(chat2)) -n*log(qhat) -apply(log(bmid[nonnaindexyears]),c(1,6),sum))
 	}
 	# check for warning flag of too low B0 and return massive logl
 	#if(pdyn[["B0_too_low_warning"]]) total.logl <- 1000 

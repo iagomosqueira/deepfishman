@@ -15,12 +15,6 @@
 # Should have all this in a package to be happy it works
 library(FLCore)
 library(FLaspm)
-#setwd("~/Work/deepfishman/FLaspm")
-#source("~/Sandbox/flr/pkg/FLCore/R/FLAccesors.R")
-#source("code/R/FLaspm_multipleindices.r")
-#source("code/R/Edwards_model.r")
-#source("code/R/Francis_model.r")
-#source("code/R/FLModel_overloads.r")
 
 # Fix parscale
 # and pop.dyn methods
@@ -30,8 +24,9 @@ library(FLaspm)
 #****************************************************************************
 
 # Data and parameter values
-index <- FLQuant(c(NA,NA,NA,NA,NA,164835,149425,102975,80397,97108,66291,NA),dimnames=list(year=1978:1989))
-catch <- FLQuant(c(15340,40430,36660,32354,20064,32263,38142,39098,39896,31478,42621,37228),dimnames=list(year=1978:1989))
+data(NZOR)
+catch <- NZOR[["catch"]]
+index <- NZOR[["index"]]
 # Setting up the test data
 amin    <- 1
 amax    <- 70
@@ -66,13 +61,11 @@ res <- new("FLaspm")
 res <- FLModel(class='FLaspm')
 
 
-ed <- FLaspm(catch=catch, index=FLQuants(index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-ed <- FLaspm()
-ed <- FLaspm(catch=catch)
+ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
 # Set the Francis model
 model(ed) <- aspm.Edwards()
 
-fr <- FLaspm(catch=catch, index=FLQuants(index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
+fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
 # Set the Francis model
 model(fr) <- aspm.Francis()
 
@@ -117,6 +110,8 @@ B0 <- 456000
 B0 <- 700000
 B0 <- 852420
 B0 <- 213105
+B0 <- 10
+
 sigma2 <- 0.1
 frstart <- list(B0 = B0)
 frlower <- 1
@@ -127,11 +122,12 @@ edlower <- c(1e-9,1e-9)
 edupper <- c(1e10,1e10)
 
 # Fit using default values
-fr.res <- fmle(fr,start=frstart, lower=frlower,upper=frupper, control=list(trace=1),autoParscale=TRUE)
 fr.res <- fmle(fr,start=frstart, lower=frlower,upper=frupper, control=list(trace=1),autoParscale=FALSE)
+fr.res <- fmle(fr,start=frstart, lower=frlower,upper=frupper, control=list(trace=1),autoParscale=TRUE)
 #fr.res <- fmle(fr,start=frstart, lower=frlower,upper=frupper, control=list(trace=1,parscale=10000))
 fr.res@params
-
+# Really struggles with initial values
+# See profile below
 
 ed.res <- fmle(ed,start=edstart, lower=edlower,upper=edupper, control=list(trace=1),autoParscale=TRUE)
 ed.res@params
@@ -148,10 +144,17 @@ fr.res@params
 fr <- FLaspm(catch=catch, index=FLQuants(index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
 # Set the Francis model
 model(fr) <- aspm.Francis()
-B0 <- 20000
-test <- aspm.pdyn.Francis(fr@catch,B0,c(fr@hh),c(fr@M),c(fr@mat),c(fr@sel),c(fr@wght),fr@amin,fr@amax) 
+B0 <- 10#300000#20000
+fr@params["B0",] <- B0
+#test <- aspm.pdyn.Francis(fr@catch,B0,c(fr@hh),c(fr@M),c(fr@mat),c(fr@sel),c(fr@wght),fr@amin,fr@amax)
+test <- pop.dyn(fr)
+# harvest maxes out
+# and abundance collapses
 
 fr@logl(B0,fr@hh,fr@M,fr@mat,fr@sel,fr@wght,fr@amin,fr@amax,fr@catch,fr@index)
+# NA
+# why...?
+
 # B0 = 20000, f by year 7 has maxed out at 100, i.e. impossible catch
 # bexp = 37576, C = 38142
 # f = 100, return warning at end, B0 too low
@@ -166,11 +169,13 @@ fr@logl(B0,fr@hh,fr@M,fr@mat,fr@sel,fr@wght,fr@amin,fr@amax,fr@catch,fr@index)
 #********************************************************************************
 # Profile
 # Method exists?
-B0seq <- seq(from=200000, to=1000000,length=100)
+B0seq <- seq(from=10, to=800000,length=100)
 frll <- rep(NA,length(B0seq))
 for (i in 1:length(B0seq))
     frll[i] <- c(fr@logl(B0seq[i],fr@hh,fr@M,fr@mat,fr@sel,fr@wght,fr@amin,fr@amax,fr@catch,fr@index))
 plot(B0seq,frll,type="l",xlab = "B0 start", ylab="logl")
+
+
 
 #********************************************************************************
 # Test creator

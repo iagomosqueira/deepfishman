@@ -2,10 +2,14 @@ import("FLCore")
 export(
   "age_to_length",
   "length_to_weight",
-  "age_to_weight")
+  "age_to_weight",
+  "aspm.Edwards",
+  "aspm.Francis")
 exportClasses(
 	"FLaspm")
 exportMethods(
   "FLaspm",
-  "pop.dyn")
+  "pop.dyn",
+  "exp.biomass",
+  "mat.biomass")
 	

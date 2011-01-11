@@ -171,18 +171,9 @@ if (!isGeneric("exp.biomass"))
     setGeneric("exp.biomass", function(object, ...)
     standardGeneric("exp.biomass"))
 
-# Is this going to work with multiple iters?
-# Probably not
-# Also what are all those cs about?
 setMethod('exp.biomass', signature(object='FLaspm'),
     function(object) {
-	#iters <- dims(object)$iter
-	#bexp <- FLQuant(NA,dimnames=dimnames(object@catch))
-	#bexp <- propagate(bexp,iters)
-	#for (i in 1:iters)
-	#    iter(bexp,i) <- aspm.pdyn(iter(object@catch,i),iter(params(object)['B0'],i),c(iter(object@hh,i)),c(iter(object@M,i)),c(iter(object@mat,i)),c(iter(object@sel,i)),c(iter(object@wght,i)),object@amin,object@amax)[["bexp"]]
-	#return(bexp)
-	return(pop.dyn(object)[["bexp"]])
+      return(pop.dyn(object)[["bexp"]])
     })
 
 # Numbers at age
