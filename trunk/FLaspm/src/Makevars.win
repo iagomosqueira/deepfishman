@@ -1,0 +1,38 @@
+# Makefile for windows
+# Looks same as *nix one
+PKG_CPPFLAGS = -I../inst/include
+PKG_CFLAGS = -I../inst/include
+#PKG_LIBS = $(SUBLIBS) $(R_HOME)/library/FLCore/libs/i386/FLCore.dll
+
+
+MkInclude = $(RHOME)/etc/Makeconf
+CFLAGS = -O0 -ggdb -Wall
+CXXFLAGS = -O0 -ggdb -Wall
+
+#SOURCES_C = FLashDLL.cpp FLash-VPA.cpp flc.cpp flc_adolc.cpp flquant_pointer.cpp fwd.cpp fwdFLStock.cpp
+SOURCES_C = flaspm_ad.cpp
+
+OBJECTS = $(SOURCES_C:.cpp=.o)
+
+SUBDIRS = adolc
+SUBLIBS = $(SUBDIRS:=.a)
+
+all: $(SHLIB)
+$(SHLIB): $(OBJECTS) sublibs
+#$(SHLIB): sublibs
+
+sublibs: subclean
+	@for d in $(SUBDIRS); do \
+	  (cd $${d} && CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" MkInclude="$(MkInclude)" $(MAKE) library) || exit 1; \
+	done
+
+clean: subclean
+	@-rm -rf .libs _libs
+	@-rm -f *.o $(SHLIB)
+
+subclean:
+	@-rm -f *.a
+	@for d in $(SUBDIRS); do \
+	  (cd $${d} && Mkinclude="$(MKinclude)" $(MAKE) clean) || exit 1; \
+	done
+
