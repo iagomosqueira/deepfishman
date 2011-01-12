@@ -62,7 +62,10 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
                 double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs);
 
-void pop_dyn_Edwards();
+void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
+                double* Catch, adouble B0,
+                double steepness, double M, double* mat,
+                double* sel, double* wght, int amin, int amax, int nyrs);
 
 void pop_dyn_common(int nages, int nyrs, adouble alpha, adouble beta, adouble** n,
                     adouble* b, adouble* bexp, double M, double* sel,
@@ -146,42 +149,7 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
   int i,j, yrcount, fp;
   // more interesting vars
   int nages = amax-amin+1;
-//  double* p = new double[nages];
-//  double rho = 0;
-  // As R0 is calced using B0, it also has to be adouble
-//  adouble R0 = 0;
   adouble alpha, beta;
-
-  // Set up equib pop
-//  p[0] = 1;
-//  for (i=1; i<nages; i++)
-//    p[i] = p[i-1]*exp(-M);
-
-//  p[nages-1] = p[nages-1] / (1-exp(-M));
-
-//  for (i=0; i<nages; i++)
-    //rho = rho + (p[i] * mat[i] * wght[i]);
-//    rho = rho + (p[i] * sel[i] * wght[i]);
-
-//  R0 = B0 / rho;
-
-  // Initial population vector in year 0
-//  for (i = 0; i<nages; i++)
-//    n[i][0] = R0 * p[i];
-
-  // initialise bexp and b
-//  for (i=0;i<nyrs;i++)
-//  {
-//    b[i] = 0;
-//    bexp[i] = 0;
-//  }
-
-//  for (i=0; i<nages; i++)
-//  {
-//    b[0] = b[0] + (n[i][0] * mat[i] * wght[i]);
-//    bexp[0] = bexp[0] + (n[i][0] * sel[i] * wght[i]);
-//  }
-
   // Get the equilibrium population, initial bexp and b and alpha and beta
   pop_dyn_common(nages, nyrs, alpha, beta, n, b, bexp, M, sel, wght, mat, B0, steepness);
 
@@ -192,11 +160,6 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
     f[0] = 1;
   //  f[0] = simpleNRtogetf(f[0], M, Catch[0], bexp[0]);
     Rprintf("f0: %f\n", f[0].getValue());
-
-
-    // Set up SRR parameters
-//    alpha = (4*steepness*R0) / (5*steepness-1);
-//    beta = B0*(1-steepness) / (5*steepness-1);
 
     // Main population loop
     // Loop through years
@@ -219,11 +182,57 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
 	    b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
     }
 
-// Print bexp and gradient
-//    for (yrcount = 0; yrcount < nyrs; yrcount++)
-//	Rprintf("bexp[%i} value: %f and gradient: %f \n", yrcount, bexp[yrcount].getValue(), bexp[yrcount].getADValue());
+}
 
-//delete [] p;
+//******************************************************************************
+// Edwards functions
+//******************************************************************************
+// Project population using h as Charlie's original - not sure that this is right
+void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
+                double* Catch, adouble B0,
+                double steepness, double M, double* mat,
+                double* sel, double* wght, int amin, int amax, int nyrs)
+{
+  // temp vars for loops and such
+  int i,j, yrcount, fp;
+  // more interesting vars
+  int nages = amax-amin+1;
+  adouble alpha, beta;
+
+  // Get the equilibrium population, initial bexp and b and alpha and beta
+  pop_dyn_common(nages, nyrs, alpha, beta, n, b, bexp, M, sel, wght, mat, B0, steepness);
+
+
+    // Is this safe...?
+    h[0] = Catch[0] / bexp[0];
+    if (h[0] < 0)
+	h[0] = 0;
+    // If catch > bexp, should crash out
+    if (h[0] > 0.999)
+	h[0] = 0.999;
+
+    // Loop through years
+    for (yrcount = 1; yrcount < nyrs; yrcount++)
+    {
+	// recruitment
+	n[0][yrcount] = alpha * b[yrcount-1] / (beta + b[yrcount-1]);
+	// adult dynamics
+	for (i=1; i<nages; i++)
+	    n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1] * h[yrcount-1]);
+	n[nages-1][yrcount] = n[nages-1][yrcount] + n[nages-1][yrcount-1] * exp(-M) * (1-sel[nages-1] * h[yrcount-1]);
+	for (i=0; i<nages; i++)
+	    bexp[yrcount] = bexp[yrcount] + (n[i][yrcount] * sel[i] * wght[i]);
+	h[yrcount] = Catch[yrcount] / bexp[yrcount];
+	if (h[yrcount] < 0)
+	    h[yrcount] = 0;
+	if (h[yrcount] > 0.999)
+	    h[yrcount] = 0.999;
+	bexp[yrcount] = Catch[yrcount] / h[yrcount];
+
+	for (i=0;i<nages;i++)
+	    b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
+    }
+
 
 }
 
@@ -236,6 +245,100 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
                 SEXP wghtSEXP, SEXP aminSEXP, SEXP amaxSEXP, SEXP nyrsSEXP)
 {
 
+    // loop and other junk vars
+    int i, j, k;
+
+    // turn all the SEXP into something more useful
+    // Do the ints
+    int amin = asInteger(aminSEXP);
+    int amax = asInteger(amaxSEXP);
+    int nyrs = asInteger(nyrsSEXP);
+    int nages = amax-amin+1;
+
+    // the scalar doubles
+    double steepness = asReal(steepnessSEXP);
+
+    // Actually, can we not just set up a pointer to the SEXP?
+    // 1D vector of doubles
+    // set them up
+    double* Catch = new double[nyrs];
+    double M = asReal(MSEXP);
+    double* mat = new double[nages];
+    double* sel = new double[nages];
+    double* wght = new double[nages];
+    // fill them in
+    for (i = 0; i<nages; i++)
+    {
+	mat[i] = REAL(matSEXP)[i];
+	sel[i] = REAL(selSEXP)[i];
+	wght[i] = REAL(wghtSEXP)[i];
+    }
+
+    for (i=0; i<nyrs; i++)
+	Catch[i] = REAL(CatchSEXP)[i];
+
+    // Set up index as 2D array
+    // coming in as an FLQuants object which extends a list
+    int nindices = length(indexSEXP);
+    double** index = new double*[nindices];
+    for (i=0;i<nindices;i++)
+	index[i] = new double[nyrs];
+
+    for (i=0; i<nindices; i++)
+    for (j=0; j<nyrs; j++)
+	index[i][j] = REAL(VECTOR_ELT(indexSEXP,i))[j];
+
+    // Set up the AD variables
+    // Can just the assignment which initialises gradient to 0
+    // Or can use x.setValue to just set the non-AD part
+    // Or can use adouble x(1,2) to see non-AD to 1 and AD to 2
+    // Or can use x.setADValue(1) to set AD value
+    adouble B0 = asReal(B0SEXP);
+    adouble sigma2 = asReal(sigma2SEXP);
+
+    adouble* q = new adouble[nindices];
+    //adouble* q = new adouble[1];
+    adouble* bexp = new adouble[nyrs];
+    adouble* b = new adouble[nyrs];
+    adouble* h = new adouble[nyrs];
+    adouble* f = new adouble[nyrs];
+
+// Setting up f if not estimating - for test purposes only
+//f <- c(0.67, 0.669, 0.305, 0.142, 0.091, 0.088, 0.109, 0.075)
+f[0] = 0.67;
+f[1] = 0.669;
+f[2] = 0.305;
+f[3] = 0.142;
+f[4] = 0.091;
+f[5] = 0.088;
+f[6] = 0.109;
+f[7] = 0.075;
+
+    for (i=0;i<nyrs;i++)
+	{
+	bexp[i] = 0;
+	b[i] = 0;
+	h[i] = 0;
+    }
+
+    adouble** n = new adouble*[nages];
+    for (i=0; i<nages; i++)
+	n[i] = new adouble[nyrs];
+
+    adouble** index_hat = new adouble*[nindices];
+    for (i=0;i<nindices;i++)
+	index_hat[i] = new adouble[nyrs];
+
+    adouble total_logl = 0;
+
+
+// Test pop.dyn functions
+pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
+Rprintf("bexp[1] %f\n", bexp[1].getValue());
+
+//******************************************************************************
+// Outputs
+//******************************************************************************
   return CatchSEXP;
 }
 
