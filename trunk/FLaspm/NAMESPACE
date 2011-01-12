@@ -1,3 +1,4 @@
+useDynLib("FLaspm")
 import("FLCore")
 export(
   "age_to_length",

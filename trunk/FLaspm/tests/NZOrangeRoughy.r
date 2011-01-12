@@ -181,6 +181,13 @@ plot(B0seq,frll,type="l",xlab = "B0 start", ylab="logl")
 
 
 #********************************************************************************
+
+#.Call(aspm_ad, CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP sigma2SEXP,
+#                SEXP steepnessSEXP, SEXP MSEXP, SEXP matSEXP, SEXP selSEXP,
+#                SEXP wghtSEXP, SEXP aminSEXP, SEXP amaxSEXP, SEXP nyrsSEXP
+
+
+#********************************************************************************
 # Test creator
 
 amin    <- 1
