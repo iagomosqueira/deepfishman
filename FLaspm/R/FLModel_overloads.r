@@ -16,7 +16,7 @@ setMethod('fmle',
   signature(object='FLaspm', start='ANY'),
   function(object, start, method='L-BFGS-B', fixed=list(),
     control=list(trace=1), lower=rep(-Inf, dim(params(object))[1]),
-    upper=rep(Inf, dim(params(object))[1]), seq.iter=TRUE, autoParscale=FALSE,
+    upper=rep(Inf, dim(params(object))[1]), seq.iter=TRUE, autoParscale=TRUE,
     tiny_number=1e-6, relAutoParscale=TRUE, ...)
   {
 

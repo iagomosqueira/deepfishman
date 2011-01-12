@@ -177,12 +177,12 @@ aspm.Francis <- function()
 	bmid <- bexp*exp(-0.5*(M+pdyn[["harvest"]]))
 	# if overfished bmid goes to 0 which kills qhat calculation later on.
 	# Set to something small
-  bmid[bmid==0] <- 1e-9
+  #bmid[bmid==0] <- 1e-9
   # But this doesn't work for the chat2 calc, because if only value of bmid is 0
   # qhat is still massive, but bmid/qhat is tiny
   # has weird effect that being just under min B0 gives worse logl than when B0 is very much less than minB0
   # This is risky: if ANY bmid == 0, set all to 0
-  #if(any(bmid==0)) bmid[] <- 1e-9
+  if(any(bmid==0)) bmid[] <- 1e-9
   # Gives a flat likelihood - impossible to solve over
   total.logl <- 0
 	#browser()
@@ -207,7 +207,7 @@ aspm.Francis <- function()
 	    return(FLPar(B0=100*max(catch)))
 	},
 	# lower and upper limits for optim()
-	lower=1,
+	lower=1e-9,
 	upper=1e12
     )
 

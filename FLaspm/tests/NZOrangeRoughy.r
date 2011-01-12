@@ -6,6 +6,7 @@
 # Methods for other outputs etc
 # Test multiple iters
 # Test multiple indices
+# Test Edwards model (compare to source paper)
 
 # C code
 # ADOLC code
@@ -57,10 +58,6 @@ s[(as - amin + 1):length(amin:amax),] <- 1
 
 #****************************************************************************
 # Create the FLaspm object
-res <- new("FLaspm")
-res <- FLModel(class='FLaspm')
-
-
 ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
 # Set the Francis model
 model(ed) <- aspm.Edwards()
@@ -69,6 +66,8 @@ fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m
 # Set the Francis model
 model(fr) <- aspm.Francis()
 
+#****************************************************************************
+# Accessor method check
 # Dummy parameters - not fitted
 B0 <- 411000* exp(0.5*c(M))
 sigma2 <- 0.1 # for Charlie
@@ -95,48 +94,62 @@ n(fr)
 harvest(ed)
 harvest(fr)
 
-plot(ed)
-plot(fr)
-
-
-fr@logl(B0,fr@hh,fr@M,fr@mat,fr@sel,fr@wght,fr@amin,fr@amax,fr@catch,fr@index)
-
 #********************************************************************************
 # Fitting test
+# If B0 is set too low then are serious issues.
+# The likelihood for a B0 lower than B0_min_for_survival is unclear. At the moment
+# it is completely flat. This causes problems for the solver.
+# So initial B0 has to be above this minimum
+# Could try setting some minimum B0 but I don't know of a way to quickly get B0_min_for_survival
 
-B0 <- 426210#400000#500000
-B0 <- 2262100#400000#500000
-B0 <- 456000
-B0 <- 700000
-B0 <- 852420
-B0 <- 213105
-B0 <- 10
-
-sigma2 <- 0.1
-frstart <- list(B0 = B0)
-frlower <- 1
-frupper <- 1e10
-
-edstart <- list(B0 = B0, sigma2=sigma2)
-edlower <- c(1e-9,1e-9)
-edupper <- c(1e10,1e10)
-
-# Fit using default values
-fr.res <- fmle(fr,start=frstart, lower=frlower,upper=frupper, control=list(trace=1),autoParscale=FALSE)
-fr.res <- fmle(fr,start=frstart, lower=frlower,upper=frupper, control=list(trace=1),autoParscale=TRUE)
-#fr.res <- fmle(fr,start=frstart, lower=frlower,upper=frupper, control=list(trace=1,parscale=10000))
+# Using default initial and bounds
+fr.res <- fmle(fr)
 fr.res@params
-# Really struggles with initial values
-# See profile below
 
-ed.res <- fmle(ed,start=edstart, lower=edlower,upper=edupper, control=list(trace=1),autoParscale=TRUE)
+ed.res <- fmle(ed)
 ed.res@params
 
-# Hurrah
 
-# Use default initial and bounds
-fr.res <- fmle(fr,control=list(trace=1),autoParscale=TRUE)
+# Or set the initial and boundary values by hand
+# Try setting B0 has 50 x max catch
+B0 <- 100*max(fr@catch)
+frstart <- list(B0 = B0)
+frlower <- 1e-9
+frupper <- 1e10
+
+fr.res <- fmle(fr,start=frstart, lower=frlower,upper=frupper, control=list(trace=1),autoParscale=FALSE)
+fr.res <- fmle(fr,start=frstart, lower=frlower,upper=frupper, control=list(trace=1),autoParscale=TRUE)
 fr.res@params
+
+B0 <- 100*max(ed@catch)
+sigma2 <- 1
+edstart <- list(B0 = B0, sigma2=sigma2)
+edlower <- c(1,1e-9)
+edupper <- c(Inf,Inf)
+
+# Same as default
+ed.res <- fmle(ed,start=edstart, lower=edlower,upper=edupper, control=list(trace=1))
+# This should be the same
+ed.res <- fmle(ed,start=edstart, lower=edlower,upper=edupper, control=list(trace=1,parscale=c(2e8,0.4)))
+# just shite
+ed.res <- fmle(ed,start=edstart, lower=edlower,upper=edupper, control=list(trace=1,parscale=c(1e5,1)))
+ed.res@params
+
+#********************************************************************************
+# Post fitting
+# Profile
+# Method exists?
+
+# Is the fit any good?
+profile(fr.res,maxsteps=30,range=0.3)
+profile(ed.res,maxsteps=30,range=0.3)
+profile(ed.res,maxsteps=30,range=0.2)
+# ed looks a bit dodgy - take a closer look
+
+# fitted logl
+ed@logl(params(ed.res)["B0"],params(ed.res)["sigma2"],ed@hh,ed@M,ed@mat,ed@sel,ed@wght,ed@amin,ed@amax,ed@catch,ed@index)
+# better logl? Yes. Problem with fit
+ed@logl(400000,0.024,ed@hh,ed@M,ed@mat,ed@sel,ed@wght,ed@amin,ed@amax,ed@catch,ed@index)
 
 #********************************************************************************
 # What happens if B0 too low, i.e. impossible catches
@@ -152,23 +165,13 @@ test <- pop.dyn(fr)
 # and abundance collapses
 
 fr@logl(B0,fr@hh,fr@M,fr@mat,fr@sel,fr@wght,fr@amin,fr@amax,fr@catch,fr@index)
-# NA
-# why...?
-
-# B0 = 20000, f by year 7 has maxed out at 100, i.e. impossible catch
-# bexp = 37576, C = 38142
-# f = 100, return warning at end, B0 too low
-# Screws up likelihood
-# could put in test, if f=100 (or set maxf var) then logl = inf
 
 # problem in pdyn and logl
 # if bmid = 0, then index / bmid = inf
 # set to 1? very hacky...
 # how to fail gracefully...
 
-#********************************************************************************
-# Profile
-# Method exists?
+# Plot profile to reveal this
 B0seq <- seq(from=10, to=800000,length=100)
 frll <- rep(NA,length(B0seq))
 for (i in 1:length(B0seq))
