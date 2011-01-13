@@ -4,19 +4,22 @@
 #define ADOLC_TAPELESS // Going to use the tapeless method
 //#define NUMBER_DIRECTIONS 2 // B0 and sigma2
 #include "adouble.h" // only this is needed for tapeless
+//#include "adolc.h"
 typedef adtl::adouble adouble; // necessary for tapeless - see manual
 
 // If not tapeless then use this
 // #include <adolc.h> // only this seems to compile but then not tapeless
 
-#include <math.h>
 #include <stdlib.h>
-#include <ctype.h>
+
+//#include <ctype.h>
 
 // R headers
 #include <Rdefines.h>
 #include <Rinternals.h>
 #include <Rmath.h>
+
+#include <math.h>
 
 // Preliminaries
 #ifdef WIN32
@@ -46,13 +49,13 @@ adouble calc_logl_Edwards();
 // qhat is function of Bexp and index
 // just qhat per index
 // same function for both? Could be, but Francis uses straight mean, Edwards is geometric mean
-void calc_qhat_geomean(adouble* bexp, double** index, adouble qhat);
-void calc_qhat_mean(adouble* bexp, double** index, adouble qhat);
+void calc_qhat_geomean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs);
+void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs);
 
 // index.hat
 // same function for both
 // index.hat = qhat * Bexp
-void calc_indexhat (adouble* bexp, adouble qhat, adouble* indexhat);
+void calc_indexhat (adouble* bexp, adouble* qhat, adouble** indexhat);
 
 // pop.dyn
 // seperate functions
@@ -67,7 +70,7 @@ void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
                 double steepness, double M, double* mat,
                 double* sel, double* wght, int amin, int amax, int nyrs);
 
-void pop_dyn_common(int nages, int nyrs, adouble alpha, adouble beta, adouble** n,
+void pop_dyn_common(int nages, int nyrs, adouble* alpha, adouble* beta, adouble** n,
                     adouble* b, adouble* bexp, double M, double* sel,
                     double* wght, double* mat, adouble B0, double steepness);
 
@@ -89,7 +92,7 @@ void pop_dyn_common(int nages, int nyrs, adouble alpha, adouble beta, adouble** 
 // Common functions
 //******************************************************************************
 
-void pop_dyn_common(int nages, int nyrs, adouble alpha, adouble beta, adouble** n,
+void pop_dyn_common(int nages, int nyrs, adouble* alpha, adouble* beta, adouble** n,
                     adouble* b, adouble* bexp, double M, double* sel,
                     double* wght, double* mat, adouble B0, double steepness)
 {
@@ -129,11 +132,69 @@ void pop_dyn_common(int nages, int nyrs, adouble alpha, adouble beta, adouble** 
   }
   
       // Set up SRR parameters
-    alpha = (4*steepness*R0) / (5*steepness-1);
-    beta = B0*(1-steepness) / (5*steepness-1);
+    *alpha = (4*steepness*R0) / (5*steepness-1);
+    *beta = B0*(1-steepness) / (5*steepness-1);
 
   delete [] p;
 
+/*
+  Rprintf("In Common\n");
+  Rprintf("R0: %f\n", R0.getValue());
+  Rprintf("steepness: %f\n", steepness);
+  Rprintf("alpha: %f\n", (*alpha).getValue());
+  Rprintf("beta: %f\n\n", (*beta).getValue());
+*/
+}
+
+void calc_qhat_geomean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs)
+{
+//	q <- exp(mean(log(ind[y1:y2]/as.vector(bexp[,y1:y2])),na.rm=T))
+  int i, j, nonnanyrs;
+  adouble mean_log_ind_over_bexp;
+  for (i = 0; i<nindices; i++)
+  {
+    // for another index does the gradient need to be reset too?
+    mean_log_ind_over_bexp = 0;
+    nonnanyrs = 0;
+    for (j=0;j<nyrs;j++)
+    {
+      // test for nan years in index (i.e. empty years)
+      if (!__isnan(index[i][j]) & !__isnan(bexp[j].getValue()))
+	    {
+        nonnanyrs++;
+		    mean_log_ind_over_bexp = mean_log_ind_over_bexp + log(index[i][j] / bexp[j]);
+        // Rewrite log section as AD getting messed up
+        //mean_log_ind_over_bexp = mean_log_ind_over_bexp + (log(index[i][j]) - log(bexp[j]));
+      }
+    }
+  	mean_log_ind_over_bexp = mean_log_ind_over_bexp / nonnanyrs;
+    //Rprintf("end mean log ind grad: %f\n", mean_log_ind_over_bexp.getADValue());
+    qhat[i] = exp(mean_log_ind_over_bexp);
+  }
+}
+
+void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs)
+{
+  //	qhat <- apply(index[[index.count]]/bmid,c(1,6),sum,na.rm=T) / n
+  int i, j, nonnanyrs;
+  adouble mean_ind_over_bexp;
+  for (i = 0; i<nindices; i++)
+  {
+    // for another index does the gradient need to be reset too?
+    mean_ind_over_bexp = 0;
+    nonnanyrs = 0;
+    for (j=0;j<nyrs;j++)
+    {
+      // test for nan years in index (i.e. empty years)
+      if (!__isnan(index[i][j]) & !__isnan(bexp[j].getValue()))
+	    {
+        nonnanyrs++;
+		    mean_ind_over_bexp = mean_ind_over_bexp + (index[i][j] / bexp[j]);
+      }
+    }
+  	qhat[i] = mean_ind_over_bexp / nonnanyrs;
+    //Rprintf("end mean log ind grad: %f\n", mean_log_ind_over_bexp.getADValue());
+  }
 }
 
 //******************************************************************************
@@ -149,7 +210,9 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
   int i,j, yrcount, fp;
   // more interesting vars
   int nages = amax-amin+1;
-  adouble alpha, beta;
+  adouble* alpha = new adouble;
+  adouble* beta = new adouble;
+
   // Get the equilibrium population, initial bexp and b and alpha and beta
   pop_dyn_common(nages, nyrs, alpha, beta, n, b, bexp, M, sel, wght, mat, B0, steepness);
 
@@ -166,7 +229,7 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
     for (yrcount = 1; yrcount < nyrs; yrcount++)
     {
 	// recruitment
-	n[0][yrcount] = alpha * b[yrcount-1] / (beta + b[yrcount-1]);
+	n[0][yrcount] = *alpha * b[yrcount-1] / (*beta + b[yrcount-1]);
 	// adult dynamics
 	for (i=1; i<nages; i++)
 	    //n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1] * h[yrcount-1]);
@@ -197,11 +260,14 @@ void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
   int i,j, yrcount, fp;
   // more interesting vars
   int nages = amax-amin+1;
-  adouble alpha, beta;
-
+  adouble* alpha = new adouble;
+  adouble* beta = new adouble;
   // Get the equilibrium population, initial bexp and b and alpha and beta
   pop_dyn_common(nages, nyrs, alpha, beta, n, b, bexp, M, sel, wght, mat, B0, steepness);
 
+//Rprintf("In Edwards\n");
+//Rprintf("alpha: %f\n", (*alpha).getValue());
+//Rprintf("beta: %f\n", (*beta).getValue());
 
     // Is this safe...?
     h[0] = Catch[0] / bexp[0];
@@ -215,7 +281,7 @@ void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
     for (yrcount = 1; yrcount < nyrs; yrcount++)
     {
 	// recruitment
-	n[0][yrcount] = alpha * b[yrcount-1] / (beta + b[yrcount-1]);
+	n[0][yrcount] = *alpha * b[yrcount-1] / (*beta + b[yrcount-1]);
 	// adult dynamics
 	for (i=1; i<nages; i++)
 	    n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1] * h[yrcount-1]);
@@ -297,7 +363,7 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     adouble B0 = asReal(B0SEXP);
     adouble sigma2 = asReal(sigma2SEXP);
 
-    adouble* q = new adouble[nindices];
+    adouble* qhat = new adouble[nindices];
     adouble* bexp = new adouble[nyrs];
     adouble* b = new adouble[nyrs];
     adouble* h = new adouble[nyrs];
@@ -337,11 +403,18 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
 
 // Test pop.dyn functions
 if (model_name == 1)
+{
   pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
+  // Test qhat functions
+  calc_qhat_geomean(bexp, index, qhat, nindices, nyrs);
+}
+
 //Rprintf("bexp[1] %f\n", bexp[1].getValue());
 if (model_name == 2)
+{
   pop_dyn_Francis(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
-
+  calc_qhat_mean(bexp, index, qhat, nindices, nyrs);
+}
 
 double B0_grad = 0;
 double sigma2_grad = 0;
@@ -349,7 +422,7 @@ double sigma2_grad = 0;
 //******************************************************************************
 // Outputs
 //******************************************************************************
-    SEXP bexpSEXP, bSEXP, hSEXP, qSEXP, loglSEXP, out, outnames, loglnames,
+    SEXP bexpSEXP, bSEXP, hSEXP, qhatSEXP, loglSEXP, out, outnames, loglnames,
           index_hatSEXP, index_dim, nSEXP, n_dim;
 
     // bexp, b and h
@@ -363,10 +436,10 @@ double sigma2_grad = 0;
       REAL(hSEXP)[i] = h[i].getValue();
     }
 
-    // q, should be one q for every index
-    PROTECT(qSEXP = allocVector(REALSXP,nindices));
+    // qhat, should be one q for every index
+    PROTECT(qhatSEXP = allocVector(REALSXP,nindices));
     for (i=0; i<nindices; i++)
-      REAL(qSEXP)[i] = q[i].getValue();
+      REAL(qhatSEXP)[i] = qhat[i].getValue();
 
     // logl - value and gradients
     PROTECT(loglSEXP = allocVector(REALSXP,3));
@@ -406,7 +479,7 @@ double sigma2_grad = 0;
     SET_ELEMENT(out,0,bexpSEXP);
     SET_ELEMENT(out,1,bSEXP);
     SET_ELEMENT(out,2,hSEXP);
-    SET_ELEMENT(out,3,qSEXP);
+    SET_ELEMENT(out,3,qhatSEXP);
     SET_ELEMENT(out,4,loglSEXP);
     SET_ELEMENT(out,5,index_hatSEXP);
     SET_ELEMENT(out,6,nSEXP);
@@ -416,7 +489,7 @@ double sigma2_grad = 0;
     SET_STRING_ELT(outnames,0,mkChar("bexp"));
     SET_STRING_ELT(outnames,1,mkChar("bmat"));
     SET_STRING_ELT(outnames,2,mkChar("harvest"));
-    SET_STRING_ELT(outnames,3,mkChar("q"));
+    SET_STRING_ELT(outnames,3,mkChar("qhat"));
     SET_STRING_ELT(outnames,4,mkChar("logl"));
     SET_STRING_ELT(outnames,5,mkChar("indexhat"));
     SET_STRING_ELT(outnames,6,mkChar("n"));
@@ -428,7 +501,7 @@ double sigma2_grad = 0;
     delete [] mat;
     delete [] sel;
     delete [] wght;
-    delete [] q;
+    delete [] qhat;
     delete [] bexp;
     delete [] b;
     delete [] h;

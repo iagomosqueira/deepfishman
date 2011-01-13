@@ -92,17 +92,22 @@ ed.pop.dyn[["harvest"]]
 edC[["harvest"]] # ?
 all.equal(c(ed.pop.dyn[["harvest"]]),edC[["harvest"]])
 
-
 # n
 ed.pop.dyn[["n"]]
 edC[["n"]]
 all.equal(c(ed.pop.dyn[["n"]]),c(edC[["n"]]))
 
-# q
+# qhat
+edC[["qhat"]]
+# calced internally for R code atm
+exp(mean(log(ed@index[[1]]/as.vector(ed.pop.dyn[["bexp"]])),na.rm=T))
+
+# index hat
+
 
 # logl
 
-# index hat
+
 
 #********************************************************************************
 # Stop
