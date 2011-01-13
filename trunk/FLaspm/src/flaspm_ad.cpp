@@ -242,7 +242,7 @@ void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
 //******************************************************************************
 extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP sigma2SEXP,
                 SEXP steepnessSEXP, SEXP MSEXP, SEXP matSEXP, SEXP selSEXP,
-                SEXP wghtSEXP, SEXP aminSEXP, SEXP amaxSEXP, SEXP nyrsSEXP)
+                SEXP wghtSEXP, SEXP aminSEXP, SEXP amaxSEXP, SEXP nyrsSEXP, SEXP modelSEXP)
 {
 
     // loop and other junk vars
@@ -254,6 +254,7 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     int amax = asInteger(amaxSEXP);
     int nyrs = asInteger(nyrsSEXP);
     int nages = amax-amin+1;
+    int model_name = asInteger(modelSEXP);
 
     // the scalar doubles
     double steepness = asReal(steepnessSEXP);
@@ -269,24 +270,24 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     // fill them in
     for (i = 0; i<nages; i++)
     {
-	mat[i] = REAL(matSEXP)[i];
-	sel[i] = REAL(selSEXP)[i];
-	wght[i] = REAL(wghtSEXP)[i];
+      mat[i] = REAL(matSEXP)[i];
+      sel[i] = REAL(selSEXP)[i];
+     	wght[i] = REAL(wghtSEXP)[i];
     }
 
     for (i=0; i<nyrs; i++)
-	Catch[i] = REAL(CatchSEXP)[i];
+      Catch[i] = REAL(CatchSEXP)[i];
 
     // Set up index as 2D array
     // coming in as an FLQuants object which extends a list
     int nindices = length(indexSEXP);
     double** index = new double*[nindices];
     for (i=0;i<nindices;i++)
-	index[i] = new double[nyrs];
-
+      index[i] = new double[nyrs];
+    // And fill it in
     for (i=0; i<nindices; i++)
-    for (j=0; j<nyrs; j++)
-	index[i][j] = REAL(VECTOR_ELT(indexSEXP,i))[j];
+      for (j=0; j<nyrs; j++)
+        index[i][j] = REAL(VECTOR_ELT(indexSEXP,i))[j];
 
     // Set up the AD variables
     // Can just the assignment which initialises gradient to 0
@@ -297,48 +298,151 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     adouble sigma2 = asReal(sigma2SEXP);
 
     adouble* q = new adouble[nindices];
-    //adouble* q = new adouble[1];
     adouble* bexp = new adouble[nyrs];
     adouble* b = new adouble[nyrs];
     adouble* h = new adouble[nyrs];
-    adouble* f = new adouble[nyrs];
+//    adouble* f = new adouble[nyrs];
 
 // Setting up f if not estimating - for test purposes only
 //f <- c(0.67, 0.669, 0.305, 0.142, 0.091, 0.088, 0.109, 0.075)
-f[0] = 0.67;
-f[1] = 0.669;
-f[2] = 0.305;
-f[3] = 0.142;
-f[4] = 0.091;
-f[5] = 0.088;
-f[6] = 0.109;
-f[7] = 0.075;
+//f[0] = 0.67;
+//f[1] = 0.669;
+//f[2] = 0.305;
+//f[3] = 0.142;
+//f[4] = 0.091;
+//f[5] = 0.088;
+//f[6] = 0.109;
+//f[7] = 0.075;
 
+    // initialise
     for (i=0;i<nyrs;i++)
-	{
-	bexp[i] = 0;
-	b[i] = 0;
-	h[i] = 0;
+    {
+      bexp[i] = 0;
+      b[i] = 0;
+      h[i] = 0;
     }
 
+    // Population array
     adouble** n = new adouble*[nages];
     for (i=0; i<nages; i++)
-	n[i] = new adouble[nyrs];
+      n[i] = new adouble[nyrs];
 
     adouble** index_hat = new adouble*[nindices];
     for (i=0;i<nindices;i++)
-	index_hat[i] = new adouble[nyrs];
+      index_hat[i] = new adouble[nyrs];
 
     adouble total_logl = 0;
 
+//******************************************************************************
 
 // Test pop.dyn functions
-pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
-Rprintf("bexp[1] %f\n", bexp[1].getValue());
+if (model_name == 1)
+  pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
+//Rprintf("bexp[1] %f\n", bexp[1].getValue());
+if (model_name == 2)
+  pop_dyn_Francis(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
+
+
+double B0_grad = 0;
+double sigma2_grad = 0;
 
 //******************************************************************************
 // Outputs
 //******************************************************************************
-  return CatchSEXP;
+    SEXP bexpSEXP, bSEXP, hSEXP, qSEXP, loglSEXP, out, outnames, loglnames,
+          index_hatSEXP, index_dim, nSEXP, n_dim;
+
+    // bexp, b and h
+    PROTECT(bexpSEXP = allocVector(REALSXP,nyrs));
+    PROTECT(bSEXP = allocVector(REALSXP,nyrs));
+    PROTECT(hSEXP = allocVector(REALSXP,nyrs));
+    for (i=0; i<nyrs; i++)
+    {
+      REAL(bexpSEXP)[i] = bexp[i].getValue();
+      REAL(bSEXP)[i] = b[i].getValue();
+      REAL(hSEXP)[i] = h[i].getValue();
+    }
+
+    // q, should be one q for every index
+    PROTECT(qSEXP = allocVector(REALSXP,nindices));
+    for (i=0; i<nindices; i++)
+      REAL(qSEXP)[i] = q[i].getValue();
+
+    // logl - value and gradients
+    PROTECT(loglSEXP = allocVector(REALSXP,3));
+    REAL(loglSEXP)[0] = total_logl.getValue();
+    REAL(loglSEXP)[1] = B0_grad;
+    REAL(loglSEXP)[2] = sigma2_grad;
+
+    PROTECT(loglnames = NEW_CHARACTER(3));
+    SET_STRING_ELT(loglnames,0,mkChar("logl"));
+    SET_STRING_ELT(loglnames,1,mkChar("logl_grad_B0"));
+    SET_STRING_ELT(loglnames,2,mkChar("logl_grad_sigma2"));
+    SET_NAMES(loglSEXP,loglnames);
+
+    // index_hat
+    PROTECT(index_dim     = allocVector(INTSXP, 2));
+    INTEGER(index_dim)[0] = nindices;
+    INTEGER(index_dim)[1] = nyrs;
+    PROTECT(index_hatSEXP = Rf_allocArray(REALSXP, index_dim));
+    i = 0;
+    for (j = 0; j<nyrs; j++)
+      for (k = 0; k <nindices; k++)
+        REAL(index_hatSEXP)[i++] = index_hat[k][j].getValue();
+
+    // n
+    PROTECT(n_dim = allocVector(INTSXP, 2));
+    INTEGER(n_dim)[0] = nages;
+    INTEGER(n_dim)[1] = nyrs;
+    PROTECT(nSEXP = Rf_allocArray(REALSXP, n_dim));
+    i = 0;
+    for (j = 0; j < nyrs; j++)
+      for (k = 0; k < nages; k++)
+        REAL(nSEXP)[i++] = n[k][j].getValue();
+
+
+    // Set up the actual list to be outputted
+    PROTECT(out = NEW_LIST(7));
+    SET_ELEMENT(out,0,bexpSEXP);
+    SET_ELEMENT(out,1,bSEXP);
+    SET_ELEMENT(out,2,hSEXP);
+    SET_ELEMENT(out,3,qSEXP);
+    SET_ELEMENT(out,4,loglSEXP);
+    SET_ELEMENT(out,5,index_hatSEXP);
+    SET_ELEMENT(out,6,nSEXP);
+
+    // And give it some dimnames
+    PROTECT(outnames = NEW_CHARACTER(7));
+    SET_STRING_ELT(outnames,0,mkChar("bexp"));
+    SET_STRING_ELT(outnames,1,mkChar("bmat"));
+    SET_STRING_ELT(outnames,2,mkChar("harvest"));
+    SET_STRING_ELT(outnames,3,mkChar("q"));
+    SET_STRING_ELT(outnames,4,mkChar("logl"));
+    SET_STRING_ELT(outnames,5,mkChar("indexhat"));
+    SET_STRING_ELT(outnames,6,mkChar("n"));
+    SET_NAMES(out,outnames);
+
+
+    // Cleaning up and freeing memory
+    delete [] Catch;
+    delete [] mat;
+    delete [] sel;
+    delete [] wght;
+    delete [] q;
+    delete [] bexp;
+    delete [] b;
+    delete [] h;
+
+    for(i=0; i<nages; i++)
+      delete [] n[i];
+
+    for(i=0; i<nindices; i++)
+      delete [] index_hat[i];
+
+    UNPROTECT(12);
+    return(out);
+
+
+//  return CatchSEXP;
 }
 
