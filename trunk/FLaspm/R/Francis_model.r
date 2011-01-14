@@ -51,7 +51,7 @@ aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
     # set up S-R parameters
     # Here we use BH formulation: R = (a * Bmat) / (b + Bmat)
     # Francis uses this?
-    # Recruitment at start of year is calculated using mature biomass at end of year
+    # Recruitment at start of year is calculated using mature biomass at end of previous year
     # hence using (bmat * exp(-M))
     alp <- (4*hh*R0) / (5*hh-1)
     bet <- ((bmat[1] * exp(-M)) * (1 - hh)) / (5*hh - 1)

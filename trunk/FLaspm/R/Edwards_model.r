@@ -35,7 +35,9 @@ aspm.pdyn.Edwards <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
 
     # set up S-R parameters
     alp <- (4*hh*R0)/(5*hh-1)
-    bet <- B0*(1-hh)/(5*hh-1)
+    #bet <- B0*(1-hh)/(5*hh-1)
+    # Should be based on virgin mature population, not virgin exploitable
+    bet <- bmat[1]*(1-hh)/(5*hh-1)
 
     for(y in 2:nyr) {
 

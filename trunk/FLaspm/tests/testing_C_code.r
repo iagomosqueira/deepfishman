@@ -53,8 +53,7 @@ fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m
 model(fr) <- aspm.Francis()
 
 #****************************************************************************
-# Accessor method check
-# Dummy parameters - not fitted
+# Test Edwards - R vs C
 B0 <- 411000* exp(0.5*c(M))
 sigma2 <- 0.1 # for Charlie
 
@@ -73,9 +72,9 @@ ed.pop.dyn <- pop.dyn(ed)
 fr.pop.dyn <- pop.dyn(fr)
 
 # Test Ed
-edC <- .Call("aspm_ad", fr@catch, fr@index, B0, sigma2,
-                fr@hh, fr@M, fr@mat, fr@sel,
-                fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 1)
+edC <- .Call("aspm_ad", ed@catch, ed@index, B0, sigma2,
+                ed@hh, ed@M, ed@mat, ed@sel,
+                ed@wght, ed@amin, ed@amax, dim(ed@catch)[2], 1)
 
 # Bexp
 ed.pop.dyn[["bexp"]]
@@ -98,16 +97,74 @@ edC[["n"]]
 all.equal(c(ed.pop.dyn[["n"]]),c(edC[["n"]]))
 
 # qhat
-edC[["qhat"]]
 # calced internally for R code atm
 exp(mean(log(ed@index[[1]]/as.vector(ed.pop.dyn[["bexp"]])),na.rm=T))
+edC[["qhat"]]
 
-# index hat
-
+# index_hat
+ed.pop.dyn[["bexp"]] * exp(mean(log(ed@index[[1]]/as.vector(ed.pop.dyn[["bexp"]])),na.rm=T))
+edC[["indexhat"]]
 
 # logl
+ed@logl(B0,sigma2, ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
+edC[["logl"]]
+
+#****************************************************************************
+# Test Francis - R vs C
+B0 <- 411000* exp(0.5*c(M))
+fr@params['B0',] <- B0
 
 
+# Test these methods
+# pop.dyn
+# exp.biomass
+# n
+# mat.biomass
+# harvest (f or h)
+fr.pop.dyn <- pop.dyn(fr)
+
+# Test Ed
+frC <- .Call("aspm_ad", fr@catch, fr@index, B0, 0,
+                fr@hh, fr@M, fr@mat, fr@sel,
+                fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)
+
+# Bexp
+fr.pop.dyn[["bexp"]]
+frC[["bexp"]]
+all.equal(c(fr.pop.dyn[["bexp"]]),frC[["bexp"]])
+
+#Bmat
+fr.pop.dyn[["bmat"]]
+frC[["bmat"]]
+all.equal(c(fr.pop.dyn[["bmat"]]),frC[["bmat"]])
+
+# h (or f)
+fr.pop.dyn[["harvest"]]
+frC[["harvest"]] # ?
+all.equal(c(fr.pop.dyn[["harvest"]]),frC[["harvest"]])
+
+# !!!! MODEL HAS CHANGED IN R !!! TIMING OF RECRUITMENT ETC.
+# n
+fr.pop.dyn[["n"]]
+frC[["n"]]
+all.equal(c(fr.pop.dyn[["n"]]),c(frC[["n"]]))
+
+
+# qhat
+# calced internally for R code atm
+bmid <- fr.pop.dyn[["bexp"]] * exp(-0.5*(c(fr@M)+fr.pop.dyn[["harvest"]]))
+qhat <- apply(fr@index[[1]]/bmid,c(1,6),sum,na.rm=T) / sum(!is.na(fr@index[[1]]))
+qhat
+frC[["qhat"]]
+
+# indexhat
+# Not calced for logl but used for residuals I think
+sweep(bmid,1,qhat,"*")
+frC[["indexhat"]]
+
+#logl
+fr@logl(B0,fr@hh,fr@M,fr@mat,fr@sel,fr@wght,fr@amin,fr@amax,fr@catch,fr@index)
+frC[["logl"]]
 
 #********************************************************************************
 # Stop
