@@ -43,19 +43,24 @@ typedef enum tagFLRConstSRR
 //******************************************************************************
 
 // Need logl for each model
-adouble calc_logl_Francis();
-adouble calc_logl_Edwards();
+adouble calc_logl_Francis(double** index, adouble* bexp, adouble* qhat,
+                          int nindices, int nyrs, double indextime, double M, adouble* h);
+adouble calc_logl_Edwards(double** index, adouble** index_hat, adouble sigma2,
+                          int nindices, int nyrs);
 
 // qhat is function of Bexp and index
 // just qhat per index
 // same function for both? Could be, but Francis uses straight mean, Edwards is geometric mean
-void calc_qhat_geomean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs);
-void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs);
+void calc_qhat_geomean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs,
+                    double indextime, double M, adouble* f);
+void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs,
+                    double indextime, double M, adouble* f);
 
 // index.hat
 // same function for both
 // index.hat = qhat * Bexp
-void calc_indexhat (adouble* bexp, adouble* qhat, adouble** indexhat);
+void calc_index_hat (adouble* bexp, adouble* qhat, adouble** indexhat,
+                    int nindices, int nyrs, double indextime, double M, adouble* f);
 
 // pop.dyn
 // seperate functions
@@ -72,7 +77,13 @@ void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
 
 void pop_dyn_common(int nages, int nyrs, adouble* alpha, adouble* beta, adouble** n,
                     adouble* b, adouble* bexp, double M, double* sel,
-                    double* wght, double* mat, adouble B0, double steepness);
+                    double* wght, double* mat, adouble B0, double steepness, double spawnlag);
+
+adouble logdnorm(double x,adouble mean,adouble sigma);
+
+adouble fobj(adouble f, double M, double Catch, adouble bexp);
+adouble fobj_grad(adouble f, double M, double Catch, adouble bexp);
+adouble simpleNRtogetf(adouble f, double M, double Catch, adouble bexp);
 
 
 // logl Francis needs:
@@ -91,11 +102,24 @@ void pop_dyn_common(int nages, int nyrs, adouble* alpha, adouble* beta, adouble*
 //******************************************************************************
 // Common functions
 //******************************************************************************
+// index.hat = qhat * Bexp
+void calc_index_hat (adouble* bexp, adouble* qhat, adouble** indexhat, int nindices, int nyrs,
+                      double indextime, double M, adouble* f)
+{
+  //indextime - when does the index occur? Francis = 0.5, Edwards = 0
+  int i, j;
+  for (i = 0; i < nindices; i++)
+    for (j =0; j < nyrs; j++)
+      indexhat[i][j] = bexp[j]*exp(-indextime*(M+f[j])) * qhat[i];
+}
 
 void pop_dyn_common(int nages, int nyrs, adouble* alpha, adouble* beta, adouble** n,
                     adouble* b, adouble* bexp, double M, double* sel,
-                    double* wght, double* mat, adouble B0, double steepness)
+                    double* wght, double* mat, adouble B0, double steepness, double spawnlag)
 {
+  // spawnlag is what point of the year the mature biomass is used for spawning
+  // For Edwards it is the start of the year (0)
+  // For Francis it is the end of the year (1)
   double* p = new double[nages];
   double rho = 0;
   adouble R0 = 0;
@@ -133,20 +157,21 @@ void pop_dyn_common(int nages, int nyrs, adouble* alpha, adouble* beta, adouble*
   
       // Set up SRR parameters
     *alpha = (4*steepness*R0) / (5*steepness-1);
-    *beta = B0*(1-steepness) / (5*steepness-1);
+    *beta = b[0]*exp(-M*spawnlag)*(1-steepness) / (5*steepness-1);
 
   delete [] p;
 
-/*
+
   Rprintf("In Common\n");
   Rprintf("R0: %f\n", R0.getValue());
   Rprintf("steepness: %f\n", steepness);
   Rprintf("alpha: %f\n", (*alpha).getValue());
   Rprintf("beta: %f\n\n", (*beta).getValue());
-*/
+
 }
 
-void calc_qhat_geomean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs)
+void calc_qhat_geomean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs,
+                        double indextime, double M, adouble* f)
 {
 //	q <- exp(mean(log(ind[y1:y2]/as.vector(bexp[,y1:y2])),na.rm=T))
   int i, j, nonnanyrs;
@@ -162,7 +187,7 @@ void calc_qhat_geomean(adouble* bexp, double** index, adouble* qhat, int nindice
       if (!__isnan(index[i][j]) & !__isnan(bexp[j].getValue()))
 	    {
         nonnanyrs++;
-		    mean_log_ind_over_bexp = mean_log_ind_over_bexp + log(index[i][j] / bexp[j]);
+		    mean_log_ind_over_bexp = mean_log_ind_over_bexp + log(index[i][j] / (bexp[j]*exp(-indextime * (M + f[j]))));
         // Rewrite log section as AD getting messed up
         //mean_log_ind_over_bexp = mean_log_ind_over_bexp + (log(index[i][j]) - log(bexp[j]));
       }
@@ -173,8 +198,11 @@ void calc_qhat_geomean(adouble* bexp, double** index, adouble* qhat, int nindice
   }
 }
 
-void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs)
+void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, int nyrs,
+                    double indextime, double M, adouble* f)
 {
+  // surveytime - when should bexp be compared to index, i.e. when was survey done?
+  // For Francis it is mid year, indextime = 0.5
   //	qhat <- apply(index[[index.count]]/bmid,c(1,6),sum,na.rm=T) / n
   int i, j, nonnanyrs;
   adouble mean_ind_over_bexp;
@@ -189,13 +217,56 @@ void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, 
       if (!__isnan(index[i][j]) & !__isnan(bexp[j].getValue()))
 	    {
         nonnanyrs++;
-		    mean_ind_over_bexp = mean_ind_over_bexp + (index[i][j] / bexp[j]);
+		    mean_ind_over_bexp = mean_ind_over_bexp + (index[i][j] / (bexp[j]*exp(-indextime * (M + f[j]))));
       }
     }
   	qhat[i] = mean_ind_over_bexp / nonnanyrs;
     //Rprintf("end mean log ind grad: %f\n", mean_log_ind_over_bexp.getADValue());
   }
 }
+
+// Second argument is indexhat
+adouble logdnorm(double x,adouble mean,adouble sigma)
+{
+    //Rprintf("mean grad: %f\n", mean.getADValue());
+     return(log(1 / sqrt(2*M_PI*sigma*sigma)) - (((x-mean)*(x-mean))/(2 * sigma*sigma)));
+}
+
+
+// Objective function for estimating f
+adouble fobj(adouble f, double M, double Catch, adouble bexp)
+{
+    adouble Catch_hat;
+    Catch_hat = bexp*(1-exp(-f-M))*(f / (f+M));
+    return ((Catch_hat - Catch)*(Catch_hat - Catch));
+}
+
+// Gradient of objective function for estimating f
+adouble fobj_grad(adouble f, double M, double Catch, adouble bexp)
+{
+    //sage_grad <- -2*((exp(-f - m) - 1)*B*f/(f + m) + c)*(B*f*exp(-f - m)/(f + m) - (exp(-f - m) - 1)*B/(f + m) + (exp(-f - m) - 1)*B*f/(f + m)^2)
+    adouble grad = -2*((exp(-f - M) - 1)*bexp*f/(f + M) + Catch)*(bexp*f*exp(-f - M)/(f + M) - (exp(-f - M) - 1)*bexp/(f + M) + (exp(-f - M) - 1)*bexp*f/pow(f + M,2));
+    return grad;
+}
+
+adouble simpleNRtogetf(adouble f, double M, double Catch, adouble bexp)
+{
+  adouble newf;
+  int i;
+  for (i=0; i<100; i++)
+  {
+    newf = f - fobj(f,M,Catch,bexp) / fobj_grad(f,M,Catch,bexp);
+	//if (sqrt(pow(f-newf,2)) > 1e-9) f = newf;
+	//condassign(f,1e-9 - sqrt(pow(f-newf,2)), f,newf);
+	// Need to set some kind of limit on f - pick 100
+	//if (f > 100) f = 100;
+	//condassign(f,f-100,100);
+    f = newf;
+  }
+  return f; // might need better convergence instead of just running 100 times
+}
+
+
 
 //******************************************************************************
 // Francis functions
@@ -212,39 +283,72 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
   int nages = amax-amin+1;
   adouble* alpha = new adouble;
   adouble* beta = new adouble;
+  adouble bmat_end_last;
 
   // Get the equilibrium population, initial bexp and b and alpha and beta
-  pop_dyn_common(nages, nyrs, alpha, beta, n, b, bexp, M, sel, wght, mat, B0, steepness);
+  pop_dyn_common(nages, nyrs, alpha, beta, n, b, bexp, M, sel, wght, mat, B0, steepness, 1);
 
 
   // Estimate first f
   // Double version
   //f[0] = ratner_search(0,1,100,M,Catch[0],bexp[0].getValue());
-    f[0] = 1;
-  //  f[0] = simpleNRtogetf(f[0], M, Catch[0], bexp[0]);
+  //f[0] = 1;
+    f[0] = simpleNRtogetf(f[0], M, Catch[0], bexp[0]);
     Rprintf("f0: %f\n", f[0].getValue());
 
     // Main population loop
     // Loop through years
-    for (yrcount = 1; yrcount < nyrs; yrcount++)
-    {
-	// recruitment
-	n[0][yrcount] = *alpha * b[yrcount-1] / (*beta + b[yrcount-1]);
-	// adult dynamics
-	for (i=1; i<nages; i++)
-	    //n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1] * h[yrcount-1]);
-	    n[i][yrcount] = n[i-1][yrcount-1] * exp(-M -(sel[i-1] * f[yrcount-1]));
-	n[nages-1][yrcount] = n[nages-1][yrcount] + n[nages-1][yrcount-1] * exp(-M - (sel[nages-1] * f[yrcount-1]));
-	for (i=0; i<nages; i++)
-	    bexp[yrcount] = bexp[yrcount] + (n[i][yrcount] * sel[i] * wght[i]);
-	// Estimate f
-	f[yrcount] = 1;
-	//f[yrcount] = ratner_search(0,1,100,M,Catch[yrcount],bexp[yrcount].getValue());
-  //f[yrcount] = simpleNRtogetf(f[yrcount-1], M, Catch[yrcount], bexp[yrcount]);
-	for (i=0;i<nages;i++)
-	    b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
-    }
+  for (yrcount = 1; yrcount < nyrs; yrcount++)
+  {
+    // recruitment
+    // 	recruitment at start of year is based on biomass at end of previous year
+    // See equation for alpha in Francis paper. alpha is calced using n exp(-5M)
+    // and n is already half way through year.
+    bmat_end_last = b[yrcount-1]*exp(-M-f[yrcount-1]);
+    n[0][yrcount] = *alpha * bmat_end_last / (*beta + bmat_end_last);
+    // adult dynamics
+    for (i=1; i<nages; i++)
+      //n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1] * h[yrcount-1]);
+      n[i][yrcount] = n[i-1][yrcount-1] * exp(-M -(sel[i-1] * f[yrcount-1]));
+    n[nages-1][yrcount] = n[nages-1][yrcount] + n[nages-1][yrcount-1] * exp(-M - (sel[nages-1] * f[yrcount-1]));
+    for (i=0; i<nages; i++)
+      bexp[yrcount] = bexp[yrcount] + (n[i][yrcount] * sel[i] * wght[i]);
+    // Estimate f
+    f[yrcount] = 1;
+    //f[yrcount] = ratner_search(0,1,100,M,Catch[yrcount],bexp[yrcount].getValue());
+    f[yrcount] = simpleNRtogetf(f[yrcount-1], M, Catch[yrcount], bexp[yrcount]);
+    for (i=0;i<nages;i++)
+      b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
+  }
+}
 
+adouble calc_logl_Francis(double** index, adouble* bexp, adouble* qhat,
+                          int nindices, int nyrs, double indextime, double M, adouble* h)
+{
+      //chat2 <- apply((index[[index.count]] / sweep(bmid,1,qhat,"*") - 1)^2,c(1,6),sum,na.rm=T) / (n-2)
+	    //total.logl <- total.logl + (-n*log(sqrt(chat2)) -n*log(qhat) -apply(log(bmid[nonnaindexyears]),c(1,6),sum))
+  adouble chat2, total_logl, log_bmid, bmid;
+  int i, j, index_count;
+  total_logl = 0;
+  for (i=0; i < nindices; i++)
+  {
+    chat2 = 0;
+    index_count = 0;
+    log_bmid = 0;
+    for (j=0; j<nyrs; j++)
+    {
+      if (!__isnan(index[i][j]))
+      {
+        index_count++;
+        bmid = bexp[j]*exp(-indextime*(M+h[j]));
+        chat2 = chat2 + pow((index[i][j] / (qhat[i] * bmid)) - 1,2);
+        log_bmid = log_bmid + log(bmid);
+      }
+    }
+    chat2 = chat2 / (index_count-2);
+    total_logl = total_logl + (-index_count*log(sqrt(chat2)) - index_count*log(qhat[i]) - log_bmid);
+  }
+  return total_logl;
 }
 
 //******************************************************************************
@@ -263,7 +367,7 @@ void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
   adouble* alpha = new adouble;
   adouble* beta = new adouble;
   // Get the equilibrium population, initial bexp and b and alpha and beta
-  pop_dyn_common(nages, nyrs, alpha, beta, n, b, bexp, M, sel, wght, mat, B0, steepness);
+  pop_dyn_common(nages, nyrs, alpha, beta, n, b, bexp, M, sel, wght, mat, B0, steepness, 0);
 
 //Rprintf("In Edwards\n");
 //Rprintf("alpha: %f\n", (*alpha).getValue());
@@ -300,6 +404,29 @@ void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
     }
 
 
+}
+
+adouble calc_logl_Edwards(double** index, adouble** index_hat, adouble sigma2,
+                          int nindices, int nyrs)
+{
+  int i, j;
+  adouble total_logl=0;
+  adouble index_logl_yr=0;
+
+  for (i = 0; i<nindices; i++)
+  {
+    index_logl_yr = 0;
+    for (j=0; j<nyrs; j++)
+    {
+      // check for NAN in index, i.e. not all years have index data
+	    if (!__isnan(index[i][j]))
+	    {
+        index_logl_yr = index_logl_yr + (logdnorm(log(index[i][j]),log(index_hat[i][j]), sqrt(sigma2)));
+	    }
+    }
+  total_logl = total_logl + index_logl_yr;
+  }
+  return total_logl;
 }
 
 
@@ -406,14 +533,19 @@ if (model_name == 1)
 {
   pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
   // Test qhat functions
-  calc_qhat_geomean(bexp, index, qhat, nindices, nyrs);
+  calc_qhat_geomean(bexp, index, qhat, nindices, nyrs, 0, M, h);
+  calc_index_hat (bexp, qhat, index_hat, nindices, nyrs, 0, M, h);
+  total_logl = calc_logl_Edwards(index, index_hat, sigma2, nindices, nyrs);
+
 }
 
 //Rprintf("bexp[1] %f\n", bexp[1].getValue());
 if (model_name == 2)
 {
   pop_dyn_Francis(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
-  calc_qhat_mean(bexp, index, qhat, nindices, nyrs);
+  calc_qhat_mean(bexp, index, qhat, nindices, nyrs, 0.5, M, h);
+  calc_index_hat (bexp, qhat, index_hat, nindices, nyrs, 0.5, M, h);
+  total_logl = calc_logl_Francis(index, bexp, qhat, nindices, nyrs, 0.5, M, h);
 }
 
 double B0_grad = 0;
