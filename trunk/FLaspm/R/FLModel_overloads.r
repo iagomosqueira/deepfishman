@@ -399,7 +399,7 @@ setMethod('predict', signature(object='FLaspm'),
         else
           dimnames <- dimnames(slot(obj, fittedSlot)[[index.count]])
 
-      #          browser()
+                #browser()
       # check inputs
         if(it == 1)
         {
