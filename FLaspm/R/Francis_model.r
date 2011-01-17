@@ -9,6 +9,7 @@
 # Population dynamics
 # Has to estimate f using ratner_search from bexp and catch
 aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
+    #cat("Current B0: ", B0, "\n")
     #browser()
     # Set up stuff
     C <- as.vector(catch)
@@ -207,7 +208,7 @@ aspm.Francis <- function()
 	    return(FLPar(B0=100*max(catch)))
 	},
 	# lower and upper limits for optim()
-	lower=1e-9,
+	lower=c(catch[,1]),
 	upper=1e12
     )
 
@@ -262,5 +263,48 @@ ratner_search <- function(func,x,abstol=1e-9,...)
 	ratner_search(func=func,x=c(x[2],xnew,x[3]),abstol=abstol,...)
     else
 	ratner_search(func=func,x=c(xnew,x[2],x[1]),abstol=abstol,...)
+}
+
+#*******************************************************************************
+# C bits
+
+aspm.Francis.C <- function()
+{
+  # set the likelihood function
+  # no sigma2 so set to 1 in .Call
+  logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
+  {
+    total.logl <- .Call("aspm_ad", catch, index, B0, 1,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 2)[["logl"]]["logl"]
+    return(total.logl)
+  }
+
+    # initial parameter values
+  initial <- structure(function(catch){
+    return(FLPar(B0=100*max(catch)))
+    },
+    # lower and upper limits for optim()
+    # Could run profile to get the min B
+    lower=c(catch[,1]),
+    upper=c(1e12)
+  )
+
+  model <- index ~ aspm.index.Francis.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+
+  return(list(logl=logl,model=model,initial=initial))
+} # }}}
+
+
+aspm.index.Francis.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+{
+  # sigma2 not needed so set to 1 in .Call
+  indexhat_array <- .Call("aspm_ad", catch, index, B0, 1,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 2)[["indexhat"]]
+  indexhat_flqs <- FLQuants()
+  for (i in 1:length(index))
+    indexhat_flqs[[i]] <- FLQuant(indexhat_array[i,],dimnames=dimnames(catch))
+  return(indexhat_flqs)
 }
 

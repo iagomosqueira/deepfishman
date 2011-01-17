@@ -147,12 +147,18 @@ setMethod('pop.dyn', signature(object='FLaspm'),
 	bmat <- bexp
 	harvest <- bexp
 	n <- FLQuant(NA,dimnames=list(age=object@amin:object@amax,year = dimnames(object@catch)$year),iter=iters)
+
 	# Need to make sure it calls the right function
 	# This is pretty ugly and slow.
 	if(grepl("Francis",as.character(model(object))[3]))
 	    pdyn.func <- "aspm.pdyn.Francis"
 	if(grepl("Edwards",as.character(model(object))[3]))
 	    pdyn.func <- "aspm.pdyn.Edwards"
+#	if(grepl("1",as.character(model(object))[3]))
+#	    pdyn.func <- "aspm.pdyn.Edwards"
+
+
+
 	for (i in 1:iters)
 	{
 	    # Need to make sure it calls the right function

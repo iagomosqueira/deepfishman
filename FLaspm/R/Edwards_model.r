@@ -121,3 +121,44 @@ aspm.Edwards <- function()
     return(list(logl=logl,model=model,initial=initial))
 } # }}}
 
+#*******************************************************************************
+# C Code
+aspm.Edwards.C <- function()
+{
+  # set the likelihood function
+  logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+  {
+    total.logl <- .Call("aspm_ad", catch, index, B0, sigma2,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 1)[["logl"]]["logl"]
+    return(total.logl)
+  }
+
+    # initial parameter values
+  initial <- structure(function(catch){
+    return(FLPar(B0=100*max(catch), sigma2=1))
+    },
+    # lower and upper limits for optim()
+    lower=c(1, 1e-8),
+    upper=c(Inf, Inf)
+  )
+
+  model <- index ~ aspm.index.Edwards.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+
+  return(list(logl=logl,model=model,initial=initial))
+} # }}}
+
+aspm.index.Edwards.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+{
+  # sigma2 not needed so set to 1 in .Call
+  indexhat_array <- .Call("aspm_ad", catch, index, B0, 1,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 1)[["indexhat"]]
+  indexhat_flqs <- FLQuants()
+  for (i in 1:length(index))
+    indexhat_flqs[[i]] <- FLQuant(indexhat_array[i,],dimnames=dimnames(catch))
+  return(indexhat_flqs)
+}
+
+
+

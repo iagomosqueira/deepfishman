@@ -117,6 +117,9 @@ void pop_dyn_common(int nages, int nyrs, adouble* alpha, adouble* beta, adouble*
                     adouble* b, adouble* bexp, double M, double* sel,
                     double* wght, double* mat, adouble B0, double steepness, double spawnlag)
 {
+    // Handy output for fmle
+    //Rprintf("Current B0: %f\n", B0.getValue());
+
   // spawnlag is what point of the year the mature biomass is used for spawning
   // For Edwards it is the start of the year (0)
   // For Francis it is the end of the year (1)
@@ -162,11 +165,11 @@ void pop_dyn_common(int nages, int nyrs, adouble* alpha, adouble* beta, adouble*
   delete [] p;
 
 
-  Rprintf("In Common\n");
-  Rprintf("R0: %f\n", R0.getValue());
-  Rprintf("steepness: %f\n", steepness);
-  Rprintf("alpha: %f\n", (*alpha).getValue());
-  Rprintf("beta: %f\n\n", (*beta).getValue());
+//  Rprintf("In Common\n");
+//  Rprintf("R0: %f\n", R0.getValue());
+//  Rprintf("steepness: %f\n", steepness);
+//  Rprintf("alpha: %f\n", (*alpha).getValue());
+//  Rprintf("beta: %f\n\n", (*beta).getValue());
 
 }
 
@@ -253,9 +256,12 @@ adouble simpleNRtogetf(adouble f, double M, double Catch, adouble bexp)
 {
   adouble newf;
   int i;
+  //Rprintf("Solving f\n");
+  //Rprintf("-------------\n");
   for (i=0; i<100; i++)
   {
     newf = f - fobj(f,M,Catch,bexp) / fobj_grad(f,M,Catch,bexp);
+    //Rprintf("newf in for loop: %f\n", newf.getValue());
 	//if (sqrt(pow(f-newf,2)) > 1e-9) f = newf;
 	//condassign(f,1e-9 - sqrt(pow(f-newf,2)), f,newf);
 	// Need to set some kind of limit on f - pick 100
@@ -281,6 +287,7 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
   int i,j, yrcount, fp;
   // more interesting vars
   int nages = amax-amin+1;
+  adouble fmax = 100;
   adouble* alpha = new adouble;
   adouble* beta = new adouble;
   adouble bmat_end_last;
@@ -292,9 +299,13 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
   // Estimate first f
   // Double version
   //f[0] = ratner_search(0,1,100,M,Catch[0],bexp[0].getValue());
-  //f[0] = 1;
+    f[0] = 1; // Needs good first estimate of f[0] else failure to converge
     f[0] = simpleNRtogetf(f[0], M, Catch[0], bexp[0]);
-    Rprintf("f0: %f\n", f[0].getValue());
+    if (__isnan(f[0].getValue())) f[0] = fmax;
+    //Rprintf("Initial f0: %f\n", f[0].getValue());
+
+// Need to check if f is something sensible
+// If not set bexp to 0
 
     // Main population loop
     // Loop through years
@@ -317,6 +328,7 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
     f[yrcount] = 1;
     //f[yrcount] = ratner_search(0,1,100,M,Catch[yrcount],bexp[yrcount].getValue());
     f[yrcount] = simpleNRtogetf(f[yrcount-1], M, Catch[yrcount], bexp[yrcount]);
+    if (__isnan(f[yrcount].getValue())) f[yrcount] = fmax;
     for (i=0;i<nages;i++)
       b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
   }
@@ -327,6 +339,9 @@ adouble calc_logl_Francis(double** index, adouble* bexp, adouble* qhat,
 {
       //chat2 <- apply((index[[index.count]] / sweep(bmid,1,qhat,"*") - 1)^2,c(1,6),sum,na.rm=T) / (n-2)
 	    //total.logl <- total.logl + (-n*log(sqrt(chat2)) -n*log(qhat) -apply(log(bmid[nonnaindexyears]),c(1,6),sum))
+// This is the current check I am using - bad!
+// if(any(bmid==0)) bmid[] <- 1e-9
+
   adouble chat2, total_logl, log_bmid, bmid;
   int i, j, index_count;
   total_logl = 0;
@@ -341,8 +356,17 @@ adouble calc_logl_Francis(double** index, adouble* bexp, adouble* qhat,
       {
         index_count++;
         bmid = bexp[j]*exp(-indextime*(M+h[j]));
+        // this is dangerous
+//        Rprintf("bmid: %f\n", bmid.getValue());
+//        if(__isnan(bmid.getValue())) Rprintf("Yes, I am a nan\n");
+        if(__isnan(bmid.getValue())) bmid = 1e-9;
+        //Rprintf("bmid again: %f\n", bmid.getValue());
+        //bmid = max(bmid,1e-9);
+        // qhat can also be NaN
         chat2 = chat2 + pow((index[i][j] / (qhat[i] * bmid)) - 1,2);
+        //Rprintf("chat2: %f", chat2.getValue());
         log_bmid = log_bmid + log(bmid);
+        //Rprintf("log_bmid: %f", log_bmid.getValue());
       }
     }
     chat2 = chat2 / (index_count-2);

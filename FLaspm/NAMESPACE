@@ -5,7 +5,13 @@ export(
   "length_to_weight",
   "age_to_weight",
   "aspm.Edwards",
-  "aspm.Francis")
+  "aspm.Edwards.C",
+  "aspm.index.Edwards",
+  "aspm.index.Edwards.C",
+  "aspm.Francis",
+  "aspm.Francis.C",
+  "aspm.index.Francis",
+  "aspm.index.Francis.C")
 exportClasses(
 	"FLaspm")
 exportMethods(
