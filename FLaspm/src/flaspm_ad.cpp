@@ -511,25 +511,11 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     // Or can use x.setValue to just set the non-AD part
     // Or can use adouble x(1,2) to see non-AD to 1 and AD to 2
     // Or can use x.setADValue(1) to set AD value
-    adouble B0 = asReal(B0SEXP);
-    adouble sigma2 = asReal(sigma2SEXP);
 
     adouble* qhat = new adouble[nindices];
     adouble* bexp = new adouble[nyrs];
     adouble* b = new adouble[nyrs];
     adouble* h = new adouble[nyrs];
-//    adouble* f = new adouble[nyrs];
-
-// Setting up f if not estimating - for test purposes only
-//f <- c(0.67, 0.669, 0.305, 0.142, 0.091, 0.088, 0.109, 0.075)
-//f[0] = 0.67;
-//f[1] = 0.669;
-//f[2] = 0.305;
-//f[3] = 0.142;
-//f[4] = 0.091;
-//f[5] = 0.088;
-//f[6] = 0.109;
-//f[7] = 0.075;
 
     // initialise
     for (i=0;i<nyrs;i++)
@@ -549,19 +535,46 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
       index_hat[i] = new adouble[nyrs];
 
     adouble total_logl = 0;
+    
+  double B0_grad = 0;
+  double sigma2_grad = 0;
+
 
 //******************************************************************************
 
 // Test pop.dyn functions
-if (model_name == 1)
-{
-  pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
-  // Test qhat functions
-  calc_qhat_geomean(bexp, index, qhat, nindices, nyrs, 0, M, h);
-  calc_index_hat (bexp, qhat, index_hat, nindices, nyrs, 0, M, h);
-  total_logl = calc_logl_Edwards(index, index_hat, sigma2, nindices, nyrs);
 
-}
+    // Tapeless
+    adouble B0 = asReal(B0SEXP);
+    adouble sigma2 = asReal(sigma2SEXP);
+
+
+
+  if (model_name == 1)
+  {
+    // Set up B0 deriv
+    B0.setADValue(1);
+    sigma2.setADValue(0);
+
+    pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
+    calc_qhat_geomean(bexp, index, qhat, nindices, nyrs, 0, M, h);
+    calc_index_hat (bexp, qhat, index_hat, nindices, nyrs, 0, M, h);
+    total_logl = calc_logl_Edwards(index, index_hat, sigma2, nindices, nyrs);
+    B0_grad = total_logl.getADValue();
+
+    // Set up sigma2 deriv
+    B0.setADValue(0);
+    sigma2.setADValue(1);
+
+    pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
+    calc_qhat_geomean(bexp, index, qhat, nindices, nyrs, 0, M, h);
+    calc_index_hat (bexp, qhat, index_hat, nindices, nyrs, 0, M, h);
+    total_logl = calc_logl_Edwards(index, index_hat, sigma2, nindices, nyrs);
+    sigma2_grad = total_logl.getADValue();
+  }
+
+
+
 
 //Rprintf("bexp[1] %f\n", bexp[1].getValue());
 if (model_name == 2)
@@ -572,8 +585,6 @@ if (model_name == 2)
   total_logl = calc_logl_Francis(index, bexp, qhat, nindices, nyrs, 0.5, M, h);
 }
 
-double B0_grad = 0;
-double sigma2_grad = 0;
 
 //******************************************************************************
 // Outputs
