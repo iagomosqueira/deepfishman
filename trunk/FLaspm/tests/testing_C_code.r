@@ -130,7 +130,7 @@ B0 <- 411000* exp(0.5*c(M))
 fr@params['B0',] <- B0
 fr.pop.dyn <- pop.dyn(fr)
 
-# Test Ed
+# Test FrC
 frC <- .Call("aspm_ad", fr@catch, fr@index, B0, 0,
                 fr@hh, fr@M, fr@mat, fr@sel,
                 fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)
@@ -246,9 +246,74 @@ profile(fr.C.res,maxsteps=30,range=0.3)
 
 #*******************************************************************************
 # AD (yeah right)
+ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
+model(ed) <- aspm.Edwards()
+
+#B0 <- 411000* exp(0.5*c(M))
+B0 <- 500000
+B0 <- max(catch)*100
+sigma2 <- 1#0.1
+ed@params['B0',] <- B0
+ed@params['sigma2',] <- sigma2
+
+ed.pop.dyn <- pop.dyn(ed)
+
+# Test Ed
+edC <- .Call("aspm_ad", ed@catch, ed@index, B0, sigma2,
+                ed@hh, ed@M, ed@mat, ed@sel,
+                ed@wght, ed@amin, ed@amax, dim(ed@catch)[2], 1)
+
+edC[["logl"]]
+# get approx grad
+loglr <- ed@logl(B0,sigma2, ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
+tiny <- 1+1e-9
+loglr_bumpB0 <- ed@logl(B0*tiny,sigma2, ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
+(loglr_bumpB0 - loglr) / (B0 * (tiny - 1))
+loglr_bumpsigma2 <- ed@logl(B0,sigma2*tiny, ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
+(loglr_bumpsigma2 - loglr) / (sigma2 * (tiny - 1))
+# Looks alright!
+
+ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
+model(ed.C) <- aspm.Edwards.C()
+ed.C <- fmle(ed.C)
+params(ed.C)
+#ed.C <- fmle(ed.C,fixed=list(sigma2=2.9568e-2))
+
+# Add gradient
+grad.Edwards <- function(B0, sigma2, hh, M, mat, sel, wght, amin, amax, catch, index)
+{
+  out <- .Call("aspm_ad", catch, index, B0, sigma2,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 1)
+  grads <- as.numeric(-1 * out[["logl"]][c("logl_grad_B0","logl_grad_sigma2")])
+  #grads <- -1 * out[["logl"]][c("logl_grad_sigma2")]
+  #cat("B0 and sigma2: ", c(B0, sigma2), "\n")
+  cat("grads: ", grads, "\n")
+  return(grads)
+}
+
+grad.Edwards(B0, sigma2, ed.C@hh, ed.C@M, ed.C@mat, ed.C@sel, ed.C@wght, ed.C@amin, ed.C@amax, ed.C@catch, ed.C@index)
 
 
+#grad.Edwards <- function(B0, sigma2, hh=ed.C@hh, M=ed.C@M, mat=ed.C@mat, sel=ed.C@sel, wght=ed.C@wght,
+#                          amin=ed.C@amin, amax=ed.C@amax, catch=ed.C@catch, index=ed.C@index)
+#{
+#  out <- .Call("aspm_ad", catch, index, B0, sigma2,
+#                hh, M, mat, sel,
+#                wght, amin, amax, dim(catch)[2], 1)
+#  return(-out[["logl"]][c("logl_grad_B0","logl_grad_sigma2")])
+#}
+#grad.Edwards(B0, sigma2)
 
+ed.CAD <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
+model(ed.CAD) <- aspm.Edwards.C()
+ed.CAD@gr <- grad.Edwards
+testAD <- fmle(ed.CAD,autoParscale=FALSE)
+
+#testAD <- fmle(ed.CAD,autoParscale=FALSE, fixed=list(sigma2=2.9568e-2))
+testAD <- fmle(ed.CAD,autoParscale=FALSE, fixed=list(B0=4.21e5))
+
+params(testAD)
 #********************************************************************************
 # Stop
 #********************************************************************************

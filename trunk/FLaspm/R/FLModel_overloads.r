@@ -92,8 +92,11 @@ setMethod('fmle',
 	  pars <- as.list(par)
 	  names(pars) <- names(start)
 	  pars[fixnm] <- lapply(fixed, iter, it)
+	  #browser()
 	  return((do.call(gr, args=c(pars, data))))
 	}
+
+
 
     # input data
     alldata <- list()
@@ -248,6 +251,8 @@ diff_logl <-  abs(1/(((logl_bump1 - logl_bump2) / (2 * unlist(start) * tiny_numb
 
         control <- c(control, list(parscale=diff_logl))
       }
+
+#browser()
 
       # TODO protect environment
       out <- do.call('optim', c(list(par=unlist(start), fn=loglfoo, method=method,
