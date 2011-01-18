@@ -248,7 +248,6 @@ diff_logl <-  abs(1/(((logl_bump1 - logl_bump2) / (2 * unlist(start) * tiny_numb
 # This fails if only one parameter = 1
 #        if(relAutoParscale)
 #          diff_logl <- diff_logl / max(diff_logl)
-
         control <- c(control, list(parscale=diff_logl))
       }
 

@@ -280,14 +280,25 @@ aspm.Francis.C <- function()
     return(total.logl)
   }
 
+  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+        B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=50)
+        llout <- rep(NA,length(B0seq))
+        for (i in 1:length(B0seq))
+          llout[i] <- .Call("aspm_ad", catch, index, B0seq[i], 1,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 2)[["logl"]]["logl"]
+        B0_max <- B0seq[which.max(llout)]
+        cat("Got initial value of B0: ", B0_max, "\n")
+        return(FLPar(B0 = B0_max))
+  },
     # initial parameter values
-  initial <- structure(function(catch){
-    return(FLPar(B0=100*max(catch)))
-    },
+#  initial <- structure(function(catch){
+#    return(FLPar(B0=100*max(catch)))
+#    },
     # lower and upper limits for optim()
     # Could run profile to get the min B
-    lower=c(catch[,1]),
-    upper=c(1e12)
+    lower=1,
+    upper=Inf
   )
 
   model <- index ~ aspm.index.Francis.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax)

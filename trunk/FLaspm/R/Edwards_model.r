@@ -135,9 +135,33 @@ aspm.Edwards.C <- function()
   }
 
     # initial parameter values
-  initial <- structure(function(catch){
-    return(FLPar(B0=100*max(catch), sigma2=1))
+  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+  #browser()
+    # Let's do something more sophisticated to get the start values
+    B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=50)
+    s2seq <- exp(seq(from = log(1e-8), to = log(10), length = 50))
+    llgrid <- expand.grid(B0=B0seq,s2=s2seq,ll=NA)
+    
+    for (i in 1:nrow(llgrid))
+    {
+    
+      llgrid[i,"ll"] <- .Call("aspm_ad", catch, index, llgrid[i,"B0"], llgrid[i,"s2"],
+                            hh, M, mat, sel,
+                            wght, amin, amax, dim(catch)[2], 1)[["logl"]]["logl"]
+    }
+    B0_max <- llgrid[which.max(llgrid[,"ll"]),"B0"]
+    s2_max <- llgrid[which.max(llgrid[,"ll"]),"s2"]
+    
+    #browser()
+    cat("Got initial guess\n")
+    cat("Initial B0: ", B0_max, "\n")
+    cat("Initial sigma2: ", s2_max, "\n")
+    return(FLPar(B0=B0_max, sigma2 = s2_max))
     },
+
+  #initial <- structure(function(catch){
+    #return(FLPar(B0=100*max(catch), sigma2=1))
+    #},
     # lower and upper limits for optim()
     lower=c(1, 1e-8),
     upper=c(Inf, Inf)
@@ -160,5 +184,64 @@ aspm.index.Edwards.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
   return(indexhat_flqs)
 }
 
+#*******************************************************************************
+# model function with gradients from AD
+aspm.Edwards.C.AD <- function()
+{
+  # set the likelihood function
+  logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+  {
+    total.logl <- .Call("aspm_ad", catch, index, B0, sigma2,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 1)[["logl"]]["logl"]
+    return(total.logl)
+  }
+
+    # initial parameter values
+  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+    # Let's do something more sophisticated to get the start values
+    # Get a profile surface and pick the parameter values that give the max LL
+    B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=50)
+    s2seq <- exp(seq(from = log(1e-8), to = log(10), length = 50))
+    llgrid <- expand.grid(B0=B0seq,s2=s2seq,ll=NA)
+
+    for (i in 1:nrow(llgrid))
+    {
+
+      llgrid[i,"ll"] <- .Call("aspm_ad", catch, index, llgrid[i,"B0"], llgrid[i,"s2"],
+                            hh, M, mat, sel,
+                            wght, amin, amax, dim(catch)[2], 1)[["logl"]]["logl"]
+    }
+    B0_max <- llgrid[which.max(llgrid[,"ll"]),"B0"]
+    s2_max <- llgrid[which.max(llgrid[,"ll"]),"s2"]
+
+    #browser()
+    cat("Got initial guess\n")
+    cat("Initial B0: ", B0_max, "\n")
+    cat("Initial sigma2: ", s2_max, "\n")
+    return(FLPar(B0=B0_max, sigma2 = s2_max))
+    },
+
+  #initial <- structure(function(catch){
+    #return(FLPar(B0=100*max(catch), sigma2=1))
+    #},
+    # lower and upper limits for optim()
+    lower=c(1, 1e-8),
+    upper=c(Inf, Inf)
+  )
+
+gr <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+  {
+    grads <- -1 * .Call("aspm_ad", catch, index, B0, sigma2,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 1)[["logl"]][c("logl_grad_B0","logl_grad_sigma2")]
+    return(grads)
+  }
+
+
+  model <- index ~ aspm.index.Edwards.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+
+  return(list(logl=logl,model=model,initial=initial,gr=gr))
+} # }}}
 
 
