@@ -109,6 +109,9 @@ edC[["logl"]]
 
 #****************************************************************************
 # Test Edwards C as a model
+# C Code now has a different intitial value given by searching over the profile
+# We can do this because it is fast. R code still uses the old way. Could change
+# it but it will be slow
 # Create the FLaspm object
 ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
 # Set the Francis model
@@ -150,12 +153,10 @@ fr.pop.dyn[["harvest"]]
 frC[["harvest"]] # ?
 all.equal(c(fr.pop.dyn[["harvest"]]),frC[["harvest"]])
 
-# !!!! MODEL HAS CHANGED IN R !!! TIMING OF RECRUITMENT ETC.
 # n
 fr.pop.dyn[["n"]]
 frC[["n"]]
 all.equal(c(fr.pop.dyn[["n"]]),c(frC[["n"]]))
-
 
 # qhat
 # calced internally for R code atm
@@ -207,7 +208,6 @@ fr.pop.dyn[["harvest"]]
 
 #****************************************************************************
 # Test Francis C as a model
-
 fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
 model(fr) <- aspm.Francis()
 
@@ -221,6 +221,9 @@ fr.res@params
 fr.C.res <- fmle(fr.C)
 fr.C.res@params
 
+profile(fr.res,maxsteps=50, range=0.3)
+profile(fr.C.res,maxsteps=50, range = 0.1)
+
 #********************************************************************************
 # Profile
 ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
@@ -232,6 +235,8 @@ ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat
 model(ed.C) <- aspm.Edwards.C()
 ed.C.res <- fmle(ed.C)
 profile(ed.C.res,maxsteps=30,range=0.3)
+profile(ed.C.res,range=list(B0=seq(from=300000,to=550000,length=30),
+                                        sigma2=exp(seq(from=log(1e-7),to=log(0.01),length=200))))
 
 
 fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
@@ -245,39 +250,50 @@ fr.C.res <- fmle(fr.C)
 profile(fr.C.res,maxsteps=30,range=0.3)
 
 #*******************************************************************************
-# AD (yeah right)
+# Edwards AD
 ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
 model(ed) <- aspm.Edwards()
 
-#B0 <- 411000* exp(0.5*c(M))
-B0 <- 500000
-B0 <- max(catch)*100
-sigma2 <- 1#0.1
-ed@params['B0',] <- B0
-ed@params['sigma2',] <- sigma2
+B0seq <- seq(from = 300000, to = 500000, length=10)
+#s2seq <- seq(from=0.001, to=2, length=10)
+s2seq <- exp(seq(from=log(1e-8), to=log(0.1), length=10))
+grads <- expand.grid(B0=B0seq, s2 = s2seq, B0grad_approx=NA, B0grad_ad=NA, s2grad_approx=NA,s2grad_ad=NA, logl=NA)
 
-ed.pop.dyn <- pop.dyn(ed)
-
-# Test Ed
-edC <- .Call("aspm_ad", ed@catch, ed@index, B0, sigma2,
+for (i in 1:nrow(grads))
+{
+  edC <- .Call("aspm_ad", ed@catch, ed@index, grads[i,"B0"], grads[i,"s2"],
                 ed@hh, ed@M, ed@mat, ed@sel,
                 ed@wght, ed@amin, ed@amax, dim(ed@catch)[2], 1)
 
-edC[["logl"]]
-# get approx grad
+  # AD grads
+  grads[i,"B0grad_ad"] <- edC[["logl"]][2]
+  grads[i,"s2grad_ad"] <- edC[["logl"]][3]
+  grads[i,"logl"] <- edC[["logl"]][1]
+  # get approx grad
+  loglr <- ed@logl(grads[i,"B0"],grads[i,"s2"], ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
+  tiny <- 1+1e-9
+  loglr_bumpB0 <- ed@logl(grads[i,"B0"]*tiny,grads[i,"s2"], ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
+  grads[i,"B0grad_approx"] <- (loglr_bumpB0 - loglr) / (grads[i,"B0"] * (tiny - 1))
+  loglr_bumpsigma2 <- ed@logl(grads[i,"B0"],grads[i,"s2"]*tiny, ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
+  grads[i,"s2grad_approx"] <- (loglr_bumpsigma2 - loglr) / (grads[i,"s2"] * (tiny - 1))
+}
+# Looks OK
+ll_mat <- matrix(grads[,"logl"],nrow=length(B0seq),ncol=length(s2seq))
+image(x=B0seq,y=s2seq,z=-ll_mat)
+
+# Weird gradient on sigma2 at low values (1e-8) but probably OK
+#4262100 1e-08
+
+sigma2 <- 0.52631580#0.2#1e-1
+B0 <- 15340.0#5e5#4262100
 loglr <- ed@logl(B0,sigma2, ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
 tiny <- 1+1e-9
-loglr_bumpB0 <- ed@logl(B0*tiny,sigma2, ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
-(loglr_bumpB0 - loglr) / (B0 * (tiny - 1))
 loglr_bumpsigma2 <- ed@logl(B0,sigma2*tiny, ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
 (loglr_bumpsigma2 - loglr) / (sigma2 * (tiny - 1))
-# Looks alright!
 
-ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-model(ed.C) <- aspm.Edwards.C()
-ed.C <- fmle(ed.C)
-params(ed.C)
-#ed.C <- fmle(ed.C,fixed=list(sigma2=2.9568e-2))
+
+
+
 
 # Add gradient
 grad.Edwards <- function(B0, sigma2, hh, M, mat, sel, wght, amin, amax, catch, index)
@@ -285,35 +301,124 @@ grad.Edwards <- function(B0, sigma2, hh, M, mat, sel, wght, amin, amax, catch, i
   out <- .Call("aspm_ad", catch, index, B0, sigma2,
                 hh, M, mat, sel,
                 wght, amin, amax, dim(catch)[2], 1)
-  grads <- as.numeric(-1 * out[["logl"]][c("logl_grad_B0","logl_grad_sigma2")])
-  #grads <- -1 * out[["logl"]][c("logl_grad_sigma2")]
-  #cat("B0 and sigma2: ", c(B0, sigma2), "\n")
-  cat("grads: ", grads, "\n")
+  grads <-   -1*c(out[["logl"]]["logl_grad_B0"], out[["logl"]]["logl_grad_sigma2"])
   return(grads)
 }
 
+B0 <- 5e5
+sigma2 <- 0.2
 grad.Edwards(B0, sigma2, ed.C@hh, ed.C@M, ed.C@mat, ed.C@sel, ed.C@wght, ed.C@amin, ed.C@amax, ed.C@catch, ed.C@index)
-
-
-#grad.Edwards <- function(B0, sigma2, hh=ed.C@hh, M=ed.C@M, mat=ed.C@mat, sel=ed.C@sel, wght=ed.C@wght,
-#                          amin=ed.C@amin, amax=ed.C@amax, catch=ed.C@catch, index=ed.C@index)
-#{
-#  out <- .Call("aspm_ad", catch, index, B0, sigma2,
-#                hh, M, mat, sel,
-#                wght, amin, amax, dim(catch)[2], 1)
-#  return(-out[["logl"]][c("logl_grad_B0","logl_grad_sigma2")])
-#}
-#grad.Edwards(B0, sigma2)
 
 ed.CAD <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
 model(ed.CAD) <- aspm.Edwards.C()
 ed.CAD@gr <- grad.Edwards
-testAD <- fmle(ed.CAD,autoParscale=FALSE)
+#ed.CAD <- fmle(ed.CAD,control=list(trace=1,parscale=c(1e8,1)))
+ed.CAD <- fmle(ed.CAD,autoParscale=FALSE) # doesn't go anywhere, just that initial guesses were decent
+ed.CAD <- fmle(ed.CAD)
+params(ed.CAD)
+profile(ed.CAD,maxsteps=100)
+# log the sigma axis - looks good!
+profile(ed.CAD,range=list(B0=seq(from=100000, to= 800000, length=50),
+                          sigma2 = exp(seq(from=log(1e-4),to=log(10), length=50))), log="y")
 
-#testAD <- fmle(ed.CAD,autoParscale=FALSE, fixed=list(sigma2=2.9568e-2))
-testAD <- fmle(ed.CAD,autoParscale=FALSE, fixed=list(B0=4.21e5))
+# Get just C model up and running
+ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
+model(ed.C) <- aspm.Edwards.C()
+ed.C <- fmle(ed.C)
+#ed.C <- fmle(ed.C, control=list(trace=1,parscale=c(1e8,1)))
+params(ed.C)
+profile(ed.C,maxsteps=100)
 
-params(testAD)
+# With gradient, doesn't make any difference in final params
+# Path looks a little different OK
+#*******************************************************************************
+# Try with the new AD model
+ed.CAD <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
+model(ed.CAD) <- aspm.Edwards.C.AD()
+ed.CAD <- fmle(ed.CAD)
+params(ed.CAD)
+profile(ed.CAD,maxsteps=100)
+
+# vs just C
+ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
+model(ed.C) <- aspm.Edwards.C()
+ed.C <- fmle(ed.C)
+params(ed.C)
+profile(ed.C,maxsteps=100)
+# slightly different path but end result is the same
+
+# Setting good initial values is crucial
+# Then the autoParscale becomes appropriate (else the parscale is set using values
+# that are far from the logl and therefore may be wrong)
+# Using the gradient makes a difference in the journey but may not make a difference
+# to the end result (I guess it depends on the data)
+
+#*******************************************
+# Try using optim
+logl_optim <- function (x, hh, M, mat, sel, wght, amin, amax, catch, index)
+{
+    B0 = x[1]
+    sigma2 = x[2]
+    indexhat.quants <- aspm.index.Edwards(catch, index, B0, hh,
+        M, mat, sel, wght, amin, amax)
+    log.indexhat.quants <- lapply(indexhat.quants, function(index) window(log(index),
+        start = dims(index)$minyear, end = dims(index)$maxyear))
+    total.logl <- 0
+    for (index.count in 1:length(index)) total.logl <- total.logl +
+        sum(dnorm(log(index[[index.count]]), log.indexhat.quants[[index.count]],
+            sqrt(sigma2), TRUE), na.rm = T)
+    return(-1 * total.logl)
+}
+
+
+initial <- c(B0 = 100*max(ed@catch), sigma2 = 1)
+# test logl_optim
+logl_optim(c(429690,0.02957), ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
+# looks same as fmle - good, can we solve?
+lower <- c(1,1e-8)
+upper <- c(Inf,Inf)
+test <- optim(par = initial, fn = logl_optim, lower=lower, upper=upper, method="L-BFGS-B",
+                control=list(trace=1, parscale=c(1.93e8,3.68e-1)),
+                hh = ed@hh, M=ed@M,mat=ed@mat,
+              sel=ed@sel, wght=ed@wght, amin=ed@amin, amax=ed@amax, catch=ed@catch, index=ed@index)
+test[["par"]]
+# as fmle - good
+
+grad <- function(x, hh, M, mat, sel, wght, amin, amax, catch, index)
+{
+  B0 <- x[1]
+  sigma2 <- x[2]
+  out <- .Call("aspm_ad", catch, index, B0, sigma2,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 1)
+  grads <- as.numeric(out[["logl"]][c("logl_grad_B0","logl_grad_sigma2")])
+  #grads <- -1 * out[["logl"]][c("logl_grad_sigma2")]
+  #cat("B0 and sigma2: ", c(B0, sigma2), "\n")
+  #cat("grads: ", grads, "\n")
+  return(-1*grads)
+}
+
+#lower <- c(c(catch)[1],1e-8)
+test.gr <- optim(par = initial, fn = logl_optim, lower=lower, upper=upper, method="L-BFGS-B",
+                control=list(trace=1,parscale=c(1e8,1)),
+                gr=grad,
+                hh = ed@hh, M=ed@M,mat=ed@mat,
+              sel=ed@sel, wght=ed@wght, amin=ed@amin, amax=ed@amax, catch=ed@catch, index=ed@index)
+
+
+#********************************************************************************
+
+ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
+model(ed.C) <- aspm.Edwards.C()
+ed.C <- fmle(ed.C)
+params(ed.C)
+profile(ed.C,range=0.1,maxsteps=50)
+
+edC <- .Call("aspm_ad", ed@catch, ed@index, 15340, 0.5263,
+                ed@hh, ed@M, ed@mat, ed@sel,
+                ed@wght, ed@amin, ed@amax, dim(ed@catch)[2], 1)
+
+
 #********************************************************************************
 # Stop
 #********************************************************************************
