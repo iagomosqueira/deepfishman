@@ -21,6 +21,8 @@ validFLaspm <- function(object)
   for (i in 1:length(object@index))
     if(!all(dimnames(object@index[[i]])$year %in% dnm_catch$year)) stop ("indices must have same year range as as catch")
 
+# More checks about the age ranges of mat, sel, wght and amin and amax
+
   return(TRUE)
 }
 

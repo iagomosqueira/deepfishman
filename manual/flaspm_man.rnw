@@ -1,0 +1,166 @@
+% Manual for FLaspm
+\documentclass[a4paper]{article}
+\usepackage{geometry}
+\usepackage{color}
+%\usepackage{framed}
+%\usepackage{setspace}
+\usepackage{amsmath}
+\usepackage{hyperref}
+%\usepackage{cite}
+\geometry{verbose,a4paper,tmargin=2cm,bmargin=1.5cm,lmargin=2cm,rmargin=3cm}
+\definecolor{shadecolor}{rgb}{0.9,0.9,0.9}
+\definecolor{darkblue}{rgb}{0,0,0.5}
+\setlength{\parskip}{\medskipamount}
+\setlength{\parindent}{0pt}
+%\onehalfspacing
+\hypersetup{colorlinks, urlcolor=darkblue}
+
+\begin{document}
+\SweaveOpts{engine=R}
+\title{FLaspm - Age Structured Production Models in FLR}
+\author{Charles T T Edwards <charles.edwards@imperial.ac.uk>\\
+Imperial College, London, UK\\
+Finlay Scott <finlay.scott@cefas.co.uk\\
+Cefas, Lowestoft, UK}
+\date{January 2011}
+\maketitle
+
+\section{Introduction}
+
+Something interesting on ASPM
+% Implemented using the FLR library ~\cite{FLRref}
+
+\section{The Models}
+
+Start at equib.
+SRR
+
+R version
+C version
+
+
+
+Differences between the models
+
+\subsection{Francis}
+
+%Main reference ~\cite{Francis92}
+The Francis model assumes that the surveys are carried out at a time when it was
+reasonable to assume that about half the year's fishing mortality had occurred.
+Consequently, the midyear biomass is used when fitting the model.
+
+Internally, the biomass used in the model is the biomass at the start of the year.
+The midyear biomass is calculated by:
+
+\begin{equation}
+B_{mid} = B_{start} e{0.5 (F + m)}
+\end{equation}
+
+Where $B$ is the exploitable biomass, $F$ is the level of fishing in that year and $m$ is
+the natural mortality.
+
+The $B_0$ that is estimated by $FLaspm$ is actually the exploitable biomass at the start of
+the year. This must be taken into account when comparing the output to published
+results.
+
+The basic model equation is the standard Baranov equation:
+
+\begin{equation}
+N_{i,j} = N_{i-1,j-1} e{F_{i-1} + m}
+\end{equation}
+
+Where $N$ is the abundance of age $j$ at the start of year $i$. $F$ is only
+applied to the exploitable fish.
+
+$F$ is calculated each year by solving the catch equation:
+
+%biomass*(1-exp(-z))*(f/z)
+
+\begin{equation}
+C_{i} = B_{i} (1 - e^{-F_{i}-m)} F_{i} / (F_{i} + m)
+\end{equation}
+
+Where $C$ is the catch. Internally, $F$ is estimated using a simple golden search
+algorithm.
+
+\subsection{Edwards}
+
+% Main reference ~\cite{Walters06}
+
+Assumptions
+SRA is assuming a pulse of catches at the end of the year (i.e. after natural mortality), with H = Catch/Bexp
+
+
+\section{Demonstration}
+
+First you need to load the $FLaspm$ library
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<>>=
+library(FLaspm)
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+To create an $FLaspm$ object you need to supply: the minimum and maximum ages
+($amin$ and $amax$) the $catch$, the $indices$,
+the natural mortality ($M$), the steepness of the SRR ($hh$), the selectivity ($sel$),
+the maturity ($mat$) and the mass-at-age ($wght$)).
+
+$amin$ and $amax$ are single numeric values. $catch$ must be an FLQuant. $index$
+must be an FLQuant or FLQuants object and the dimensions of the indices must
+be the same as the catch. Any empty years should be $NA$. $M$ and $hh$ can be passed
+as single numeric values (they are represented as FLQuant objects in the class).
+$sel$ and $mat$ can either be single numeric values that are the age of fish entering
+the fishery and the age of maturity respectively, or they can be passed as
+age structured FLQuant objects that have maturity and selectivity at age.
+$wght$ must be passed as an FLQuant object.
+
+Here we will use the Orange Roughy data set from CITE FRANCIS. We will need to
+calculate the mass-at-age using the Von Bertalanffy equations.
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=FALSE>>=
+# Load the data - here's some I prepared earlier
+data(NZOR)
+catch <- NZOR[["catch"]]
+index <- NZOR[["index"]]
+# Check the dimensions are OK
+dimnames(catch)
+dimnames(index)
+# Note that index has NA in some years
+# Enter the parameter values
+amin    <- 1
+amax    <- 70
+hh <- 0.95
+M <- 0.05
+mat_age <- 23
+sel_age <- 23
+# age-length parameters
+Linf  <- 42.5 #cm
+k     <- 0.059
+t0    <- -0.346
+# length-weight
+alpha <- 0.0963 # grams
+beta  <- 2.68
+
+# Set up FLQuants for weights
+# Note that we convert the mass at age to tonnes
+mass_at_age <- age_to_weight(amin:amax,Linf,k,t0,alpha,beta)
+w <- FLQuant(mass_at_age, dimnames=list(age=amin:amax)) / 1e6
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+
+
+%\bibliography{flaspm_bib}{}
+%\bibliographystyle{plain}
+
+\end{document}
