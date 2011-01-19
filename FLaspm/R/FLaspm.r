@@ -6,7 +6,24 @@
 # package it
 
 #*******************************************************************************
-#library(FLCore)
+# Validity
+validFLaspm <- function(object)
+{
+#browser()
+
+  # check that dim indices are the same as dim catch
+  dim_catch <- dim(object@catch)
+  for (i in 1:length(object@index))
+    if(all(dim(object@index[[i]]) != dim_catch)) stop ("indices must have same dims as catch")
+
+  # check year range of indices and catches are the same
+  dnm_catch <- dimnames(object@catch)
+  for (i in 1:length(object@index))
+    if(!all(dimnames(object@index[[i]])$year %in% dnm_catch$year)) stop ("indices must have same year range as as catch")
+
+  return(TRUE)
+}
+
 # Age structured parameters like sel and mat need to be FLQuant
 # Shouldn't affect the model
 # (also opens the possibility of year effects like sel changing over time which will require model changes)
@@ -25,8 +42,11 @@ setClass('FLaspm', representation(
   amin='numeric',
   fitted_index = 'FLQuants',
   residuals_index = 'FLQuants'
-  )
+  ),
+  validity=validFLaspm
 )
+
+
 
 # creator
 setGeneric("FLaspm", function(model, ...){
@@ -41,14 +61,58 @@ setMethod('FLaspm', signature(model='ANY'),
     return(res)
   }
 )
+
+#setMethod('FLaspm', signature(model='missing'),
+#  function(...)
+#  {
+#    #browser()
+#    res <- FLModel(..., class='FLaspm')
+#    return(res)
+#  }
+#)
+
 setMethod('FLaspm', signature(model='missing'),
   function(...)
   {
     #browser()
-    res <- FLModel(..., class='FLaspm')
+    args <- list(...)
+    # check through list for names (numeric and length 1)
+    amin <- args[["amin"]]
+    amax <- args[["amax"]]
+    arg_names <- names(args)
+    # Test for mat and sel
+    for (slot in c("mat","sel"))
+    {
+      if (slot %in% arg_names & is.numeric(args[[slot]]) & length(args[[slot]]) == 1)
+      {
+        temp <- FLQuant(0, dimnames=list(age=amin:amax))
+        temp[(args[[slot]] - amin + 1):length(amin:amax),] <- 1
+        args[[slot]] <- temp
+      }
+    }
+
+    # Test for hh and M
+    for (slot in c("hh","M"))
+    {
+      if (slot %in% arg_names & is.numeric(args[[slot]]) & !is.FLQuant(args[[slot]]) & length(args[[slot]]) == 1)
+        args[[slot]] <- FLQuant(args[[slot]])
+    }
+
+    # Test for index
+    if ("index" %in% arg_names & is.FLQuant(args[["index"]]))
+      args[["index"]] <- FLQuants(index=args[["index"]])
+
+    res <- do.call(FLModel,c(list(class='FLaspm'), args))
+
+
+
+    #res <- FLModel(..., class='FLaspm')
     return(res)
   }
 )
+
+
+
 
 #setMethod('FLaspm', signature(model='ANY'),
 #  function(model, ...)
