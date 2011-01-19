@@ -223,6 +223,7 @@ void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, 
 		    mean_ind_over_bexp = mean_ind_over_bexp + (index[i][j] / (bexp[j]*exp(-indextime * (M + f[j]))));
       }
     }
+    // Cast from int to double? nonnanyrs?
   	qhat[i] = mean_ind_over_bexp / nonnanyrs;
     //Rprintf("end mean log ind grad: %f\n", mean_log_ind_over_bexp.getADValue());
   }
@@ -261,8 +262,10 @@ adouble simpleNRtogetf(adouble f, double M, double Catch, adouble bexp)
   for (i=0; i<100; i++)
   {
     newf = f - fobj(f,M,Catch,bexp) / fobj_grad(f,M,Catch,bexp);
-    //Rprintf("newf in for loop: %f\n", newf.getValue());
-	//if (sqrt(pow(f-newf,2)) > 1e-9) f = newf;
+//    Rprintf("i: %i\n", i);
+//    Rprintf("newf in for loop: %f\n", newf.getValue());
+//    Rprintf("newf grad in for loop: %f\n", newf.getADValue());
+    if (sqrt(pow(f-newf,2)) < 1e-9) return f;
 	//condassign(f,1e-9 - sqrt(pow(f-newf,2)), f,newf);
 	// Need to set some kind of limit on f - pick 100
 	//if (f > 100) f = 100;
@@ -302,7 +305,8 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
     f[0] = 1; // Needs good first estimate of f[0] else failure to converge
     f[0] = simpleNRtogetf(f[0], M, Catch[0], bexp[0]);
     if (__isnan(f[0].getValue())) f[0] = fmax;
-    //Rprintf("Initial f0: %f\n", f[0].getValue());
+    //Rprintf("Initial f0 value : %f\n", f[0].getValue());
+    //Rprintf("Initial f0 AD val: %f\n", f[0].getADValue() * 1e8);
 
 // Need to check if f is something sensible
 // If not set bexp to 0
@@ -327,7 +331,8 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
     // Estimate f
     f[yrcount] = 1;
     //f[yrcount] = ratner_search(0,1,100,M,Catch[yrcount],bexp[yrcount].getValue());
-    f[yrcount] = simpleNRtogetf(f[yrcount-1], M, Catch[yrcount], bexp[yrcount]);
+//    Rprintf("yrcount: %i\n", yrcount);
+    f[yrcount] = simpleNRtogetf(f[yrcount], M, Catch[yrcount], bexp[yrcount]);
     if (__isnan(f[yrcount].getValue())) f[yrcount] = fmax;
     for (i=0;i<nages;i++)
       b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
@@ -542,13 +547,11 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
 
 //******************************************************************************
 
-// Test pop.dyn functions
+// Model evaluations
 
     // Tapeless
     adouble B0 = asReal(B0SEXP);
     adouble sigma2 = asReal(sigma2SEXP);
-
-
 
   if (model_name == 1)
   {
@@ -573,17 +576,28 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     sigma2_grad = total_logl.getADValue();
   }
 
+  //Rprintf("bexp[1] %f\n", bexp[1].getValue());
+  if (model_name == 2)
+  {
+    // Set up B0 deriv
+    B0.setADValue(1);
+    sigma2.setADValue(0);
+    pop_dyn_Francis(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
 
+//for (i=0; i<12; i++)
+//{
+//  Rprintf("f[%i] grad: %f\n", i, h[i].getADValue()*1e8);
+//  Rprintf("bexp[%i] grad: %f\n", i, bexp[i].getADValue());
+//}
 
-
-//Rprintf("bexp[1] %f\n", bexp[1].getValue());
-if (model_name == 2)
-{
-  pop_dyn_Francis(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
-  calc_qhat_mean(bexp, index, qhat, nindices, nyrs, 0.5, M, h);
-  calc_index_hat (bexp, qhat, index_hat, nindices, nyrs, 0.5, M, h);
-  total_logl = calc_logl_Francis(index, bexp, qhat, nindices, nyrs, 0.5, M, h);
-}
+    calc_qhat_mean(bexp, index, qhat, nindices, nyrs, 0.5, M, h);
+    // This gradient is very wrong
+    Rprintf("qhat grad: %f\n", qhat[0].getADValue() * 1e6);
+    calc_index_hat (bexp, qhat, index_hat, nindices, nyrs, 0.5, M, h);
+    total_logl = calc_logl_Francis(index, bexp, qhat, nindices, nyrs, 0.5, M, h);
+    B0_grad = total_logl.getADValue();
+    sigma2_grad = 0;
+  }
 
 
 //******************************************************************************

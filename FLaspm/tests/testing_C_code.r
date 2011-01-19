@@ -353,8 +353,76 @@ profile(ed.C,maxsteps=100)
 # Using the gradient makes a difference in the journey but may not make a difference
 # to the end result (I guess it depends on the data)
 
-#*******************************************
-# Try using optim
+#*******************************************************************************
+# Francis AD
+B0seq <- seq(from = 300000, to = 500000, length=10)
+grads <- data.frame(B0=B0seq,B0grad_approx = NA, B0grad_ad = NA, loglR = NA, loglC=NA)
+
+for (i in 1:nrow(grads))
+{
+  frC <- .Call("aspm_ad", fr@catch, fr@index, grads[i,"B0"], 0,
+                fr@hh, fr@M, fr@mat, fr@sel,
+                fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)
+
+  # AD grads
+  grads[i,"B0grad_ad"] <- frC[["logl"]][2]
+  grads[i,"loglC"] <- frC[["logl"]][1]
+  # get approx grad
+  loglr <- fr@logl(grads[i,"B0"],fr@hh, fr@M, fr@mat, fr@sel, fr@wght, fr@amin, fr@amax, fr@catch, fr@index)
+  grads[i,"loglR"] <- loglr
+  tiny <- 1+1e-9
+  loglr_bumpB0 <- fr@logl(grads[i,"B0"]*tiny,fr@hh, fr@M, fr@mat, fr@sel, fr@wght, fr@amin, fr@amax, fr@catch, fr@index)
+  grads[i,"B0grad_approx"] <- (loglr_bumpB0 - loglr) / (grads[i,"B0"] * (tiny - 1))
+}
+
+# terrible
+
+B0 <- 433333
+#B0 <- 600000
+frC <- .Call("aspm_ad", fr@catch, fr@index, B0, 0,
+                fr@hh, fr@M, fr@mat, fr@sel,
+                fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)
+
+ll_orig <- frC[["logl"]][1]
+tiny <- 1+1e-9
+ll_bump <- .Call("aspm_ad", fr@catch, fr@index, B0*tiny, 0,
+                fr@hh, fr@M, fr@mat, fr@sel,
+                fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)[["logl"]][1]
+(ll_bump - ll_orig) / (B0 * (tiny - 1))
+frC[["logl"]][2]
+# Yes!
+
+
+# Look at qhat - looks fine @ B0 = 300000 to 600000
+qhat_orig <- frC[["qhat"]]
+tiny <- 1+1e-9
+qhat_bump <- .Call("aspm_ad", fr@catch, fr@index, B0*tiny, 0,
+                fr@hh, fr@M, fr@mat, fr@sel,
+                fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)[["qhat"]]
+(qhat_bump - qhat_orig) / (B0 * (tiny - 1))
+
+
+
+
+
+# Look at f[0] or f[11]
+measure <- "bexp"
+i <- 12
+f0_orig <- c(frC[[measure]])[i]
+tiny <- 1+1e-9
+f0_bump <- c(.Call("aspm_ad", fr@catch, fr@index, B0*tiny, 0,
+                fr@hh, fr@M, fr@mat, fr@sel,
+                fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)[[measure]])[i]
+(f0_bump - f0_orig) / (B0 * (tiny - 1))
+
+# fs now look OK
+# so does bexp
+
+# look at f[end] and bexp (only AD params in qhat calc)
+
+
+#*******************************************************************************
+# Try using optim with Edwards
 logl_optim <- function (x, hh, M, mat, sel, wght, amin, amax, catch, index)
 {
     B0 = x[1]

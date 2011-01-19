@@ -208,7 +208,7 @@ aspm.Francis <- function()
 	    return(FLPar(B0=100*max(catch)))
 	},
 	# lower and upper limits for optim()
-	lower=c(catch[,1]),
+	lower=1,
 	upper=1e12
     )
 
