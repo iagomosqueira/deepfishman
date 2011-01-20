@@ -43,7 +43,8 @@ setClass('FLaspm', representation(
   amax='numeric',
   amin='numeric',
   fitted_index = 'FLQuants',
-  residuals_index = 'FLQuants'
+  residuals_index = 'FLQuants',
+  pop.dyn = 'function'
   ),
   validity=validFLaspm
 )
@@ -114,87 +115,9 @@ setMethod('FLaspm', signature(model='missing'),
 )
 
 
-
-
-#setMethod('FLaspm', signature(model='ANY'),
-#  function(model, ...)
-#  {
-#      # Pull out args
-#      args <- list(...)
-#      #res <- FLModel(model, ..., class='FLaspm')
-#      res <- FLaspm(...)
-#      model(res) <- model
-#    return(res)
-#  }
-#)
-# 
-#
-## More useful creator
-## This is called if model is missing. Can we specify model too?
-## Pass in selage, matage, M, hh, amin, amax, Linf, K, t0
-## and catch and indices
-#
-# Calling FLModel with missing model, calls as if with formula
-# All FLArray slots then set to same dims
-# Including fitted and residual which is wrong.
-#setMethod('FLaspm', signature(model='missing'),
-#  function(...)
-#  {
-#      #browser()
-#	args <- list(...)
-#	# Make age based quants based on amin and amax
-#	if (all(c('amin','amax') %in% names(args)))
-#	{
-#	    amin <- args[['amin']]
-#	    amax <- args[['amax']]
-#	    age.quant <- FLQuant(NA,dimnames=list(age=amin:amax))
-#	    # Age based quants based on this
-#	    sel <- age.quant
-#	    wght <- age.quant
-#	    mat <- age.quant
-#	    # Fill these up if you have them
-#	    if ('selage' %in% names(args))
-#	    {
-#		sel[] <- 0
-#		sel[ac(args[['selage']]:amax),] <- 1  
-#	    }
-#	    if ('matage' %in% names(args))
-#	    {
-#		mat[] <- 0
-#		mat[ac(args[['matage']]:amax),] <- 1  
-#	    }
-#	    if (all(c('Linf','k','t0','a','b') %in% names(args)))
-#		wght[] <- args[['a']] * (args[['Linf']] * (1 - exp(-args[['k']] * ((amin:amax) - args[['t0']]))))^args[['b']]
-#	    res <- FLModel(amin=amin, amax=amax, sel=sel, wght=wght, mat=mat,class='FLaspm')
-#	}
-#	else
-#	    res <- FLModel(..., class='FLaspm')
-#
-#	#browser()
-#	# Non-age structured Quants
-#	# This is horrible
-#	if('M' %in% names(args)) res@M <- M
-#	else res@M <- FLQuant()
-#	if('hh' %in% names(args)) res@hh <-hh 
-#	else res@hh <- FLQuant()
-#	if('catch' %in% names(args)) res@catch <- catch
-#	else res@catch <- FLQuant()
-#	if('index' %in% names(args)) 
-#	{
-#	    if (!is.FLQuants(index)) index <- FLQuants(index)
-#	    res@index <- index   
-#	}
-#	else res@index <- FLQuants()
-#
-#	    # More checks, make catch and index have same year range
-#
-#	return(res)
-#  }
-#)
-#
-
-
 #********************************************************************************
+# REWRITE pop.dyn so it evaluates the pop.dyn slot
+
 # post-fitting accessors for biomass and fishing mortality etc.
 # Need to fix this so that it works with Charlie and Francis models
 
@@ -216,26 +139,43 @@ setMethod('pop.dyn', signature(object='FLaspm'),
 
 	# Need to make sure it calls the right function
 	# This is pretty ugly and slow.
-	if(grepl("Francis",as.character(model(object))[3]))
-	    pdyn.func <- "aspm.pdyn.Francis"
-	if(grepl("Edwards",as.character(model(object))[3]))
-	    pdyn.func <- "aspm.pdyn.Edwards"
+#	if(grepl("Francis",as.character(model(object))[3]))
+#	    pdyn.func <- "aspm.pdyn.Francis"
+#	if(grepl("Edwards",as.character(model(object))[3]))
+#	    pdyn.func <- "aspm.pdyn.Edwards"
 #	if(grepl("1",as.character(model(object))[3]))
 #	    pdyn.func <- "aspm.pdyn.Edwards"
+
+  # Sort out arguments for pop.dyn call
+  parnames_not_in_params <- names(formals(object@pop.dyn)[names(formals(object@pop.dyn)) %in% slotNames(object)])
+  args <- tapply(parnames_not_in_params, 1:length(parnames_not_in_params),function(x) slot(object,x), simplify=FALSE)
+  names(args) <- parnames_not_in_params
+  # add in params from params slot
+  parnames_in_params <- names(formals(object@pop.dyn))[names(formals(object@pop.dyn)) %in% dimnames(object@params)$params]
+  par_args <- tapply(parnames_in_params, 1:length(parnames_in_params),function(x) object@params[x], simplify=FALSE)
+  names(par_args) <- parnames_in_params
+  args <- c(args,par_args)
+
 
 
 
 	for (i in 1:iters)
 	{
 	    # Need to make sure it calls the right function
-	    op <- eval(call(pdyn.func,iter(object@catch,i),iter(params(object)['B0'],i),c(iter(object@hh,i)),c(iter(object@M,i)),c(iter(object@mat,i)),c(iter(object@sel,i)),c(iter(object@wght,i)),object@amin,object@amax))
+	    #op <- eval(call(pdyn.func,iter(object@catch,i),iter(params(object)['B0'],i),c(iter(object@hh,i)),c(iter(object@M,i)),c(iter(object@mat,i)),c(iter(object@sel,i)),c(iter(object@wght,i)),object@amin,object@amax))
 	    #op <- aspm.pdyn(iter(object@catch,i),iter(params(object)['B0'],i),c(iter(object@hh,i)),c(iter(object@M,i)),c(iter(object@mat,i)),c(iter(object@sel,i)),c(iter(object@wght,i)),object@amin,object@amax)
-	    iter(bexp,i) <- op[["bexp"]]
-	    iter(bmat,i) <- op[["bmat"]]
-	    iter(n,i) <- op[["n"]]
-	    iter(harvest,i) <- op[["harvest"]]
+
+      #op <- object@pop.dyn(iter(object@catch,i),iter(params(object)['B0'],i),c(iter(object@hh,i)),c(iter(object@M,i)),c(iter(object@mat,i)),c(iter(object@sel,i)),c(iter(object@wght,i)),object@amin,object@amax)
+      iter_args <- lapply(args,function(x)iter(x,i))
+      op <- do.call(object@pop.dyn,iter_args)
+
+
+      iter(bexp,i)[] <- op[["bexp"]]
+	    iter(bmat,i)[] <- op[["bmat"]]
+	    iter(n,i)[] <- op[["n"]]
+	    iter(harvest,i)[] <- op[["harvest"]]
 	}
-	return(op)
+	return(list(bexp=bexp,bmat=bmat,n=n,harvest=harvest))
     })
 
 # exploitable biomass {{{

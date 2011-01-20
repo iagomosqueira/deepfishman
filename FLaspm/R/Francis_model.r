@@ -12,6 +12,14 @@ aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
     #cat("Current B0: ", B0, "\n")
     #browser()
     # Set up stuff
+    # Strip out FLQuants for speed
+    mat <- c(mat)
+    sel <- c(sel)
+    hh   <- c(hh)
+    M   <- c(M)
+    
+
+
     C <- as.vector(catch)
     nyr <- length(C)
     nag <- amax-amin+1
@@ -155,16 +163,15 @@ aspm.index.Francis <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
 
 aspm.Francis <- function()
 {
-    # set the likelihood function
-    logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
-    {
-    
-    
+  # set the likelihood function
+  logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
+  {
     mat <- c(mat)
     sel <- c(sel)
     hh   <- c(hh)
     M   <- c(M)
-    #browser()
+
+  #browser()
 	# Get the FLQuants object with the estimated indices
 	# Actually, do we need indexhat?
 	# Francis just uses qhat and chat, no need to calc the indexhat
@@ -213,7 +220,10 @@ aspm.Francis <- function()
     )
 
     model <- index ~ aspm.index.Francis(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
-    return(list(logl=logl,model=model,initial=initial))
+    
+    pop.dyn <- aspm.pdyn.Francis
+    
+    return(list(logl=logl,model=model,initial=initial, pop.dyn=pop.dyn))
 } # }}}
 
 
@@ -268,6 +278,13 @@ ratner_search <- function(func,x,abstol=1e-9,...)
 #*******************************************************************************
 # C bits
 
+aspm.pdyn.Francis.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
+    op <- .Call("aspm_ad", catch, index, B0, 1,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 2)
+    return(op)
+}
+
 aspm.Francis.C <- function()
 {
   # set the likelihood function
@@ -303,7 +320,9 @@ aspm.Francis.C <- function()
 
   model <- index ~ aspm.index.Francis.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
 
-  return(list(logl=logl,model=model,initial=initial))
+#  pop.dyn <- aspm.Francis.C
+pop.dyn <- aspm.pdyn.Francis.C
+  return(list(logl=logl,model=model,initial=initial,pop.dyn=pop.dyn))
 } # }}}
 
 

@@ -2,17 +2,17 @@
 \documentclass[a4paper]{article}
 \usepackage{geometry}
 \usepackage{color}
-%\usepackage{framed}
-%\usepackage{setspace}
+\usepackage{framed}
+\usepackage{setspace}
 \usepackage{amsmath}
 \usepackage{hyperref}
-%\usepackage{cite}
+\usepackage{cite}
 \geometry{verbose,a4paper,tmargin=2cm,bmargin=1.5cm,lmargin=2cm,rmargin=3cm}
 \definecolor{shadecolor}{rgb}{0.9,0.9,0.9}
 \definecolor{darkblue}{rgb}{0,0,0.5}
 \setlength{\parskip}{\medskipamount}
 \setlength{\parindent}{0pt}
-%\onehalfspacing
+\onehalfspacing
 \hypersetup{colorlinks, urlcolor=darkblue}
 
 \begin{document}
@@ -93,6 +93,7 @@ SRA is assuming a pulse of catches at the end of the year (i.e. after natural mo
 
 \section{Demonstration}
 
+\subsection{Simple deterministic demonstration}
 First you need to load the $FLaspm$ library
 
 \begin{center}
@@ -119,8 +120,7 @@ the fishery and the age of maturity respectively, or they can be passed as
 age structured FLQuant objects that have maturity and selectivity at age.
 $wght$ must be passed as an FLQuant object.
 
-Here we will use the Orange Roughy data set from CITE FRANCIS. We will need to
-calculate the mass-at-age using the Von Bertalanffy equations.
+Here we will use the Orange Roughy data set from CITE FRANCIS.
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
@@ -141,6 +141,19 @@ hh <- 0.95
 M <- 0.05
 mat_age <- 23
 sel_age <- 23
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+
+We will need to calculate the mass-at-age using the Von Bertalanffy equations
+and then create an age structured FLQuant for the masses.
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=FALSE>>=
 # age-length parameters
 Linf  <- 42.5 #cm
 k     <- 0.059
@@ -148,7 +161,6 @@ t0    <- -0.346
 # length-weight
 alpha <- 0.0963 # grams
 beta  <- 2.68
-
 # Set up FLQuants for weights
 # Note that we convert the mass at age to tonnes
 mass_at_age <- age_to_weight(amin:amax,Linf,k,t0,alpha,beta)
@@ -158,7 +170,98 @@ w <- FLQuant(mass_at_age, dimnames=list(age=amin:amax)) / 1e6
 \end{minipage}
 \end{center}
 
+Now we can create the FLaspm object by calling the $FLaspm$ constructor and
+passing the data:
 
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=FALSE>>=
+or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+The final stage is to set which model we will use: Francis or Edwards.
+As the data has come from CITE FRANCIS we will use the Francis model. Each model
+has two versions, one that is written in pure R, the other uses C. The results
+from both are the same. The C version is faster so it is better to use that:
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=FALSE>>=
+model(or) <- aspm.Francis.C()
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+Setting the model also sets up the intital values for the fitted parameters (in
+this case $B_{0}$. It is possible to specify your own but unless you have a good
+reason to do so (such as problems with the fit) then you should the default
+setting. To estimate the parameters use the $fmle()$ method:
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=FALSE>>=
+or <- fmle(or)
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+After fitting it is essential to check the quality of the fit by looking
+at the likelihood profile. This can be done with the $profile()$ method. The
+range argument can be used to explore the likelihood either side of the estimated
+parameter value.
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<fig = TRUE, echo=FALSE>>=
+profile(or,maxsteps=50,range=0.25)
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+You should hopefully see that the value of the fitted parameter occurs at the
+maximum likelihood. The value of the fitted parameter can be seen with the
+$params()$ method:
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=FALSE>>=
+params(or)
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+Remember that $B_{0}$ is the virgin exploitable biomass at the start of the year.
+CITE Francis estimates $B_{0}$ midway through the year. We can compare our result
+with Francis by calculating the midyear virgin biomass:
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=TRUE>>=
+params(or) * exp(-0.5 * or@M)
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+Francis estimates the value of midyear virgin biomass as 411000 tonnes. So our
+estimate is pretty good.
+
+qhat
+c (need to return from C code? - or calc as a method)
 
 %\bibliography{flaspm_bib}{}
 %\bibliographystyle{plain}

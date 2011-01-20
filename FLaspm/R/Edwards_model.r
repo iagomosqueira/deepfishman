@@ -2,6 +2,12 @@
 # Population dynamics
 # Uses Charlie's formulation that uses h.
 aspm.pdyn.Edwards <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
+    # strip out FLQuants for speed
+    mat <- c(mat)
+    sel <- c(sel)
+    hh   <- c(hh)
+    M   <- c(M)
+
     C <- as.vector(catch)
     nyr <- length(C)
     nag <- amax-amin+1
@@ -118,7 +124,10 @@ aspm.Edwards <- function()
     )
 
     model <- index ~ aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
-    return(list(logl=logl,model=model,initial=initial))
+    
+    pop.dyn <- aspm.pdyn.Edwards
+    
+    return(list(logl=logl,model=model,initial=initial, pop.dyn=pop.dyn))
 } # }}}
 
 #*******************************************************************************
