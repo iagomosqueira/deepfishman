@@ -208,16 +208,47 @@ aspm.Francis <- function()
 	# But fucks up
 	return(total.logl)
     }
+
+initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+  #browser()
+    cat("getting initial values\n")
+    # Let's do something more sophisticated to get the start values
+    B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=10)
+    llseq <- rep(NA,length(B0seq))
+
+    for (i in 1:length(llseq))
+    {
+      # logl is still visible in the parent environment - seems a little dodgy to me...
+      llseq[i] <- logl(B0seq[i],hh,M,mat,sel,wght,amin,amax,catch,index)
+    }
+    B0_max <- B0seq[which.max(llseq)]
+    
+
+    #browser()
+    cat("Got initial guess\n")
+    cat("Initial B0: ", B0_max, "\n")
+    return(FLPar(B0=B0_max))
+    },
+
+  #initial <- structure(function(catch){
+    #return(FLPar(B0=100*max(catch), sigma2=1))
+    #},
+    # lower and upper limits for optim()
+    lower=1,
+    upper=Inf
+  )
+
   
     # initial parameter values
     # Want to start away from B0 crash, but real problems here
-    initial <- structure(function(catch){
-	    return(FLPar(B0=100*max(catch)))
-	},
-	# lower and upper limits for optim()
-	lower=1,
-	upper=1e12
-    )
+#    initial <- structure(function(catch){
+##    browser()
+#	    return(FLPar(B0=100*max(catch)))
+#	},
+#	# lower and upper limits for optim()
+#	lower=1,
+#	upper=1e12
+#   )
 
     model <- index ~ aspm.index.Francis(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
     

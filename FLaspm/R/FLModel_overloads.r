@@ -192,6 +192,9 @@ for (index.count in 1:length(object@index))
           data <- c(data, covar(object)[covarnm])
       }
       # start values
+      
+      #browser()
+      
       if(missing(start)) {
         # add call to @initial
         if(is.function(object@initial))
