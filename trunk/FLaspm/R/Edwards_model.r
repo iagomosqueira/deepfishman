@@ -104,24 +104,54 @@ aspm.Edwards <- function()
     # set the likelihood function
     logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
     {
-	#browser()
-	# Get the FLQuants object with the estimated indices
-	indexhat.quants <- aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
-	log.indexhat.quants <- lapply(indexhat.quants,function(index) window(log(index),start=dims(index)$minyear,end=dims(index)$maxyear))
-	total.logl <- 0
-	for (index.count in 1:length(index))
-	    total.logl <- total.logl + sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
-	return(total.logl)
+      # Get the FLQuants object with the estimated indices
+      indexhat.quants <- aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+      log.indexhat.quants <- lapply(indexhat.quants,function(index) window(log(index),start=dims(index)$minyear,end=dims(index)$maxyear))
+      total.logl <- 0
+      for (index.count in 1:length(index))
+        total.logl <- total.logl + sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
+      return(total.logl)
     }
+
+initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+  #browser()
+    cat("getting initial values\n")
+    # Let's do something more sophisticated to get the start values
+    B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=10)
+    s2seq <- exp(seq(from = log(1e-8), to = log(10), length = 10))
+    llgrid <- expand.grid(B0=B0seq,s2=s2seq,ll=NA)
+
+    for (i in 1:nrow(llgrid))
+    {
+      # logl is still visible in the parent environment - seems a little dodgy to me...
+      llgrid[i,"ll"] <- logl(llgrid[i,"B0"],llgrid[i,"s2"],hh,M,mat,sel,wght,amin,amax,catch,index)
+    }
+    B0_max <- llgrid[which.max(llgrid[,"ll"]),"B0"]
+    s2_max <- llgrid[which.max(llgrid[,"ll"]),"s2"]
+
+    #browser()
+    cat("Got initial guess\n")
+    cat("Initial B0: ", B0_max, "\n")
+    cat("Initial sigma2: ", s2_max, "\n")
+    return(FLPar(B0=B0_max, sigma2 = s2_max))
+    },
+
+  #initial <- structure(function(catch){
+    #return(FLPar(B0=100*max(catch), sigma2=1))
+    #},
+    # lower and upper limits for optim()
+    lower=c(1, 1e-8),
+    upper=c(Inf, Inf)
+  )
   
     # initial parameter values
-    initial <- structure(function(catch){
-	    return(FLPar(B0=100*max(catch), sigma2=1))
-	},
-	# lower and upper limits for optim()
-	lower=c(1, 1e-8),
-	upper=c(Inf, Inf)
-    )
+#    initial <- structure(function(catch){
+#	    return(FLPar(B0=100*max(catch), sigma2=1))
+#	},
+#	# lower and upper limits for optim()
+#	lower=c(1, 1e-8),
+#	upper=c(Inf, Inf)
+ #   )
 
     model <- index ~ aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
     
