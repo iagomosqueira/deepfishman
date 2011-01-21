@@ -183,6 +183,47 @@ setMethod('calc.qhat', signature(object='FLaspm'),
   }
 )
 
+if (!isGeneric("sigma2"))
+    setGeneric("sigma2", function(object, ...)
+    standardGeneric("sigma2"))
+    
+setMethod('sigma2', signature(object='FLaspm'),
+    function(object, yrfrac=0.5)
+    {
+      # check if sigma2 is in params slot, if so use that
+      if ("sigma2" %in% dimnames(object@params)$params)
+        return(object@params["sigma2",])
+      # Otherwise we'll have to calculate it using Francis method
+      bmid <- exp.biomass.mid(object,yrfrac=yrfrac)
+      qhat <- calc.qhat(object)
+      index <- object@index
+      s2 <- FLPar(sigma2 = NA)
+      s2 <- propagate(s2,length(index))
+      for (index.count in 1:length(index))
+      {
+        nonnaindexyears <- !is.na(index[[index.count]])
+        # number of non NA years in index
+        n <- dim(index[[index.count]][nonnaindexyears])[2]
+        s2["sigma2",index.count] <- apply((index[[index.count]] / sweep(bmid,1,qhat[[index.count]],"*") - 1)^2,c(1,6),sum,na.rm=T) / (n-2)
+      }
+      return(s2)
+})
+
+# exploitable biomass at some point through the year{{{
+# Warning - this only makes sense if harvest has units of 'f'
+if (!isGeneric("exp.biomass.mid"))
+    setGeneric("exp.biomass.mid", function(object, ...)
+    standardGeneric("exp.biomass.mid"))
+
+setMethod('exp.biomass.mid', signature(object='FLaspm'),
+    function(object, yrfrac=0.5) {
+      pdyn <- calc.pop.dyn(object)
+      bexp <- pdyn[["bexp"]]
+      bmid <- bexp*exp(-yrfrac*sweep(pdyn[["harvest"]],c(1,3:6),object@M,"+"))
+      return(bmid)
+    })
+
+
 # exploitable biomass {{{
 if (!isGeneric("exp.biomass"))
     setGeneric("exp.biomass", function(object, ...)
@@ -190,7 +231,7 @@ if (!isGeneric("exp.biomass"))
 
 setMethod('exp.biomass', signature(object='FLaspm'),
     function(object) {
-      return(pop.dyn(object)[["bexp"]])
+      return(calc.pop.dyn(object)[["bexp"]])
     })
 
 # Numbers at age
@@ -200,7 +241,7 @@ if (!isGeneric("n"))
 
 setMethod('n', signature(object='FLaspm'),
     function(object) {
-	return(pop.dyn(object)[["n"]])
+	return(calc.pop.dyn(object)[["n"]])
     })
 
 # Mature biomass
@@ -210,7 +251,7 @@ if (!isGeneric("mat.biomass"))
 
 setMethod('mat.biomass', signature(object='FLaspm'),
     function(object) {
-	return(pop.dyn(object)[["bmat"]])
+	return(calc.pop.dyn(object)[["bmat"]])
     })
 
 # f
@@ -222,7 +263,7 @@ if (!isGeneric('harvest'))
 setMethod('harvest', signature(object='FLaspm'),
 	function(object)
 	{
-    all <- pop.dyn(object)
+    all <- calc.pop.dyn(object)
     return(all[["harvest"]])
 	}
     )

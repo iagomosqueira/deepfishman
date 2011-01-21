@@ -22,6 +22,7 @@ exportMethods(
   "FLaspm",
   "calc.pop.dyn",
   "exp.biomass",
+  "exp.biomass.mid",
   "mat.biomass",
   "calc.qhat")
 	
