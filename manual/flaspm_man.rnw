@@ -245,13 +245,14 @@ params(or)
 
 Remember that $B_{0}$ is the virgin exploitable biomass at the start of the year.
 CITE Francis estimates $B_{0}$ midway through the year. We can compare our result
-with Francis by calculating the midyear virgin biomass:
+with Francis by calculating the midyear exploitable virgin biomass with the
+exp.biomass.mid() method:
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
 <<echo=TRUE>>=
-params(or) * exp(-0.5 * or@M)
+exp.biomass.mid(or,yrfrac = 0.5)
 @
 %\end{shaded}%
 \end{minipage}
