@@ -328,11 +328,11 @@ aspm.Francis.C <- function()
   # no sigma2 so set to 1 in .Call
   logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
   {
-    #browser()
-    #total.logl <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)[["logl"]]["logl"]
-    total.logl <- .Call("aspm_ad", catch, index, B0, 1,
-                hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 2)[["logl"]]["logl"]
+
+    total.logl <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)[["logl"]]["logl"]
+    #total.logl <- .Call("aspm_ad", catch, index, B0, 1,
+    #            hh, M, mat, sel,
+    #            wght, amin, amax, dim(catch)[2], 2)[["logl"]]["logl"]
     return(total.logl)
   }
 
