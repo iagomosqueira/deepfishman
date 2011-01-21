@@ -264,10 +264,11 @@ if (!isGeneric("exp.biomass.mid"))
     standardGeneric("exp.biomass.mid"))
 
 setMethod('exp.biomass.mid', signature(object='FLaspm'),
-    function(object, yrfrac=0.5) {
+    function(object, yrfrac=0.5, virgin=T) {
+      # if virgin - no fishing at harvest = 0
       pdyn <- calc.pop.dyn(object)
       bexp <- pdyn[["bexp"]]
-      bmid <- bexp*exp(-yrfrac*sweep(pdyn[["harvest"]],c(1,3:6),object@M,"+"))
+      bmid <- bexp*exp(-yrfrac*sweep(as.numeric(!virgin)*pdyn[["harvest"]],c(1,3:6),object@M,"+"))
       return(bmid)
     })
 

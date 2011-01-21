@@ -252,17 +252,27 @@ exp.biomass.mid() method:
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
 <<echo=TRUE>>=
-exp.biomass.mid(or,yrfrac = 0.5)
+exp.biomass.mid(or,yrfrac = 0.5,virgin=TRUE)
 @
 %\end{shaded}%
 \end{minipage}
 \end{center}
 
 Francis estimates the value of midyear virgin biomass as 411000 tonnes. So our
-estimate is pretty good.
+estimate is pretty good. We can also check out estimated value of $q_{hat}$ with
+the $calc.qhat()$ method:
 
-qhat
-c (need to return from C code? - or calc as a method)
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=TRUE>>=
+calc.qhat(or)
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+Francis reports the estimated value of $q_{hat}$ to be 0.59.
 
 %\bibliography{flaspm_bib}{}
 %\bibliographystyle{plain}

@@ -158,7 +158,7 @@ indexhat(fr.C)
 all.equal(c(indexhat(fr)),c(indexhat(fr.C)))
 
 #****************************************************************************
-# Test Edwards C as a model
+# Fit the Edwads model
 # R code is pretty slow due to the way initial values are calculated
 # Create the FLaspm object
 ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, amax=amax, amin=amin)
@@ -175,137 +175,42 @@ ed.C@params
 
 # Fit any good?
 profile(ed,maxsteps=30) # slooooooow
-profile(ed.C,maxsteps=30)
+x11()
+profile(ed.C,maxsteps=30,main="C version")
+#Looks good
+
+# Fit the Francis model
+fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, amax=amax, amin=amin)
+model(fr) <- aspm.Francis()
+
+fr.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, amax=amax, amin=amin)
+model(fr.C) <- aspm.Francis.C()
+
+fr <- fmle(fr)
+fr@params
+
+fr.C <- fmle(fr.C)
+fr.C@params
+
+exp.biomass(fr)
+
+# Fit any good?
+profile(fr,maxsteps=30, main="R version") # slooooooow
+x11()
+profile(fr.C,maxsteps=30,main="C version")
+# C version looks weird but that is because the likelihood when stock crashes is undefined
+
+#****************************************************************************
+# STOP
+
+
+
+
+
+
 
 #****************************************************************************
 
-
-
-
-
-
-
-
-# Test Francis - R vs C
-B0 <- 411000* exp(0.5*c(M))
-fr@params['B0',] <- B0
-fr.pop.dyn <- calc.pop.dyn(fr)
-
-# Test FrC
-frC <- .Call("aspm_ad", fr@catch, fr@index, B0, 0,
-                fr@hh, fr@M, fr@mat, fr@sel,
-                fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)
-
-# Bexp
-fr.pop.dyn[["bexp"]]
-frC[["bexp"]]
-all.equal(c(fr.pop.dyn[["bexp"]]),frC[["bexp"]])
-
-#Bmat
-fr.pop.dyn[["bmat"]]
-frC[["bmat"]]
-all.equal(c(fr.pop.dyn[["bmat"]]),frC[["bmat"]])
-
-# h (or f)
-fr.pop.dyn[["harvest"]]
-frC[["harvest"]] # ?
-all.equal(c(fr.pop.dyn[["harvest"]]),frC[["harvest"]])
-
-# n
-fr.pop.dyn[["n"]]
-frC[["n"]]
-all.equal(c(fr.pop.dyn[["n"]]),c(frC[["n"]]))
-
-# qhat
-# calced internally for R code atm
-bmid <- fr.pop.dyn[["bexp"]] * exp(-0.5*(c(fr@M)+fr.pop.dyn[["harvest"]]))
-qhat <- apply(fr@index[[1]]/bmid,c(1,6),sum,na.rm=T) / sum(!is.na(fr@index[[1]]))
-qhat
-frC[["qhat"]]
-all.equal(c(qhat),frC[["qhat"]])
-
-# indexhat
-# Not calced for logl but used for residuals I think
-ih <- aspm.index.Francis(fr@catch,fr@index,B0,fr@hh,fr@M,fr@mat,fr@sel,fr@wght,fr@amin,fr@amax)
-ihc <- aspm.index.Francis.C(fr@catch,fr@index,B0,fr@hh,fr@M,fr@mat,fr@sel,fr@wght,fr@amin,fr@amax)
-
-# why can't I compare the FLQuants?
-# units are not the same - so leave it
-all.equal(c(ih[[1]]),c(ihc[[1]]))
-
-
-#logl
-logl <- fr@logl(B0,fr@hh,fr@M,fr@mat,fr@sel,fr@wght,fr@amin,fr@amax,fr@catch,fr@index)
-logl
-frC[["logl"]]
-all.equal(c(logl),as.numeric(frC[["logl"]][1]))
-
-# Try logl profile
-B0seq <- seq(from=1, to = 800000, length=20)
-loglr <- rep(NA,length(B0seq))
-loglc <- rep(NA,length(B0seq))
-for (i in 1:length(B0seq))
-{
-  loglr[i] <- fr@logl(B0seq[i],fr@hh,fr@M,fr@mat,fr@sel,fr@wght,fr@amin,fr@amax,fr@catch,fr@index)
-  loglc[i] <- .Call("aspm_ad", fr@catch, fr@index, B0seq[i], 0, fr@hh, fr@M, fr@mat, fr@sel,
-       fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)[["logl"]][1]
-}
-
-plot(B0seq,loglr,type="l")
-lines(B0seq,loglc,col=3)
-
-# low B0 = 1
-B0 <- 2e5#1
-test <- .Call("aspm_ad", fr@catch, fr@index, B0, 0, fr@hh, fr@M, fr@mat, fr@sel,
-       fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)
-
-fr@params['B0',] <- B0
-fr.pop.dyn <- calc.pop.dyn(fr)
-fr.pop.dyn[["harvest"]]
-
-
-#****************************************************************************
-# Test Francis C as a model
-fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-model(fr) <- aspm.Francis()
-
-fr.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-model(fr.C) <- aspm.Francis.C()
-
-# Need to get pop.dyn working for C code
-fr.res <- fmle(fr)
-fr.res@params
-
-fr.C.res <- fmle(fr.C)
-fr.C.res@params
-
-profile(fr.res,maxsteps=50, range=0.3)
-profile(fr.C.res,maxsteps=50, range = 0.1)
-
-#********************************************************************************
-# Profile
-ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-model(ed) <- aspm.Edwards()
-ed.res <- fmle(ed)
-profile(ed.res,maxsteps=30,range=0.3)
-
-ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-model(ed.C) <- aspm.Edwards.C()
-ed.C.res <- fmle(ed.C)
-profile(ed.C.res,maxsteps=30,range=0.3)
-profile(ed.C.res,range=list(B0=seq(from=300000,to=550000,length=30),
-                                        sigma2=exp(seq(from=log(1e-7),to=log(0.01),length=200))))
-
-
-fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-model(fr) <- aspm.Francis()
-fr.res <- fmle(fr)
-profile(fr.res,maxsteps=30,range=0.2)
-
-fr.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-model(fr.C) <- aspm.Francis.C()
-fr.C.res <- fmle(fr.C)
-profile(fr.C.res,maxsteps=30,range=0.3)
 
 #*******************************************************************************
 # Edwards AD
