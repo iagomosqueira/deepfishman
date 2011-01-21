@@ -43,10 +43,10 @@ w <- FLQuant(age_to_weight(amin:amax,Linf,k,t0,alpha,beta), dimnames=list(age=am
 
 #****************************************************************************
 # Create the FLaspm objects
-ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, fpm=1, amax=amax, amin=amin)
+ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, amax=amax, amin=amin)
 model(ed) <- aspm.Edwards()
 
-fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, fpm=1, amax=amax, amin=amin)
+fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, amax=amax, amin=amin)
 model(fr) <- aspm.Francis()
 
 #****************************************************************************
@@ -66,8 +66,8 @@ fr@params['B0',] <- B0
 # n
 # mat.biomass
 # harvest (f or h)
-ed.pop.dyn <- pop.dyn(ed)
-fr.pop.dyn <- pop.dyn(fr)
+ed.pop.dyn <- calc.pop.dyn(ed)
+fr.pop.dyn <- calc.pop.dyn(fr)
 
 exp.biomass(ed)
 exp.biomass(fr)
@@ -145,7 +145,7 @@ model(fr) <- aspm.Francis()
 B0 <- 10#300000#20000
 fr@params["B0",] <- B0
 #test <- aspm.pdyn.Francis(fr@catch,B0,c(fr@hh),c(fr@M),c(fr@mat),c(fr@sel),c(fr@wght),fr@amin,fr@amax)
-test <- pop.dyn(fr)
+test <- calc.pop.dyn(fr)
 # harvest maxes out
 # and abundance collapses
 

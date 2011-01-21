@@ -13,6 +13,11 @@ aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
     #browser()
     # Set up stuff
     # Strip out FLQuants for speed
+
+    # This is pretty dangerous for multiple iters
+    # fmle solves on an iter by iter basis so this is OK for that
+    # but if calling pop.dyn with multiple iters, this will probably fail
+
     mat <- c(mat)
     sel <- c(sel)
     hh   <- c(hh)
@@ -166,48 +171,49 @@ aspm.Francis <- function()
   # set the likelihood function
   logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
   {
+    #browser()
     mat <- c(mat)
     sel <- c(sel)
     hh   <- c(hh)
     M   <- c(M)
+    # get the population trajectory given B0
+    #pdyn <- aspm.pdyn.Francis(catch,B0,hh,M,mat,sel,wght,amin,amax)
+    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax)
+    bexp <- pdyn[["bexp"]]
+    bmid <- bexp*exp(-0.5*(M+pdyn[["harvest"]]))
+    # if overfished bmid goes to 0 which kills qhat calculation later on.
+    # Set to something small
+    #bmid[bmid==0] <- 1e-9
+    # But this doesn't work for the chat2 calc, because if only value of bmid is 0
+    # qhat is still massive, but bmid/qhat is tiny
+    # has weird effect that being just under min B0 gives worse logl than when B0 is very much less than minB0
+    # This is risky: if ANY bmid == 0, set all to 0
+    if(any(bmid==0)) bmid[] <- 1e-9
+    # Gives a flat likelihood - impossible to solve over
+    total.logl <- 0
 
-  #browser()
-	# Get the FLQuants object with the estimated indices
-	# Actually, do we need indexhat?
-	# Francis just uses qhat and chat, no need to calc the indexhat
-	#indexhat.quants <- aspm.index.Francis(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
-	# What is likelihood function?
-	# need q and chat calculation
-	#log.indexhat.quants <- lapply(indexhat.quants,function(index) window(log(index),start=dims(index)$minyear,end=dims(index)$maxyear))
-	pdyn <- aspm.pdyn.Francis(catch,B0,hh,M,mat,sel,wght,amin,amax)
-	#browser()
-	bexp <- pdyn[["bexp"]]
-	bmid <- bexp*exp(-0.5*(M+pdyn[["harvest"]]))
-	# if overfished bmid goes to 0 which kills qhat calculation later on.
-	# Set to something small
-  #bmid[bmid==0] <- 1e-9
-  # But this doesn't work for the chat2 calc, because if only value of bmid is 0
-  # qhat is still massive, but bmid/qhat is tiny
-  # has weird effect that being just under min B0 gives worse logl than when B0 is very much less than minB0
-  # This is risky: if ANY bmid == 0, set all to 0
-  if(any(bmid==0)) bmid[] <- 1e-9
-  # Gives a flat likelihood - impossible to solve over
-  total.logl <- 0
-	#browser()
-	for (index.count in 1:length(index))
-	{
-	    nonnaindexyears <- !is.na(index[[index.count]])
+    for (index.count in 1:length(index))
+    {
+      nonnaindexyears <- !is.na(index[[index.count]])
 	    # number of non NA years in index
 	    n <- dim(index[[index.count]][nonnaindexyears])[2]
+	    # easier to calc here than to use the qhat slot
 	    qhat <- apply(index[[index.count]]/bmid,c(1,6),sum,na.rm=T) / n
-	    chat2 <- apply((index[[index.count]] / sweep(bmid,1,qhat,"*") - 1)^2,c(1,6),sum,na.rm=T) / (n-2)
+      chat2 <- apply((index[[index.count]] / sweep(bmid,1,qhat,"*") - 1)^2,c(1,6),sum,na.rm=T) / (n-2)
 	    total.logl <- total.logl + (-n*log(sqrt(chat2)) -n*log(qhat) -apply(log(bmid[nonnaindexyears]),c(1,6),sum))
-	}
-	# check for warning flag of too low B0 and return massive logl
-	#if(pdyn[["B0_too_low_warning"]]) total.logl <- 1000 
-	# But fucks up
-	return(total.logl)
     }
+  return(total.logl)
+  }
+
+  # qhat is mean of index / b
+  qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
+  {
+    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax)
+    bexp <- pdyn[["bexp"]]
+    bmid <- bexp*exp(-0.5*sweep(pdyn[["harvest"]],c(1,3:6),M,"+"))
+    q <- lapply(index,function(x,b) apply(sweep(x,2:6,b,"/"),c(1,6),mean,na.rm=T), b=bmid)
+    return(q)
+  }
 
 initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
   #browser()
@@ -251,10 +257,10 @@ initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
 #   )
 
     model <- index ~ aspm.index.Francis(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
-    
+
     pop.dyn <- aspm.pdyn.Francis
     
-    return(list(logl=logl,model=model,initial=initial, pop.dyn=pop.dyn))
+    return(list(logl=logl,model=model,initial=initial, pop.dyn=pop.dyn, qhat=qhat))
 } # }}}
 
 
@@ -322,9 +328,11 @@ aspm.Francis.C <- function()
   # no sigma2 so set to 1 in .Call
   logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
   {
-    total.logl <- .Call("aspm_ad", catch, index, B0, 1,
-                hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 2)[["logl"]]["logl"]
+    #browser()
+    total.logl <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)[["logl"]]["logl"]
+#    total.logl <- .Call("aspm_ad", catch, index, B0, 1,
+#                hh, M, mat, sel,
+#                wght, amin, amax, dim(catch)[2], 2)[["logl"]]["logl"]
     return(total.logl)
   }
 
@@ -351,9 +359,24 @@ aspm.Francis.C <- function()
 
   model <- index ~ aspm.index.Francis.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
 
+  qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
+  {
+    q <- .Call("aspm_ad", catch, index, B0, 1, hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 2)[["qhat"]]
+    # returns a vector of qs
+    # should return a list
+    qlist <- FLQuants()
+    for (i in 1:length(q))
+      qlist[[i]] <- FLQuant(q[i])
+    names(qlist) <- names(index)
+    return(qlist)
+  }
+
+
+
 #  pop.dyn <- aspm.Francis.C
-pop.dyn <- aspm.pdyn.Francis.C
-  return(list(logl=logl,model=model,initial=initial,pop.dyn=pop.dyn))
+  pop.dyn <- aspm.pdyn.Francis.C
+  return(list(logl=logl,model=model,initial=initial,pop.dyn=pop.dyn, qhat=qhat))
 } # }}}
 
 

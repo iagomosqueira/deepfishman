@@ -73,28 +73,28 @@ aspm.index.Edwards <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
     yr <- as.numeric(dimnames(catch)[['year']])
     dm <- dimnames(catch)
 
-
     # Strip out the FLQuant to speed it up
-    mat <- c(mat)
-    sel <- c(sel)
-    hh   <- c(hh)
-    M   <- c(M)
+#    mat <- c(mat)
+#    sel <- c(sel)
+#    hh   <- c(hh)
+#    M   <- c(M)
 
     index.hat <- FLQuants()
+    pdyn <- aspm.pdyn.Edwards(catch,B0,hh,M,mat,sel,wght,amin,amax)
+#    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax)
+    bexp <- pdyn[["bexp"]]
 
     for (index.count in 1:length(index))
     { 
-	pdyn <- aspm.pdyn.Edwards(catch,B0,hh,M,mat,sel,wght,amin,amax)
-	bexp <- pdyn[["bexp"]]
-	# nuisance q
-	ind <- as.vector(index[[index.count]])
-	iyr <- as.numeric(dimnames(index[[index.count]])[['year']])
-	ys <- iyr[1]
-	yf <- iyr[length(iyr)]
-	y1 <- (ys-yr[1])+1
-	y2 <- (yf-yr[1])+1
-	q <- exp(mean(log(ind[y1:y2]/as.vector(bexp[,y1:y2])),na.rm=T))
-	index.hat[[index.count]] <- FLQuant(q*bexp,dimnames=dm)
+      # nuisance q
+      ind <- as.vector(index[[index.count]])
+      iyr <- as.numeric(dimnames(index[[index.count]])[['year']])
+      ys <- iyr[1]
+      yf <- iyr[length(iyr)]
+      y1 <- (ys-yr[1])+1
+      y2 <- (yf-yr[1])+1
+      q <- exp(mean(log(ind[y1:y2]/as.vector(bexp[,y1:y2])),na.rm=T))
+      index.hat[[index.count]] <- FLQuant(q*bexp,dimnames=dm)
     }
     return(index.hat)
 }
@@ -104,6 +104,11 @@ aspm.Edwards <- function()
     # set the likelihood function
     logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
     {
+      # pop.dyn to get bexp
+      # qhat - slot
+      # indexhat - call func
+      # calc logl
+
       # Get the FLQuants object with the estimated indices
       indexhat.quants <- aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
       log.indexhat.quants <- lapply(indexhat.quants,function(index) window(log(index),start=dims(index)$minyear,end=dims(index)$maxyear))
@@ -113,8 +118,18 @@ aspm.Edwards <- function()
       return(total.logl)
     }
 
-initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
-  #browser()
+  # qhat is geometric mean of index / b
+  qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
+  {
+    #browser()
+    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax)
+    bexp <- pdyn[["bexp"]]
+    q <- lapply(index,function(x,b) exp(apply(log(sweep(x,2:6,b,"/")),c(1,6),mean,na.rm=T)), b=bexp)
+    return(q)
+  }
+
+
+  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
     cat("getting initial values\n")
     # Let's do something more sophisticated to get the start values
     B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=10)
@@ -135,33 +150,26 @@ initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
     cat("Initial sigma2: ", s2_max, "\n")
     return(FLPar(B0=B0_max, sigma2 = s2_max))
     },
-
-  #initial <- structure(function(catch){
-    #return(FLPar(B0=100*max(catch), sigma2=1))
-    #},
-    # lower and upper limits for optim()
     lower=c(1, 1e-8),
     upper=c(Inf, Inf)
   )
   
-    # initial parameter values
-#    initial <- structure(function(catch){
-#	    return(FLPar(B0=100*max(catch), sigma2=1))
-#	},
-#	# lower and upper limits for optim()
-#	lower=c(1, 1e-8),
-#	upper=c(Inf, Inf)
- #   )
-
     model <- index ~ aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
     
     pop.dyn <- aspm.pdyn.Edwards
     
-    return(list(logl=logl,model=model,initial=initial, pop.dyn=pop.dyn))
+    return(list(logl=logl,model=model,initial=initial, pop.dyn=pop.dyn, qhat=qhat))
 } # }}}
 
 #*******************************************************************************
 # C Code
+aspm.pdyn.Edwards.C <- function(catch,index,B0,sigma2,hh,M,mat,sel,wght,amin,amax) {
+    op <- .Call("aspm_ad", catch, index, B0, sigma2,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 1)
+    return(op)
+}
+
 aspm.Edwards.C <- function()
 {
   # set the likelihood function
@@ -206,9 +214,25 @@ aspm.Edwards.C <- function()
     upper=c(Inf, Inf)
   )
 
+  qhat <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+  {
+    q <- .Call("aspm_ad", catch, index, B0, sigma2, hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], 1)[["qhat"]]
+    # returns a vector of qs
+    # should return a list
+    qlist <- FLQuants()
+    for (i in 1:length(q))
+      qlist[[i]] <- FLQuant(q[i])
+    names(qlist) <- names(index)
+    return(qlist)
+  }
+
+
   model <- index ~ aspm.index.Edwards.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
 
-  return(list(logl=logl,model=model,initial=initial))
+  pop.dyn <- aspm.pdyn.Edwards.C
+
+  return(list(logl=logl,model=model,initial=initial, pop.dyn=pop.dyn, qhat=qhat))
 } # }}}
 
 aspm.index.Edwards.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)

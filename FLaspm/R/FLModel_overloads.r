@@ -28,7 +28,8 @@ setMethod('fmle',
     args <- list(...)
     call <- sys.call(1)
     logl <- object@logl
-
+    pop.dyn <- object@pop.dyn
+    qhat <- object@qhat
 
 
 #browser()

@@ -1,13 +1,15 @@
 #****************************************************************************
 # Testing the common FLaspm methods for both methods on the NZ Orange Roughy data
 # Checking that C code gives the same pop.dyn results
+# And that fitting with C or R model gives the same
+# Also some testing of the gradients returned from AD. Not recommended that you
+# use this yet
 #****************************************************************************
 
 #****************************************************************************
 # Preliminaries
 library(FLCore)
 library(FLaspm)
-
 #****************************************************************************
 
 # Data and parameter values
@@ -31,68 +33,67 @@ beta  <- 2.68
 am <- 23
 as <- 23
 
-# Set up FLQuants for weights, maturity and selectivity
-# Could make a constructor function for this
+# Set up FLQuant for weights
 w <- FLQuant(age_to_weight(amin:amax,Linf,k,t0,alpha,beta), dimnames=list(age=amin:amax)) / 1e6 # convert to tonnes
-# age at maturity
-# maturity vector
-m <- FLQuant(0, dimnames=list(age=amin:amax))
-m[(am - amin + 1):length(amin:amax),] <- 1
-# age at commercial selectivity (age of recruitment to fishery)
-s <- FLQuant(0, dimnames=list(age=amin:amax))
-s[(as - amin + 1):length(amin:amax),] <- 1
 
 #****************************************************************************
-# Create the FLaspm object
-ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-# Set the Francis model
+# Create the FLaspm objects - R and C version
+ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w,amax=amax, amin=amin)
 model(ed) <- aspm.Edwards()
 
-fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-# Set the Francis model
+ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w,amax=amax, amin=amin)
+model(ed.C) <- aspm.Edwards.C()
+
+fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w,amax=amax, amin=amin)
 model(fr) <- aspm.Francis()
+
+fr.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w,amax=amax, amin=amin)
+model(fr.C) <- aspm.Francis.C()
 
 #****************************************************************************
 # Test Edwards - R vs C
 B0 <- 411000* exp(0.5*c(M))
-sigma2 <- 0.1 # for Charlie
+sigma2 <- 0.1
+fr@params['B0',] <- B0
+fr.C@params['B0',] <- B0
 ed@params['B0',] <- B0
 ed@params['sigma2',] <- sigma2
 
+ed.C@params['B0',] <- B0
+ed.C@params['sigma2',] <- sigma2
 
-# Test these methods
-# pop.dyn
-# exp.biomass
-# n
-# mat.biomass
-# harvest (f or h)
-ed.pop.dyn <- pop.dyn(ed)
 
-# Test Ed
-edC <- .Call("aspm_ad", ed@catch, ed@index, B0, sigma2,
-                ed@hh, ed@M, ed@mat, ed@sel,
-                ed@wght, ed@amin, ed@amax, dim(ed@catch)[2], 1)
+# Test the population dynamics
+ed.pop.R <- calc.pop.dyn(ed)
+ed.pop.C <- calc.pop.dyn(ed.C)
 
 # Bexp
-ed.pop.dyn[["bexp"]]
-edC[["bexp"]]
-all.equal(c(ed.pop.dyn[["bexp"]]),edC[["bexp"]])
+ed.pop.R[["bexp"]]
+ed.pop.C[["bexp"]]
+all.equal(c(ed.pop.R[["bexp"]]),c(ed.pop.C[["bexp"]]))
 
 #Bmat
-ed.pop.dyn[["bmat"]]
-edC[["bmat"]]
-all.equal(c(ed.pop.dyn[["bmat"]]),edC[["bmat"]])
+ed.pop.R[["bmat"]]
+ed.pop.C[["bmat"]]
+all.equal(c(ed.pop.R[["bmat"]]),c(ed.pop.C[["bmat"]]))
 
-# h (or f)
-ed.pop.dyn[["harvest"]]
-edC[["harvest"]] # ?
-all.equal(c(ed.pop.dyn[["harvest"]]),edC[["harvest"]])
+# harvest
+ed.pop.R[["harvest"]]
+ed.pop.C[["harvest"]] # ?
+all.equal(c(ed.pop.R[["harvest"]]),c(ed.pop.C[["harvest"]]))
 
 # n
-ed.pop.dyn[["n"]]
-edC[["n"]]
-all.equal(c(ed.pop.dyn[["n"]]),c(edC[["n"]]))
+ed.pop.R[["n"]]
+ed.pop.C[["n"]]
+all.equal(c(ed.pop.R[["n"]]),c(ed.pop.C[["n"]]))
 
+# calc.qhat
+
+#**** Write methods for these ************
+
+# make qhat a slot - set a function for it.
+# clean edwards hat function
+# Use this function in indxhat function
 # qhat
 # calced internally for R code atm
 exp(mean(log(ed@index[[1]]/as.vector(ed.pop.dyn[["bexp"]])),na.rm=T))
@@ -100,7 +101,7 @@ edC[["qhat"]]
 
 # index_hat
 aspm.index.Edwards(ed@catch,ed@index,B0,ed@hh,ed@M,ed@mat,ed@sel,ed@wght,ed@amin,ed@amax)
-aspm.index.Edwards.C(ed@catch,ed@index,B0,ed@hh,ed@M,ed@mat,ed@sel,ed@wght,ed@amin,ed@amax)
+aspm.index.Edwards.C(ed.C@catch,ed.C@index,B0,ed.C@hh,ed.C@M,ed.C@mat,ed.C@sel,ed.C@wght,ed.C@amin,ed.C@amax)
 all.equal(aspm.index.Edwards(ed@catch,ed@index,B0,ed@hh,ed@M,ed@mat,ed@sel,ed@wght,ed@amin,ed@amax),aspm.index.Edwards.C(ed@catch,ed@index,B0,ed@hh,ed@M,ed@mat,ed@sel,ed@wght,ed@amin,ed@amax))
 
 # logl
@@ -131,7 +132,7 @@ ed.C.res@params
 # Test Francis - R vs C
 B0 <- 411000* exp(0.5*c(M))
 fr@params['B0',] <- B0
-fr.pop.dyn <- pop.dyn(fr)
+fr.pop.dyn <- calc.pop.dyn(fr)
 
 # Test FrC
 frC <- .Call("aspm_ad", fr@catch, fr@index, B0, 0,
@@ -202,7 +203,7 @@ test <- .Call("aspm_ad", fr@catch, fr@index, B0, 0, fr@hh, fr@M, fr@mat, fr@sel,
        fr@wght, fr@amin, fr@amax, dim(fr@catch)[2], 2)
 
 fr@params['B0',] <- B0
-fr.pop.dyn <- pop.dyn(fr)
+fr.pop.dyn <- calc.pop.dyn(fr)
 fr.pop.dyn[["harvest"]]
 
 
@@ -555,7 +556,7 @@ model(fr) <- aspm.Francis()
 B0 <- 10#300000#20000
 fr@params["B0",] <- B0
 #test <- aspm.pdyn.Francis(fr@catch,B0,c(fr@hh),c(fr@M),c(fr@mat),c(fr@sel),c(fr@wght),fr@amin,fr@amax)
-test <- pop.dyn(fr)
+test <- calc.pop.dyn(fr)
 # harvest maxes out
 # and abundance collapses
 

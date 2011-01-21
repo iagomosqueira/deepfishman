@@ -11,12 +11,17 @@ export(
   "aspm.Francis",
   "aspm.Francis.C",
   "aspm.index.Francis",
-  "aspm.index.Francis.C")
+  "aspm.index.Francis.C",
+  "aspm.pdyn.Francis.C",
+  "aspm.pdyn.Francis",
+  "aspm.pdyn.Edwards.C",
+  "aspm.pdyn.Edwards"  )
 exportClasses(
 	"FLaspm")
 exportMethods(
   "FLaspm",
-  "pop.dyn",
+  "calc.pop.dyn",
   "exp.biomass",
-  "mat.biomass")
+  "mat.biomass",
+  "calc.qhat")
 	

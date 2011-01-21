@@ -44,7 +44,8 @@ setClass('FLaspm', representation(
   amin='numeric',
   fitted_index = 'FLQuants',
   residuals_index = 'FLQuants',
-  pop.dyn = 'function'
+  pop.dyn = 'function',
+  qhat = 'function'
   ),
   validity=validFLaspm
 )
@@ -121,15 +122,14 @@ setMethod('FLaspm', signature(model='missing'),
 # post-fitting accessors for biomass and fishing mortality etc.
 # Need to fix this so that it works with Charlie and Francis models
 
-if (!isGeneric("pop.dyn"))
-    setGeneric("pop.dyn", function(object, ...)
-    standardGeneric("pop.dyn"))
+if (!isGeneric("calc.pop.dyn"))
+    setGeneric("calc.pop.dyn", function(object, ...)
+    standardGeneric("calc.pop.dyn"))
 
-# Also what are all those cs about?
 # This is pretty crappy, doing one iter at a time
-setMethod('pop.dyn', signature(object='FLaspm'),
+setMethod('calc.pop.dyn', signature(object='FLaspm'),
     function(object) {
-	#browser()
+  #browser()
 	iters <- dims(object)$iter
 	bexp <- FLQuant(NA,dimnames=dimnames(object@catch))
 	bexp <- propagate(bexp,iters)
@@ -137,14 +137,7 @@ setMethod('pop.dyn', signature(object='FLaspm'),
 	harvest <- bexp
 	n <- FLQuant(NA,dimnames=list(age=object@amin:object@amax,year = dimnames(object@catch)$year),iter=iters)
 
-	# Need to make sure it calls the right function
-	# This is pretty ugly and slow.
-#	if(grepl("Francis",as.character(model(object))[3]))
-#	    pdyn.func <- "aspm.pdyn.Francis"
-#	if(grepl("Edwards",as.character(model(object))[3]))
-#	    pdyn.func <- "aspm.pdyn.Edwards"
-#	if(grepl("1",as.character(model(object))[3]))
-#	    pdyn.func <- "aspm.pdyn.Edwards"
+  #browser()
 
   # Sort out arguments for pop.dyn call
   parnames_not_in_params <- names(formals(object@pop.dyn)[names(formals(object@pop.dyn)) %in% slotNames(object)])
@@ -156,27 +149,39 @@ setMethod('pop.dyn', signature(object='FLaspm'),
   names(par_args) <- parnames_in_params
   args <- c(args,par_args)
 
-
-
-
 	for (i in 1:iters)
 	{
-	    # Need to make sure it calls the right function
-	    #op <- eval(call(pdyn.func,iter(object@catch,i),iter(params(object)['B0'],i),c(iter(object@hh,i)),c(iter(object@M,i)),c(iter(object@mat,i)),c(iter(object@sel,i)),c(iter(object@wght,i)),object@amin,object@amax))
-	    #op <- aspm.pdyn(iter(object@catch,i),iter(params(object)['B0'],i),c(iter(object@hh,i)),c(iter(object@M,i)),c(iter(object@mat,i)),c(iter(object@sel,i)),c(iter(object@wght,i)),object@amin,object@amax)
-
-      #op <- object@pop.dyn(iter(object@catch,i),iter(params(object)['B0'],i),c(iter(object@hh,i)),c(iter(object@M,i)),c(iter(object@mat,i)),c(iter(object@sel,i)),c(iter(object@wght,i)),object@amin,object@amax)
       iter_args <- lapply(args,function(x)iter(x,i))
       op <- do.call(object@pop.dyn,iter_args)
-
-
       iter(bexp,i)[] <- op[["bexp"]]
 	    iter(bmat,i)[] <- op[["bmat"]]
 	    iter(n,i)[] <- op[["n"]]
 	    iter(harvest,i)[] <- op[["harvest"]]
 	}
 	return(list(bexp=bexp,bmat=bmat,n=n,harvest=harvest))
-    })
+})
+
+if (!isGeneric("calc.qhat"))
+    setGeneric("calc.qhat", function(object, ...)
+    standardGeneric("calc.qhat"))
+
+setMethod('calc.qhat', signature(object='FLaspm'),
+    function(object)
+    {
+      # call object@qhat with right arguments
+      # e.g.
+      parnames_not_in_params <- names(formals(object@qhat)[names(formals(object@qhat)) %in% slotNames(object)])
+      args <- tapply(parnames_not_in_params, 1:length(parnames_not_in_params),function(x) slot(object,x), simplify=FALSE)
+      names(args) <- parnames_not_in_params
+      # add in params from params slot
+      parnames_in_params <- names(formals(object@qhat))[names(formals(object@qhat)) %in% dimnames(object@params)$params]
+      par_args <- tapply(parnames_in_params, 1:length(parnames_in_params),function(x) object@params[x], simplify=FALSE)
+      names(par_args) <- parnames_in_params
+      args <- c(args,par_args)
+      op <- do.call(object@qhat,args)
+      return(op)
+  }
+)
 
 # exploitable biomass {{{
 if (!isGeneric("exp.biomass"))
@@ -217,27 +222,10 @@ if (!isGeneric('harvest'))
 setMethod('harvest', signature(object='FLaspm'),
 	function(object)
 	{
-	    #bexp <- exp.biomass(object)
-	    #iter <- dims(object)$iter
-	    #f <- FLQuant(NA,dimnames=dimnames(bexp))
-	    #for (i in 1:iter)
-	    #    for (y in 1:dim(object@catch)[2])
-	    #        f[,y,,,,i] <- ratner_search(func=fobj,x=c(0,1,100),m=c(iter(object@M,i)),catch=c(iter(object@catch,i))[y],biomass=c(iter(bexp,i))[y])
-	    #return(f)
-	    all <- pop.dyn(object)
-	    return(all[["harvest"]])
+    all <- pop.dyn(object)
+    return(all[["harvest"]])
 	}
     )
-
-# harvest rate {{{
-#if (!isGeneric("harvest.rate"))
-#	setGeneric("harvest.rate", function(object, ...)
-#    	standardGeneric("harvest.rate"))
-#setMethod('harvest.rate', signature(object='FLaspm'),
-#  function(object) {
-#    return(object@catch / exp.biomass(object))})
-## }}}
-
 
 # methods
 setMethod('index', signature(object='FLaspm'),
