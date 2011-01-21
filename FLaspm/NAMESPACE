@@ -24,5 +24,8 @@ exportMethods(
   "exp.biomass",
   "exp.biomass.mid",
   "mat.biomass",
-  "calc.qhat")
+  "calc.qhat",
+  "calc.sigma2",
+  "calc.logl",
+  "indexhat")
 	

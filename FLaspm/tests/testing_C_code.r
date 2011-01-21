@@ -7,10 +7,8 @@
 #****************************************************************************
 
 #****************************************************************************
-# Preliminaries
 library(FLCore)
 library(FLaspm)
-#****************************************************************************
 
 # Data and parameter values
 data(NZOR)
@@ -51,8 +49,10 @@ fr.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, ma
 model(fr.C) <- aspm.Francis.C()
 
 #****************************************************************************
-# Test Edwards - R vs C
-B0 <- 411000* exp(0.5*c(M))
+# Testing the projection methods
+# Need to set the parameter values first
+# Test Edwards first - R vs C
+B0 <- 500000
 sigma2 <- 0.1
 fr@params['B0',] <- B0
 fr.C@params['B0',] <- B0
@@ -62,73 +62,130 @@ ed@params['sigma2',] <- sigma2
 ed.C@params['B0',] <- B0
 ed.C@params['sigma2',] <- sigma2
 
-
 # Test the population dynamics
 ed.pop.R <- calc.pop.dyn(ed)
 ed.pop.C <- calc.pop.dyn(ed.C)
 
 # Bexp
-ed.pop.R[["bexp"]]
-ed.pop.C[["bexp"]]
-all.equal(c(ed.pop.R[["bexp"]]),c(ed.pop.C[["bexp"]]))
+exp.biomass(ed)
+exp.biomass(ed.C)
+all.equal(c(exp.biomass(ed)),c(exp.biomass(ed.C)))
 
 #Bmat
-ed.pop.R[["bmat"]]
-ed.pop.C[["bmat"]]
-all.equal(c(ed.pop.R[["bmat"]]),c(ed.pop.C[["bmat"]]))
+mat.biomass(ed)
+mat.biomass(ed.C)
+all.equal(c(mat.biomass(ed)),c(mat.biomass(ed.C)))
 
 # harvest
-ed.pop.R[["harvest"]]
-ed.pop.C[["harvest"]] # ?
-all.equal(c(ed.pop.R[["harvest"]]),c(ed.pop.C[["harvest"]]))
+harvest(ed)
+harvest(ed.C)
+all.equal(c(harvest(ed)),c(harvest(ed.C)))
 
 # n
-ed.pop.R[["n"]]
-ed.pop.C[["n"]]
-all.equal(c(ed.pop.R[["n"]]),c(ed.pop.C[["n"]]))
+n(ed)
+n(ed.C)
+all.equal(c(n(ed)),c(n(ed.C)))
 
 # calc.qhat
+calc.qhat(ed)
+calc.qhat(ed.C)
+all.equal(c(calc.qhat(ed)),c(calc.qhat(ed.C)))
 
-#**** Write methods for these ************
+# calc.sigma2 - for Edwards model just pulls it out of the params slot
+calc.sigma2(ed)
+calc.sigma2(ed.C)
+all.equal(c(calc.sigma2(ed)),c(calc.sigma2(ed.C)))
 
-# make qhat a slot - set a function for it.
-# clean edwards hat function
-# Use this function in indxhat function
-# qhat
-# calced internally for R code atm
-exp(mean(log(ed@index[[1]]/as.vector(ed.pop.dyn[["bexp"]])),na.rm=T))
-edC[["qhat"]]
+# calc.logl
+calc.logl(ed)
+calc.logl(ed.C)
+all.equal(c(calc.logl(ed)),c(calc.logl(ed.C)))
 
-# index_hat
-aspm.index.Edwards(ed@catch,ed@index,B0,ed@hh,ed@M,ed@mat,ed@sel,ed@wght,ed@amin,ed@amax)
-aspm.index.Edwards.C(ed.C@catch,ed.C@index,B0,ed.C@hh,ed.C@M,ed.C@mat,ed.C@sel,ed.C@wght,ed.C@amin,ed.C@amax)
-all.equal(aspm.index.Edwards(ed@catch,ed@index,B0,ed@hh,ed@M,ed@mat,ed@sel,ed@wght,ed@amin,ed@amax),aspm.index.Edwards.C(ed@catch,ed@index,B0,ed@hh,ed@M,ed@mat,ed@sel,ed@wght,ed@amin,ed@amax))
+# indexhat
+indexhat(ed)
+indexhat(ed.C)
+all.equal(c(indexhat(ed)),c(indexhat(ed.C)))
 
-# logl
-ed@logl(B0,sigma2, ed@hh, ed@M, ed@mat, ed@sel, ed@wght, ed@amin, ed@amax, ed@catch, ed@index)
-edC[["logl"]]
+#****************************************************************************
+# Do same as above for Francis
+B0 <- 500000
+fr@params['B0',] <- B0
+fr.C@params['B0',] <- B0
+
+# Test the population dynamics
+fr.pop.R <- calc.pop.dyn(fr)
+fr.pop.C <- calc.pop.dyn(fr.C)
+
+# Bexp
+exp.biomass(fr)
+exp.biomass(fr.C)
+all.equal(c(exp.biomass(fr)),c(exp.biomass(fr.C)))
+
+#Bmat
+mat.biomass(fr)
+mat.biomass(fr.C)
+all.equal(c(mat.biomass(fr)),c(mat.biomass(fr.C)))
+
+# harvest
+harvest(fr)
+harvest(fr.C)
+# slightly different due to different f solvers in C and R
+all.equal(c(harvest(fr)),c(harvest(fr.C)))
+
+# n
+n(fr)
+n(fr.C)
+all.equal(c(n(fr)),c(n(fr.C)))
+
+# calc.qhat
+calc.qhat(fr)
+calc.qhat(fr.C)
+all.equal(c(calc.qhat(fr)),c(calc.qhat(fr.C)))
+
+# calc.sigma2 - for Edwards model just pulls it out of the params slot
+calc.sigma2(fr)
+calc.sigma2(fr.C)
+all.equal(c(calc.sigma2(fr)),c(calc.sigma2(fr.C)))
+
+# calc.logl
+calc.logl(fr)
+calc.logl(fr.C)
+all.equal(c(calc.logl(fr)),c(calc.logl(fr.C)))
+
+# indexhat
+indexhat(fr)
+indexhat(fr.C)
+all.equal(c(indexhat(fr)),c(indexhat(fr.C)))
 
 #****************************************************************************
 # Test Edwards C as a model
-# C Code now has a different intitial value given by searching over the profile
-# We can do this because it is fast. R code still uses the old way. Could change
-# it but it will be slow
+# R code is pretty slow due to the way initial values are calculated
 # Create the FLaspm object
-ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
-# Set the Francis model
+ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, amax=amax, amin=amin)
 model(ed) <- aspm.Edwards()
 
-ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=s, mat=m, wght=w, fpm=1, amax=amax, amin=amin)
+ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, amax=amax, amin=amin)
 model(ed.C) <- aspm.Edwards.C()
 
-# Need to get pop.dyn working for C code
-ed.res <- fmle(ed)
-ed.res@params
+ed <- fmle(ed)
+ed@params
 
-ed.C.res <- fmle(ed.C)
-ed.C.res@params
+ed.C <- fmle(ed.C)
+ed.C@params
+
+# Fit any good?
+profile(ed,maxsteps=30) # slooooooow
+profile(ed.C,maxsteps=30)
 
 #****************************************************************************
+
+
+
+
+
+
+
+
 # Test Francis - R vs C
 B0 <- 411000* exp(0.5*c(M))
 fr@params['B0',] <- B0
