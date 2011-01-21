@@ -122,11 +122,13 @@ setMethod('FLaspm', signature(model='missing'),
 # post-fitting accessors for biomass and fishing mortality etc.
 # Need to fix this so that it works with Charlie and Francis models
 
+# Does one iter at a time - bit crappy
+# This is because pop.dyn function only handles one iter at a time
 if (!isGeneric("calc.pop.dyn"))
     setGeneric("calc.pop.dyn", function(object, ...)
     standardGeneric("calc.pop.dyn"))
 
-# This is pretty crappy, doing one iter at a time
+
 setMethod('calc.pop.dyn', signature(object='FLaspm'),
     function(object) {
   #browser()
@@ -136,8 +138,6 @@ setMethod('calc.pop.dyn', signature(object='FLaspm'),
 	bmat <- bexp
 	harvest <- bexp
 	n <- FLQuant(NA,dimnames=list(age=object@amin:object@amax,year = dimnames(object@catch)$year),iter=iters)
-
-  #browser()
 
   # Sort out arguments for pop.dyn call
   parnames_not_in_params <- names(formals(object@pop.dyn)[names(formals(object@pop.dyn)) %in% slotNames(object)])
@@ -161,6 +161,40 @@ setMethod('calc.pop.dyn', signature(object='FLaspm'),
 	return(list(bexp=bexp,bmat=bmat,n=n,harvest=harvest))
 })
 
+if (!isGeneric("calc.logl"))
+    setGeneric("calc.logl", function(object, ...)
+    standardGeneric("calc.logl"))
+
+
+# Does one iter at a time - bit crappy
+# This is because pop.dyn function only handles one iter at a time
+setMethod('calc.logl', signature(object='FLaspm'),
+  function(object) {
+
+    #pop.dyn <- object@pop.dyn # not needed?
+    iters <- dims(object)$iter
+    logl <- FLQuant(NA,iter=iters)
+
+    # Sort out arguments for pop.dyn call
+    parnames_not_in_params <- names(formals(object@logl)[names(formals(object@logl)) %in% slotNames(object)])
+  args <- tapply(parnames_not_in_params, 1:length(parnames_not_in_params),function(x) slot(object,x), simplify=FALSE)
+  names(args) <- parnames_not_in_params
+  # add in params from params slot
+  parnames_in_params <- names(formals(object@logl))[names(formals(object@logl)) %in% dimnames(object@params)$params]
+  par_args <- tapply(parnames_in_params, 1:length(parnames_in_params),function(x) object@params[x], simplify=FALSE)
+  names(par_args) <- parnames_in_params
+  args <- c(args,par_args)
+
+	for (i in 1:iters)
+	{
+      iter_args <- lapply(args,function(x)iter(x,i))
+      iter(logl,i)[] <- do.call(object@logl,iter_args)
+	}
+	return(logl)
+})
+
+
+
 if (!isGeneric("calc.qhat"))
     setGeneric("calc.qhat", function(object, ...)
     standardGeneric("calc.qhat"))
@@ -183,11 +217,11 @@ setMethod('calc.qhat', signature(object='FLaspm'),
   }
 )
 
-if (!isGeneric("sigma2"))
-    setGeneric("sigma2", function(object, ...)
-    standardGeneric("sigma2"))
+if (!isGeneric("calc.sigma2"))
+    setGeneric("calc.sigma2", function(object, ...)
+    standardGeneric("calc.sigma2"))
     
-setMethod('sigma2', signature(object='FLaspm'),
+setMethod('calc.sigma2', signature(object='FLaspm'),
     function(object, yrfrac=0.5)
     {
       # check if sigma2 is in params slot, if so use that
@@ -209,8 +243,22 @@ setMethod('sigma2', signature(object='FLaspm'),
       return(s2)
 })
 
+if (!isGeneric("indexhat"))
+    setGeneric("indexhat", function(object, ...)
+    standardGeneric("indexhat"))
+
+setMethod('indexhat', signature(object='FLaspm'),
+  function(object, yrfrac=0) {
+    # yrfac should be 0 for Edwards and 0.5 for Francis
+    bexp <- exp.biomass.mid(object,yrfrac)
+    qhat <- calc.qhat(object)
+    ihat <- lapply(qhat,function(x,b) sweep(b,c(1,3:6),x,"*"),b=bexp)
+    return(ihat)
+})
+
 # exploitable biomass at some point through the year{{{
 # Warning - this only makes sense if harvest has units of 'f'
+# should put a check in but harvest needs to be done correctly elsewhere first
 if (!isGeneric("exp.biomass.mid"))
     setGeneric("exp.biomass.mid", function(object, ...)
     standardGeneric("exp.biomass.mid"))

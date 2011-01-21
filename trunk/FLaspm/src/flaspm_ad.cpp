@@ -592,7 +592,7 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
 
     calc_qhat_mean(bexp, index, qhat, nindices, nyrs, 0.5, M, h);
     // This gradient is very wrong
-    Rprintf("qhat grad: %f\n", qhat[0].getADValue() * 1e6);
+    //Rprintf("qhat grad: %f\n", qhat[0].getADValue() * 1e6);
     calc_index_hat (bexp, qhat, index_hat, nindices, nyrs, 0.5, M, h);
     total_logl = calc_logl_Francis(index, bexp, qhat, nindices, nyrs, 0.5, M, h);
     B0_grad = total_logl.getADValue();
