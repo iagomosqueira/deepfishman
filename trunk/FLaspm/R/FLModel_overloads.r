@@ -20,9 +20,7 @@ setMethod('fmle',
     tiny_number=1e-6, relAutoParscale=TRUE, ...)
   {
 
-#stop("Just checking that we are in fmle for FLasmp")
-
-      #browser()
+#browser()
 
     # TODO Check with FL
     args <- list(...)
@@ -168,6 +166,7 @@ setMethod('fmle',
       iter=1:iter))
     object@hessian <- object@vcov
 
+# Not picked up iters
 # Set up fitted_index and residual_index slots
 for (index.count in 1:length(object@index))
 {
@@ -178,6 +177,7 @@ for (index.count in 1:length(object@index))
 
     for (it in 1:iter)
     {
+    cat("iter: ", it, "\n")
       # data
       if(seq.iter)
         data <- lapply(alldata, iter, it)
@@ -195,7 +195,9 @@ for (index.count in 1:length(object@index))
       # start values
       
       #browser()
-      
+      # Turned start to start_args - probably a bad idea
+      # I want initial to be called every time
+      # Problem is after it has been called once, start is no longer missing
       if(missing(start)) {
         # add call to @initial
         if(is.function(object@initial))
@@ -424,3 +426,19 @@ setMethod('predict', signature(object='FLaspm'),
   return(fitted_index)
   }
 )   # }}}
+
+
+# Also overloading dims()
+# overload dims() for FLaspm
+# original dims in FLComp does not count FLQuants
+# We need to here because index slot is FLQuants and can be multi iter
+
+setMethod("dims", signature(obj="FLaspm"),
+    # Returns a list with different parameters
+    function(obj, ...)
+	{
+    res <- callNextMethod()
+    iters_in_index_slot <- max(unlist(lapply(obj@index,function(x)dim(x)[6])))
+    res$iter <- max(res$iter,iters_in_index_slot)
+    return(res)
+	})
