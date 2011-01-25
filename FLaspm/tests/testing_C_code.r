@@ -54,8 +54,6 @@ model(fr.C) <- aspm.Francis.C()
 # Test Edwards first - R vs C
 B0 <- 500000
 sigma2 <- 0.1
-fr@params['B0',] <- B0
-fr.C@params['B0',] <- B0
 ed@params['B0',] <- B0
 ed@params['sigma2',] <- sigma2
 
@@ -174,7 +172,7 @@ ed.C <- fmle(ed.C)
 ed.C@params
 
 # Fit any good?
-profile(ed,maxsteps=30) # slooooooow
+profile(ed,maxsteps=30, main="R vesion") # slooooooow
 x11()
 profile(ed.C,maxsteps=30,main="C version")
 #Looks good
@@ -192,13 +190,16 @@ fr@params
 fr.C <- fmle(fr.C)
 fr.C@params
 
-exp.biomass(fr)
+# Francis gets 411000
+# Get 411500 - sweet
+exp.biomass.mid(fr,yrfrac=0.5,virgin=T)
 
 # Fit any good?
 profile(fr,maxsteps=30, main="R version") # slooooooow
 x11()
 profile(fr.C,maxsteps=30,main="C version")
 # C version looks weird but that is because the likelihood when stock crashes is undefined
+# yscale is different to R. Narrow the range it looks good
 
 #****************************************************************************
 # STOP
