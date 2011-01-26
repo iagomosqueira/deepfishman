@@ -34,24 +34,24 @@ beta  <- 2.68
 mass_at_age <- age_to_weight(amin:amax,Linf,k,t0,alpha,beta)
 w <- FLQuant(mass_at_age, dimnames=list(age=amin:amax)) / 1e6
 
+index.cv <- 0.15
+niters <- 100
+
 # Deterministic projection
 or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
 model(or) <- aspm.Francis.C()
 or <- fmle(or)
 
-B0hat <- params(or)['B0',]
+B0true <- params(or)['B0',]
 
-# CV = 15%
-index.cv <- 0.15
-niters <- 100
 
 # Set up simulated object
 orsim <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
 model(orsim) <- aspm.Francis.C()
 # Choose a trial B0
-B0trial <- 500000
+B0trial <- 400000
 params(orsim)['B0',] <- B0trial
 # Get the population trajectory
 orsim.traj <- calc.pop.dyn(orsim)[["bexp"]]
@@ -66,27 +66,36 @@ index.sim <- rnorm(niters,orsim.traj,index.cv*orsim.traj)
 #orsim.traj[,yr]
 #sd(c(index.sim[,yr])) / mean(c(index.sim[,yr]))
 
-index81 <- iter(index.sim,81)
-or81 <- FLaspm(catch=catch, index=index81, M=M,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
-model(or81) <- aspm.Francis.C()
-or81 <- fmle(or81)
-
 # ormonte - fit with the spoof index - multiple iterations
 or.monte <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
 model(or.monte) <- aspm.Francis.C()
-# step 4 - fitting fails
-# Problem with start
-# only calls intitial once - not every time
 or.monte <- fmle(or.monte)
 params(or.monte)
 
-or.monte@index # 100 iters
-dims(or.monte)$iter # only picked up 1 - check with Iago how this works
-# Might only just look at FLQuant slots, not FLQuants
-# might need to overload dims for FLaspm
-# Not just for picking up iters in fmle(), but in predict() too
-# does iter work for FLQuants? Think so - browser through fmle to check
+c(params(or.monte)) > c(B0true)
+# Proportion of B0monte that are greater than B0true
+
+#*******************************************************************************
+
+B0trial <- seq(from=350000,to=500000,length=10)
+prop <- rep(NA,length(B0trial))
+for (i in 1:length(B0trial))
+{
+cat("i: ", i, "\n")
+  params(orsim)['B0',] <- B0trial[i]
+  orsim.traj <- calc.pop.dyn(orsim)[["bexp"]]
+  index.sim <- rnorm(niters,orsim.traj,index.cv*orsim.traj)
+
+  # ormonte - fit with the spoof index - multiple iterations
+  or.monte <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
+  model(or.monte) <- aspm.Francis.C()
+  or.monte <- fmle(or.monte)
+  
+  prop[i] <- sum(c(params(or.monte)) > c(B0true))
+# Proportion of B0monte that are greater than B0true
+}
+
 
 
