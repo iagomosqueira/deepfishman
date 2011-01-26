@@ -17,17 +17,20 @@ setMethod('fmle',
   function(object, start, method='L-BFGS-B', fixed=list(),
     control=list(trace=1), lower=rep(-Inf, dim(params(object))[1]),
     upper=rep(Inf, dim(params(object))[1]), seq.iter=TRUE, autoParscale=TRUE,
-    tiny_number=1e-6, relAutoParscale=TRUE, ...)
+    tiny_number=1e-6, relAutoParscale=TRUE, always_eval_initial=TRUE,...)
   {
 
-#browser()
+  if(missing(start)) orig_start_is_missing <- TRUE
 
+#browser()
+    #orig_start <- start
     # TODO Check with FL
     args <- list(...)
     call <- sys.call(1)
     logl <- object@logl
     pop.dyn <- object@pop.dyn
     qhat <- object@qhat
+
 
 
 #browser()
@@ -198,17 +201,36 @@ for (index.count in 1:length(object@index))
       # Turned start to start_args - probably a bad idea
       # I want initial to be called every time
       # Problem is after it has been called once, start is no longer missing
-      if(missing(start)) {
-        # add call to @initial
+#      if(missing(start)) {
+##        # add call to @initial
+ #       if(is.function(object@initial))
+ #        start <- as(do.call(object@initial, args=data[names(formals(object@initial))]),
+#           'list')
+#        else
+#          start <- formals(logl)[names(formals(logl))%in%parnm]
+#      }
+#      else
+#        # HACK! clean up fixed list if elements are named vectors
+#        start <- lapply(start, function(x){ names(x) <- NULL; x})
+
+#browser()
+
+# Still not very happy with this. The else formals gets called even if it has been
+# previously called. Not very shiny
+if ((missing(start) | always_eval_initial == T))
+{
         if(is.function(object@initial))
          start <- as(do.call(object@initial, args=data[names(formals(object@initial))]),
            'list')
         else
           start <- formals(logl)[names(formals(logl))%in%parnm]
-      }
-      else
-        # HACK! clean up fixed list if elements are named vectors
-        start <- lapply(start, function(x){ names(x) <- NULL; x})
+}
+else
+# HACK! clean up fixed list if elements are named vectors
+start <- lapply(start, function(x){ names(x) <- NULL; x})
+
+
+
 
       if(!is.null(fixnm))
         start[fixnm] <- NULL
