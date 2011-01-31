@@ -94,6 +94,13 @@ setMethod('FLaspm', signature(model='missing'),
         args[[slot]] <- temp
       }
     }
+    
+    # test for mean weight
+    if ("wght" %in% arg_names & is.numeric(args[["wght"]]) & length(args[["wght"]]) == 1)
+      {
+        temp <- FLQuant(args[["wght"]], dimnames=list(age=amin:amax))
+        args[["wght"]] <- temp
+      }
 
     # Test for hh and M
     for (slot in c("hh","M"))
@@ -105,6 +112,14 @@ setMethod('FLaspm', signature(model='missing'),
     # Test for index
     if ("index" %in% arg_names & is.FLQuant(args[["index"]]))
       args[["index"]] <- FLQuants(index=args[["index"]])
+      
+    # use mcf to align dimensions?
+    
+    # default value for fpm if not specified
+    if (!("fpm" %in% arg_names)) {
+      args[["fpm"]] <- 1
+      
+    }
 
     res <- do.call(FLModel,c(list(class='FLaspm'), args))
 

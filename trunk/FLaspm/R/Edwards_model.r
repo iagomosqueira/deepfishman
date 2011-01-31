@@ -28,7 +28,7 @@ aspm.pdyn.Edwards <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
     # set up eqm population
     p[1] <- 1
     for(a in 2:nag)
-	p[a] <- p[a-1]*exp(-M)
+	     p[a] <- p[a-1]*exp(-M)
     p[nag] <- p[nag]/(1-exp(-M))
     rho <- sum(p * mat * wght)
     R0 <- B0 / rho
