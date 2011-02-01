@@ -1,0 +1,10 @@
+install Rtools (http://www.murdoch-sutherland.com/Rtools/) and ensure that path includes:
+
+C:\R\Rtools\bin;C:\R\Rtools\MinGW\bin;C:\Program Files\R\R-2.12.1\bin\i386;
+
+From console navigate to trunk folder and compile using:
+
+Rcmd build --force --binary FLaspm
+
+
+

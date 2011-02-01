@@ -2,28 +2,29 @@
 # Population dynamics
 # Uses Charlie's formulation that uses h.
 aspm.pdyn.Edwards <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
+    
     # strip out FLQuants for speed
-    mat <- c(mat)
-    sel <- c(sel)
-    hh   <- c(hh)
-    M   <- c(M)
-
+    mat <- as.vector(mat)
+    sel <- as.vector(sel)
+    hh  <- as.vector(hh)
+    M   <- as.vector(M)
     C <- as.vector(catch)
+    
     nyr <- length(C)
     nag <- amax-amin+1
-    yr <- as.numeric(dimnames(catch)[['year']])
+    yr  <- as.numeric(dimnames(catch)[['year']])
     iyr <- as.numeric(dimnames(index)[['year']])
-    dm <- dimnames(catch)
-    #ind <- as.vector(index)
-    ys <- iyr[1]
-    yf <- iyr[length(iyr)]
-    y1 <- (ys-yr[1])+1
-    y2 <- (yf-yr[1])+1
-    n <- array(dim=c(nag,nyr))
+    dm  <- dimnames(catch)
+    ys  <- iyr[1]
+    yf  <- iyr[length(iyr)]
+    y1  <- (ys-yr[1])+1
+    y2  <- (yf-yr[1])+1
+    
+    n    <- array(dim=c(nag,nyr))
     bmat <- vector("numeric",length=nyr)
     bexp <- vector("numeric",length=nyr)
-    h <- vector("numeric",length=nyr)
-    p <- vector("numeric",length=nag)
+    h    <- vector("numeric",length=nyr)
+    p    <- vector("numeric",length=nag)
 
     # set up eqm population
     p[1] <- 1
@@ -41,29 +42,29 @@ aspm.pdyn.Edwards <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
 
     # set up S-R parameters
     alp <- (4*hh*R0)/(5*hh-1)
-    #bet <- B0*(1-hh)/(5*hh-1)
+    bet <- B0*(1-hh)/(5*hh-1)
     # Should be based on virgin mature population, not virgin exploitable
-    bet <- bmat[1]*(1-hh)/(5*hh-1)
+    #bet <- bmat[1]*(1-hh)/(5*hh-1)
 
     for(y in 2:nyr) {
 
-	n[1,y] <- alp * bmat[y-1]/(bet + bmat[y-1])
+      n[1,y] <- alp * bmat[y-1]/(bet + bmat[y-1])
 
-	# adult dynamics
-	for(a in 2:nag)
+	   # adult dynamics
+	   for(a in 2:nag)
 	    n[a,y] <- n[a-1,y-1]*exp(-M)*(1-sel[a-1]*h[y-1])
-	n[nag,y] <- n[nag,y] + n[nag,y-1]*exp(-M)*(1-sel[nag]*h[y-1])
-	bexp[y] <- sum(n[,y] * sel * wght)
-	h[y] <- C[y] / bexp[y]
-	h[y] <- max(h[y],0)
-	h[y] <- min(h[y],0.999)
-	bexp[y] <- C[y] / h[y]
-	bmat[y] <- sum(n[,y] * mat * wght)
+	   n[nag,y] <- n[nag,y] + n[nag,y-1]*exp(-M)*(1-sel[nag]*h[y-1])
+	   bexp[y] <- sum(n[,y] * sel * wght)
+	   h[y] <- C[y] / bexp[y]
+	   h[y] <- max(h[y],0)
+	   h[y] <- min(h[y],0.999)
+	   bexp[y] <- C[y] / h[y]
+	   bmat[y] <- sum(n[,y] * mat * wght)
     }
 
-    return(list(bexp=FLQuant(bexp,dimnames=dm),
-		    bmat=FLQuant(bmat,dimnames=dm),
-		    n = FLQuant(n,dimnames=list(age=amin:amax,year=dm$year)),
+    return(list(bexp=FLQuant(bexp,dimnames=dm,units=units(catch)),
+		    bmat=FLQuant(bmat,dimnames=dm,units=units(catch)),
+		    n = FLQuant(n,dimnames=list(age=amin:amax,year=dm$year),units="numbers"),
 		    harvest=FLQuant(h,dimnames=dm, units="h") ))
 }
 
@@ -118,41 +119,43 @@ aspm.Edwards <- function()
       return(total.logl)
     }
 
-  # qhat is geometric mean of index / b
-  qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
-  {
-    #browser()
-    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax)
-    bexp <- pdyn[["bexp"]]
-    q <- lapply(index,function(x,b) exp(apply(log(sweep(x,2:6,b,"/")),c(1,6),mean,na.rm=T)), b=bexp)
-    return(q)
-  }
-
-
-  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
-    cat("getting initial values\n")
-    # Let's do something more sophisticated to get the start values
-    B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=10)
-    s2seq <- exp(seq(from = log(1e-8), to = log(10), length = 10))
-    llgrid <- expand.grid(B0=B0seq,s2=s2seq,ll=NA)
-
-    for (i in 1:nrow(llgrid))
+    # qhat is geometric mean of index / b
+    qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
     {
-      # logl is still visible in the parent environment - seems a little dodgy to me...
-      llgrid[i,"ll"] <- logl(llgrid[i,"B0"],llgrid[i,"s2"],hh,M,mat,sel,wght,amin,amax,catch,index)
+      #browser()
+      pdyn <- aspm.pdyn.Edwards(catch,B0,hh,M,mat,sel,wght,amin,amax)
+      bexp <- pdyn[["bexp"]]
+      q <- lapply(index,function(x,b) exp(apply(log(sweep(x,2:6,b,"/")),c(1,6),mean,na.rm=T)), b=bexp)
+      return(q)
     }
-    B0_max <- llgrid[which.max(llgrid[,"ll"]),"B0"]
-    s2_max <- llgrid[which.max(llgrid[,"ll"]),"s2"]
 
-    #browser()
-    cat("Got initial guess\n")
-    cat("Initial B0: ", B0_max, "\n")
-    cat("Initial sigma2: ", s2_max, "\n")
-    return(FLPar(B0=B0_max, sigma2 = s2_max))
-    },
-    lower=c(1, 1e-8),
-    upper=c(Inf, Inf)
-  )
+
+    initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+    
+      # can this be changed so that it is only called when FLPar is empty?
+      cat("getting initial values\n")
+      # Let's do something more sophisticated to get the start values
+      B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=10)
+      s2seq <- exp(seq(from = log(1e-8), to = log(10), length = 10))
+      llgrid <- expand.grid(B0=B0seq,s2=s2seq,ll=NA)
+
+      for (i in 1:nrow(llgrid))
+      {
+        # logl is still visible in the parent environment - seems a little dodgy to me...
+        llgrid[i,"ll"] <- logl(llgrid[i,"B0"],llgrid[i,"s2"],hh,M,mat,sel,wght,amin,amax,catch,index)
+      }
+      B0_max <- llgrid[which.max(llgrid[,"ll"]),"B0"]
+      s2_max <- llgrid[which.max(llgrid[,"ll"]),"s2"]
+
+      #browser()
+      cat("Got initial guess\n")
+      cat("Initial B0: ", B0_max, "\n")
+      cat("Initial sigma2: ", s2_max, "\n")
+      return(FLPar(B0=B0_max, sigma2 = s2_max))
+      },
+      lower=c(1, 1e-8),
+      upper=c(Inf, Inf)
+    )
   
     model <- index ~ aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
     
@@ -183,7 +186,7 @@ aspm.Edwards.C <- function()
 
     # initial parameter values
   initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
-  #browser()
+
     # Let's do something more sophisticated to get the start values
     B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=50)
     s2seq <- exp(seq(from = log(1e-8), to = log(10), length = 50))
