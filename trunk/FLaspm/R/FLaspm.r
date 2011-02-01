@@ -43,6 +43,7 @@ setClass('FLaspm', representation(
   amax='numeric',
   amin='numeric',
   fitted_index = 'FLQuants',
+  fitted_flag = 'list',
   residuals_index = 'FLQuants',
   pop.dyn = 'function',
   qhat = 'function'
@@ -107,6 +108,8 @@ setMethod('FLaspm', signature(model='missing'),
     {
       if (slot %in% arg_names & is.numeric(args[[slot]]) & !is.FLQuant(args[[slot]]) & length(args[[slot]]) == 1)
         args[[slot]] <- FLQuant(args[[slot]])
+      if (slot %in% arg_names & is.numeric(args[[slot]]) & !is.FLQuant(args[[slot]]) & length(args[[slot]]) > 1)
+        args[[slot]] <- FLQuant(args[[slot]],dim=c(1,1,1,1,1,length(args[[slot]])))
     }
 
     # Test for index
@@ -120,10 +123,14 @@ setMethod('FLaspm', signature(model='missing'),
       args[["fpm"]] <- 1
       
     }
-
+    
+    # fill flags for fitting
+    temp <- vector('list',length(args[["index"]]))
+    names(temp) <- names(args[["index"]])
+    temp[] <- FALSE
+    args[["fitted_flag"]] <- temp
+    
     res <- do.call(FLModel,c(list(class='FLaspm'), args))
-
-
 
     #res <- FLModel(..., class='FLaspm')
     return(res)
@@ -175,6 +182,34 @@ setMethod('calc.pop.dyn', signature(object='FLaspm'),
 	}
 	return(list(bexp=bexp,bmat=bmat,n=n,harvest=harvest))
 })
+
+if (!isGeneric("calc.initial"))
+    setGeneric("calc.initial", function(object, ...)
+    standardGeneric("calc.initial"))
+
+
+# Does one iter at a time - bit crappy
+# This is because pop.dyn function only handles one iter at a time
+setMethod('calc.initial', signature(object='FLaspm'),
+  function(object) {
+
+    iters <- dims(object)$iter
+    init <- FLPar(NA,dimnames=dimnames(object@params),iter=iters)   # need iter argument?
+
+    # Sort out arguments for call
+    parnames_not_in_params <- names(formals(object@initial)[names(formals(object@initial)) %in% slotNames(object)])
+    args <- tapply(parnames_not_in_params, 1:length(parnames_not_in_params),function(x) slot(object,x), simplify=FALSE)
+    names(args) <- parnames_not_in_params
+
+    for (i in 1:iters)
+    {
+      iter_args <- lapply(args,function(x)iter(x,i))
+      iter(init,i)[] <- do.call(object@initial,iter_args)
+    }
+    
+    return(init)
+})
+
 
 if (!isGeneric("calc.logl"))
     setGeneric("calc.logl", function(object, ...)
@@ -358,17 +393,23 @@ age_to_weight <- function(age,Linf,k,t0,a,b)
 setMethod('plot', signature(x='FLaspm'),
   function(x, ...) {
 
-      # If not actually fitted, need to calc the residuals etc here
+    ihat <- indexhat(x)
+    par(mfrow=c(length(x@index),1))
+    y.rng <- range(lapply(x@index,range,na.rm=TRUE),
+                   lapply(x@fitted_index,range,na.rm=TRUE))
+    
+    for(i in 1:length(x@index)) {
+      if(!x@fitted_flag[[i]]) x@fitted_index[[i]] <- ihat[[i]]
 
-
-    par(mfrow=c(3,1))
-    plot(dimnames(x@index[[1]])$year,x@index[[1]],main='Fit to index',xlab='Year',ylab=paste('Index (',units(x@index[[1]]),')',sep=''), ...)
-    lines(dimnames(x@index[[1]])$year,x@fitted_index[[1]],lty=2, ...)
-    plot(x@fitted_index[[1]],x@residuals_index[[1]],main='Residuals',ylab='Residuals',xlab=paste('Fitted Values (',units(x@index[[1]]),')',sep=''), ...)
-    abline(h=0,lty=2)
+      plot(dimnames(x@index[[i]])$year,x@index[[i]],ylim = y.rng, main='Fit to index',xlab='Year',ylab=paste('Index (',units(x@index[[i]]),')',sep=''), ...)
+      lines(dimnames(x@index[[i]])$year,x@fitted_index[[i]],lty=2, ...)
+    
+    }
+    #plot(x@fitted_index[[1]],x@residuals_index[[1]],main='Residuals',ylab='Residuals',xlab=paste('Fitted Values (',units(x@index[[1]]),')',sep=''), ...)
+    #abline(h=0,lty=2)
     #qqplot
-    qqnorm(as.vector(x@residuals_index[[1]]),main='QQ plot of residuals', ...)
-    qqline(as.vector(x@residuals_index[[1]]),lty=2, ...)
+    #qqnorm(as.vector(x@residuals_index[[1]]),main='QQ plot of residuals', ...)
+    #qqline(as.vector(x@residuals_index[[1]]),lty=2, ...)
   }
 )
 

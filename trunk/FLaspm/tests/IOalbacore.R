@@ -1,7 +1,7 @@
 
 library(FLCore)
 library(FLaspm)
-#data(IOalbacore)
+#data(IOalbacore)                 # this doesn't work?
 load("../data/IOalbacore.RData")
 
 
@@ -19,7 +19,6 @@ M <- 0.34
 
 # mean weight (tonnes)
 mw <- 0.014/1e3
-mw <- FLQuant(mw,dimnames=list(age=amin:amax))    # temp
 
 # age at commercial selectivity
 as <- 5
@@ -34,36 +33,63 @@ alb <- FLaspm(catch=IOalbacore$catch,
 
 model(alb) <- aspm.Edwards()
 
-# initial guess for B0 and sigma2
+# calculate initial starting values
+alb@params <- calc.initial(alb)
 
-B0 <- 120000/1e3
-sigma2 <- 0.1
+# check initial fit
+plot(alb)
 
-start <- list(B0 = B0, sigma2 = sigma2)
-lower <- rep(1e-9,2)
-upper <- rep(1e10,2)
+# now run optimisation        # note that alb@fitted_index does not contain headers for each list item  
+alb <- fmle(alb)              # can we change the fitted_flags when we optimise?
+                              # do we have to find the initial values again?
+                              # currently re-calculates initival values for each fit...
+                              
+# check fit
+plot(alb)
+plot(harvest(alb),type='l')
 
-alb.res <- fmle(alb,start=start, lower=lower,upper=upper,seq.iter=FALSE)
-params(alb.res)
+# likelihood profile
+profile(alb)
 
-plot(1950:2007,as.vector(alb.res@fitted),ylim=c(0,5.5),xlab='Year',ylab='CPUE',type='l',col=2)
-points(1950:2007,as.vector(alb.res@index))
+# more than one index
 
-# using logl() and optimise
+index1 <- IOalbacore$index * rlnorm(dim(alb@index[[1]])[2],0,sqrt(log(1 + 0.1)^2))
+index2 <- IOalbacore$index * rlnorm(dim(alb@index[[1]])[2],0,sqrt(log(1 + 0.1)^2))
 
-obj.fn <- function(x) {
-  return(-logl(alb)(x,sigma2,hh,M,m,s,mw,amin,amax,alb@catch,alb@index))
-}
+alb.mi <- FLaspm(catch=IOalbacore$catch,
+              index=FLQuants(index1=index1,index2=index2),
+              M=M,hh=hh,sel=as, mat=am,wght=mw,amax=amax, amin=amin)
 
-xx <- optimise(obj.fn,interval=c(0,500),maximum=FALSE)[['minimum']]
-xx
+model(alb.mi) <- aspm.Edwards()
 
-# plot profile
-B0.seq <- 80:160
-lk <- c()
-for(i in 1:length(B0.seq)) lk <- c(lk,obj.fn(B0.seq[i]))
-plot(B0.seq,lk,type='l')
+alb.mi <- fmle(alb.mi)
 
-# accessor functions
-exp.biomass(alb.res)
-harvest.rate(alb.res)
+plot(alb.mi)
+plot(harvest(alb.mi),type='l')
+
+# likelihood profile
+
+# multiple iterations across hh
+hh.it <- runif(10,0.7,0.8)
+
+alb.it <- FLaspm(catch=IOalbacore$catch,
+              index=IOalbacore$index,
+              M=M,hh=hh.it,sel=as, mat=am,wght=mw,amax=amax, amin=amin)
+
+model(alb.it) <- aspm.Edwards()
+
+alb.it <- fmle(alb.it)
+
+boxplot(data~year,as.data.frame(exp.biomass(alb.it)),outline=F)
+boxplot(data~year,as.data.frame(harvest(alb.it)),outline=F)
+
+# likelihood profile
+
+
+
+
+
+
+
+
+
