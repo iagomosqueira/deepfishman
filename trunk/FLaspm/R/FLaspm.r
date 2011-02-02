@@ -249,11 +249,15 @@ if (!isGeneric("calc.qhat"))
     setGeneric("calc.qhat", function(object, ...)
     standardGeneric("calc.qhat"))
 
+# Fix this for multiple iters
+# Maybe the qhat function should work for multiple iters
+# because here we are calling it repeatedly - pretty inefficient
 setMethod('calc.qhat', signature(object='FLaspm'),
     function(object)
     {
       # call object@qhat with right arguments
       # e.g.
+      #browser()
       parnames_not_in_params <- names(formals(object@qhat)[names(formals(object@qhat)) %in% slotNames(object)])
       args <- tapply(parnames_not_in_params, 1:length(parnames_not_in_params),function(x) slot(object,x), simplify=FALSE)
       names(args) <- parnames_not_in_params
@@ -262,7 +266,18 @@ setMethod('calc.qhat', signature(object='FLaspm'),
       par_args <- tapply(parnames_in_params, 1:length(parnames_in_params),function(x) object@params[x], simplify=FALSE)
       names(par_args) <- parnames_in_params
       args <- c(args,par_args)
-      op <- do.call(object@qhat,args)
+      # Set up output object
+      op <- FLQuants()
+      for (flq in 1:length(object@index))
+        op[[flq]] <- FLQuant(NA,iter=dims(object@index[[flq]])$iter)
+      for (it in 1:dims(object)$iter)
+      {
+        iter.args <- lapply(args,function(x,it)iter(x,it),it=it)
+        iter.op <- do.call(object@qhat,iter.args)
+        for (flq in 1:length(object@index))
+          iter(op[[flq]],it) <- iter.op[[flq]]
+      }
+      
       return(op)
   }
 )
@@ -300,6 +315,7 @@ if (!isGeneric("indexhat"))
 setMethod('indexhat', signature(object='FLaspm'),
   function(object, yrfrac=0) {
     # yrfac should be 0 for Edwards and 0.5 for Francis
+    #browser()
     bexp <- exp.biomass.mid(object,yrfrac)
     qhat <- calc.qhat(object)
     ihat <- lapply(qhat,function(x,b) sweep(b,c(1,3:6),x,"*"),b=bexp)

@@ -199,9 +199,11 @@ aspm.Francis <- function()
 	    n <- dim(index[[index.count]][nonnaindexyears])[2]
 	    # easier to calc here than to use the qhat slot
 	    qhat <- apply(index[[index.count]]/bmid,c(1,6),sum,na.rm=T) / n
+	    #cat("qhatR", qhat, "\n")
       chat2 <- apply((index[[index.count]] / sweep(bmid,1,qhat,"*") - 1)^2,c(1,6),sum,na.rm=T) / (n-2)
 	    total.logl <- total.logl + (-n*log(sqrt(chat2)) -n*log(qhat) -apply(log(bmid[nonnaindexyears]),c(1,6),sum))
     }
+  #cat("B0: ", B0, " loglR: ", total.logl,"\n")
   return(total.logl)
   }
 
@@ -231,7 +233,7 @@ initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
     
 
     #browser()
-    cat("Got initial guess\n")
+    #cat("Got initial guess\n")
     cat("Initial B0: ", B0_max, "\n")
     return(FLPar(B0=B0_max))
     },
@@ -328,11 +330,10 @@ aspm.Francis.C <- function()
   # no sigma2 so set to 1 in .Call
   logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
   {
-
-    total.logl <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)[["logl"]]["logl"]
-    #total.logl <- .Call("aspm_ad", catch, index, B0, 1,
-    #            hh, M, mat, sel,
-    #            wght, amin, amax, dim(catch)[2], 2)[["logl"]]["logl"]
+    allop <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+    total.logl <- allop[["logl"]]["logl"]
+#    total.logl <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)[["logl"]]["logl"]
+    #cat("B0: ", B0, " loglC: ", total.logl, " qhatC: ", allop[["qhat"]], "\n")
     return(total.logl)
   }
 
@@ -344,7 +345,7 @@ aspm.Francis.C <- function()
                 hh, M, mat, sel,
                 wght, amin, amax, dim(catch)[2], 2)[["logl"]]["logl"]
         B0_max <- B0seq[which.max(llout)]
-        cat("Got initial value of B0: ", B0_max, "\n")
+        #cat("Got initial value of B0: ", B0_max, "\n")
         return(FLPar(B0 = B0_max))
   },
     # initial parameter values
