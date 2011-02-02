@@ -37,6 +37,7 @@ typedef enum tagFLRConstSRR
    Edwards         = 2
   } model;
 
+//double fmax = 100;
 
 //******************************************************************************
 // Function definitions
@@ -208,7 +209,12 @@ void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, 
   // For Francis it is mid year, indextime = 0.5
   //	qhat <- apply(index[[index.count]]/bmid,c(1,6),sum,na.rm=T) / n
   int i, j, nonnanyrs;
+  int extinction = 0;
   adouble mean_ind_over_bexp;
+  adouble bmid;
+  for (j=0; j<nyrs; j++)
+    if (f[j].getValue() == 100) extinction = 1;
+
   for (i = 0; i<nindices; i++)
   {
     // for another index does the gradient need to be reset too?
@@ -220,11 +226,18 @@ void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, 
       if (!__isnan(index[i][j]) & !__isnan(bexp[j].getValue()))
 	    {
         nonnanyrs++;
-		    mean_ind_over_bexp = mean_ind_over_bexp + (index[i][j] / (bexp[j]*exp(-indextime * (M + f[j]))));
+        bmid = bexp[j]*exp(-indextime*(M+f[j]));
+        if (extinction == 1) bmid = 1e-9;
+		    mean_ind_over_bexp = mean_ind_over_bexp + (index[i][j] / (bmid));
       }
     }
     // Cast from int to double? nonnanyrs?
   	qhat[i] = mean_ind_over_bexp / nonnanyrs;
+  	// qhat sometimes goes to NaN because bmid has gone to 1e-9
+  	// So set up some hack for qhat to max out at 1e10 if NaN or Inf
+  	if(__isnan(qhat[i].getValue())) qhat[i] = 1e10;
+  	if (qhat[i].getValue() == INFINITY) qhat[i] = 1e10;
+  	//if(!isfinite(qhat[i].getValue())) qhat[i] = 1e10;
     //Rprintf("end mean log ind grad: %f\n", mean_log_ind_over_bexp.getADValue());
   }
 }
@@ -304,7 +317,9 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
   //f[0] = ratner_search(0,1,100,M,Catch[0],bexp[0].getValue());
     f[0] = 1; // Needs good first estimate of f[0] else failure to converge
     f[0] = simpleNRtogetf(f[0], M, Catch[0], bexp[0]);
+    // Do we need this? When is f a NaN?
     if (__isnan(f[0].getValue())) f[0] = fmax;
+    if (f[0].getValue() > fmax) f[0] = fmax;
     //Rprintf("Initial f0 value : %f\n", f[0].getValue());
     //Rprintf("Initial f0 AD val: %f\n", f[0].getADValue() * 1e8);
 
@@ -334,6 +349,8 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
 //    Rprintf("yrcount: %i\n", yrcount);
     f[yrcount] = simpleNRtogetf(f[yrcount], M, Catch[yrcount], bexp[yrcount]);
     if (__isnan(f[yrcount].getValue())) f[yrcount] = fmax;
+    // Again, do we need this?
+    if (f[yrcount].getValue() > fmax) f[yrcount] = fmax;
     for (i=0;i<nages;i++)
       b[yrcount] = b[yrcount] + (n[i][yrcount] * mat[i] * wght[i]);
   }
@@ -349,7 +366,13 @@ adouble calc_logl_Francis(double** index, adouble* bexp, adouble* qhat,
 
   adouble chat2, total_logl, log_bmid, bmid;
   int i, j, index_count;
+  int extinction = 0;
   total_logl = 0;
+  // if harvest has maxed out set all bmids to 1e-9
+  for (j=0; j<nyrs; j++)
+    if (h[j].getValue() == 100) extinction = 1;
+
+
   for (i=0; i < nindices; i++)
   {
     chat2 = 0;
@@ -365,16 +388,27 @@ adouble calc_logl_Francis(double** index, adouble* bexp, adouble* qhat,
 //        Rprintf("bmid: %f\n", bmid.getValue());
 //        if(__isnan(bmid.getValue())) Rprintf("Yes, I am a nan\n");
         if(__isnan(bmid.getValue())) bmid = 1e-9;
+        if (extinction == 1) bmid = 1e-9;
+
         //Rprintf("bmid again: %f\n", bmid.getValue());
         //bmid = max(bmid,1e-9);
         // qhat can also be NaN
         chat2 = chat2 + pow((index[i][j] / (qhat[i] * bmid)) - 1,2);
-        //Rprintf("chat2: %f", chat2.getValue());
+        //if (chat2==INFINITY)
+        //{
+//          Rprintf("chat2: %f\n", chat2.getValue());
+//          Rprintf("index[%i][%i]: %f\n", i, j, index[i][j]);
+//          Rprintf("bexp[%i]: %f\n", j, bexp[j].getValue() * 1e9);
+//          Rprintf("h[%i]: %f\n", j, h[j].getValue());
+//          Rprintf("bmid: %f\n", bmid.getValue() * 1e9);
+//          Rprintf("qhat[%i]: %f\n", i,qhat[i].getValue());
+        //}
         log_bmid = log_bmid + log(bmid);
         //Rprintf("log_bmid: %f", log_bmid.getValue());
       }
     }
     chat2 = chat2 / (index_count-2);
+    //Rprintf("chat2: %f\n", chat2.getValue());
     total_logl = total_logl + (-index_count*log(sqrt(chat2)) - index_count*log(qhat[i]) - log_bmid);
   }
   return total_logl;
@@ -577,6 +611,7 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
   }
 
   //Rprintf("bexp[1] %f\n", bexp[1].getValue());
+  // Francis
   if (model_name == 2)
   {
     // Set up B0 deriv
