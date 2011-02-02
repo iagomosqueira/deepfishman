@@ -202,6 +202,63 @@ profile(fr.C,maxsteps=30,main="C version")
 # yscale is different to R. Narrow the range it looks good
 
 #****************************************************************************
+# The Francis model has problems with the likelihood at low levels of B0
+# This can make fitting a real problem, even when the 'true' B0 is a resonable value
+library(FLCore)
+library(FLaspm)
+
+# Data and parameter values
+data(NZOR)
+catch <- NZOR[["catch"]]
+index <- NZOR[["index"]]
+# Setting up the test data
+amin    <- 1
+amax    <- 70
+# steepness of BH recruitment
+hh <- FLQuant(0.95)
+# natural mortality ,not age specific
+M <- FLQuant(0.05)
+# age-length
+Linf  <- 42.5 #cm
+k     <- 0.059
+t0    <- -0.346
+# length-weight
+alpha <- 0.0963 # grams
+beta  <- 2.68
+am <- 23
+as <- 23
+
+# Set up FLQuant for weights
+w <- FLQuant(age_to_weight(amin:amax,Linf,k,t0,alpha,beta), dimnames=list(age=amin:amax)) / 1e6 # convert to tonnes
+
+fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w,amax=amax, amin=amin)
+model(fr) <- aspm.Francis()
+
+fr.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w,amax=amax, amin=amin)
+model(fr.C) <- aspm.Francis.C()
+
+params(fr)["B0",] <- 400000
+params(fr.C)["B0",] <- 400000
+calc.logl(fr)
+calc.logl(fr.C)
+
+par(mfrow=c(2,1))
+profile(fr,maxsteps=30)
+profile(fr.C,maxsteps=30)
+
+params(fr.C)["B0",] <- 200000
+params(fr)["B0",] <- 200000
+exp.biomass(fr.C)
+harvest(fr.C)
+calc.logl(fr)
+calc.logl(fr.C)
+
+par(mfrow=c(2,1))
+profile(fr,maxsteps=30)
+profile(fr.C,maxsteps=30)
+
+
+#****************************************************************************
 # STOP
 
 
