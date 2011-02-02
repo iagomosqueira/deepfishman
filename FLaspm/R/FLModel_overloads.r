@@ -21,6 +21,7 @@ setMethod('fmle',
   {
 
   if(missing(start)) orig_start_is_missing <- TRUE
+  parscale_in_control <- 'parscale' %in% names(control)
 
 #browser()
     #orig_start <- start
@@ -229,9 +230,6 @@ else
 # HACK! clean up fixed list if elements are named vectors
 start <- lapply(start, function(x){ names(x) <- NULL; x})
 
-
-
-
       if(!is.null(fixnm))
         start[fixnm] <- NULL
       if(any(!names(start) %in% parnm))
@@ -247,15 +245,18 @@ start <- lapply(start, function(x){ names(x) <- NULL; x})
 
     #browser()
 
+      # After first parscale, parscale is in control and this is not called
       # autoParscale
-      if(autoParscale && !'parscale' %in% names(control))
+      # This is a hack, could be an option to parscale only on first iter
+      #if(autoParscale && !'parscale' %in% names(control))
+      if(autoParscale && !parscale_in_control)
       {
         # named vectors for logl plus/minus tiny_number and diff
         diff_logl <- logl_bump1 <- logl_bump2 <- unlist(start)
 
         # get logLik for start values
         logl_start <- do.call(logl, args=c(start, data, fixed))
-
+        #cat("logl_start: ", logl_start, "\n")
         for(j in names(start))
         {
           # bump up & down each param by tiny_number
@@ -271,7 +272,7 @@ start <- lapply(start, function(x){ names(x) <- NULL; x})
 	#    2 * tiny_number)
 
 diff_logl <-  abs(1/(((logl_bump1 - logl_bump2) / (2 * unlist(start) * tiny_number))))
-
+#cat("diff_logl: ", diff_logl, "\n")
         # relative
 # This fails if only one parameter = 1
 #        if(relAutoParscale)
@@ -279,6 +280,7 @@ diff_logl <-  abs(1/(((logl_bump1 - logl_bump2) / (2 * unlist(start) * tiny_numb
         control <- c(control, list(parscale=diff_logl))
       }
 
+#if (it==2) browser()
 #browser()
 
       # TODO protect environment
@@ -286,7 +288,7 @@ diff_logl <-  abs(1/(((logl_bump1 - logl_bump2) / (2 * unlist(start) * tiny_numb
 			      #hessian=TRUE, control=control, lower=lower, upper=upper, gr=gr)))
         hessian=TRUE, control=control, lower=lower, upper=upper, gr=grfoo)))
 
-#browser()
+
 
 
       # output
