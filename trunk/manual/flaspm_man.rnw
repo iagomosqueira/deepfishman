@@ -199,7 +199,7 @@ model(or) <- aspm.Francis.C()
 \end{minipage}
 \end{center}
 
-Setting the model also sets up the intital values for the fitted parameters (in
+Setting the model also sets up a function to calculate the initial values for the fitted parameters (in
 this case $B_{0}$. It is possible to specify your own but unless you have a good
 reason to do so (such as problems with the fit) then you should the default
 setting. To estimate the parameters use the $fmle()$ method:
@@ -273,6 +273,78 @@ calc.qhat(or)
 \end{center}
 
 Francis reports the estimated value of $q_{hat}$ to be 0.59.
+
+\subsection{Estimating a probability distribution for $B_{0}$}
+Francis (REF) provides a Monte Carlo routine for estimating a probability
+distribution for $B_{0}$. The routine answers the question: "If this were
+the true $B_{0}$, how likely is it that we would get an estimate of virgin
+biomass as large as or greater than $B_{0}$HAT", where $B_{0}$ hat is
+the result from the simple deterministic assessment above. Following
+Francis(REF) the procedure is as follows:
+1) Choose a trial value of $B_{0}$.
+2) Calculate the biomass history for this trial $B_{0}$.
+3) Generate simulated indices by assuming that the indices are normally
+distributed with a mean value equal to the corresponding value in the biomass
+history and with a CV of 19\% (estimated by Francis).
+4) Calculate the value of $B_{0sim}$ that maximises the likelihood estimate
+for the simulated survey indices.
+5) Repeat steps 1-4 100 times and calculate the proportion of the $B_{0sim}$
+estimates that are greater than $B_{0}$HAT.
+6) Repeat steps 1-5 for a range of trial of $B_{0}$ values.
+
+This process is relatively easy to carry out using $FLaspm$ because multiple
+iterations can be processed in parallel.
+It should be remembered that here
+$B_{0}$ is the virgin biomass at the start of the year whilst the index is
+the relative abundance midyear.
+A sequence of trial $B_{0mid}$ values and corresponding $B_{0trial}$ values at
+the start of the year is calculated. These are looped over using a for loop.
+The midyear biomass history for each
+value of $B_{0}$ is calculated by setting the $params()$ value to the trial
+$B_{0}$ value and using the $exp.biomass.mid()$ method.
+The simulated index is generated using the R function $rnorm()$. It is possible
+to generate all 100 iterations simultaneously. A new $FLaspm()$ is set up
+using the simulated index and the value of $B_{0sim}$ that maximises the
+likelihood for each iteration is calculated. The probability of this value
+of $B_{0sim}$ being greater than $B_{0trial}$ is calculated.
+The R code for this procedure using the New Zealand Orange Roughy
+data is shown below:
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=TRUE>>=
+index.cv <- 0.19
+niters <- 100
+or_true <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
+model(or_true) <- aspm.Francis.C()
+or_true <- fmle(or_true)
+B0_true <- params(or_true)['B0',]
+or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
+model(or) <- aspm.Francis.C()
+Bmidtrial <- seq(from=300000,to=500000,length=10)
+B0trial <- Bmidtrial*exp(0.5*M)
+B0iters <- array(NA,dim=c(length(B0trial),niters))
+for (i in 1:length(B0trial))
+{
+  params(or)['B0',] <- B0trial[i]
+  or.traj.mid <- exp.biomass.mid(or,yrfrac=0.5,virgin=F)
+  index.sim <- rnorm(niters,or.traj.mid,index.cv*or.traj.mid)
+  or.sim <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+  model(or.sim) <- aspm.Francis.C()
+  or.sim <- fmle(or.sim)
+  B0iters[i,] <-(params(or.sim))
+}
+
+
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
 
 %\bibliography{flaspm_bib}{}
 %\bibliographystyle{plain}
