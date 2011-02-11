@@ -22,8 +22,6 @@ aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
     sel <- c(sel)
     hh   <- c(hh)
     M   <- c(M)
-    
-
 
     C <- as.vector(catch)
     nyr <- length(C)

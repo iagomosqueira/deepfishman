@@ -80,7 +80,7 @@ aspm.index.Edwards <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
 #    hh   <- c(hh)
 #    M   <- c(M)
 
-    index.hat <- FLQuants()
+    index.hat <- FLQuants()        # loop over fitted indecies only using fitted_flag slot
     pdyn <- aspm.pdyn.Edwards(catch,B0,hh,M,mat,sel,wght,amin,amax)
 #    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax)
     bexp <- pdyn[["bexp"]]
@@ -298,7 +298,7 @@ aspm.Edwards.C.AD <- function()
 
 gr <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
   {
-    grads <- -1 * .Call("aspm_ad", catch, index, B0, sigma2,
+    grads <-  .Call("aspm_ad", catch, index, B0, sigma2,
                 hh, M, mat, sel,
                 wght, amin, amax, dim(catch)[2], 1)[["logl"]][c("logl_grad_B0","logl_grad_sigma2")]
     return(grads)

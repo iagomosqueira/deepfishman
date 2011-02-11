@@ -99,7 +99,7 @@ First you need to load the $FLaspm$ library
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<>>=
+<<quiet=TRUE,echo=TRUE,results=verbatim>>=
 library(FLaspm)
 @
 %\end{shaded}%
@@ -122,10 +122,13 @@ $wght$ must be passed as an FLQuant object.
 
 Here we will use the Orange Roughy data set from CITE FRANCIS.
 
+% The keep.source argument means that comments are kept in
+% results=hide, no output from R console is included
+% Not sure about the quiet argument
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=FALSE>>=
+<<echo=TRUE,keep.source=TRUE,results=hide>>=
 # Load the data - here's some I prepared earlier
 data(NZOR)
 catch <- NZOR[["catch"]]
@@ -153,7 +156,7 @@ and then create an age structured FLQuant for the masses.
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=FALSE>>=
+<<echo=TRUE,keep.source=TRUE,results=hide>>=
 # age-length parameters
 Linf  <- 42.5 #cm
 k     <- 0.059
@@ -176,9 +179,9 @@ passing the data:
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=FALSE>>=
+<<echo=TRUE,keep.source=TRUE,results=hide>>=
 or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
+              mat=mat_age, wght=w, amax=amax, amin=amin)
 @
 %\end{shaded}%
 \end{minipage}
@@ -192,7 +195,7 @@ from both are the same. The C version is faster so it is better to use that:
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=FALSE>>=
+<<echo=TRUE,keep.source=TRUE,results=hide>>=
 model(or) <- aspm.Francis.C()
 @
 %\end{shaded}%
@@ -207,7 +210,7 @@ setting. To estimate the parameters use the $fmle()$ method:
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=FALSE>>=
+<<echo=TRUE,keep.source=TRUE,results=hide>>=
 or <- fmle(or)
 @
 %\end{shaded}%
@@ -222,7 +225,7 @@ parameter value.
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<fig = TRUE, echo=FALSE>>=
+<<echo=TRUE, fig=TRUE, keep.source=TRUE,results=hide>>=
 profile(or,maxsteps=50,range=0.25)
 @
 %\end{shaded}%
@@ -236,7 +239,7 @@ $params()$ method:
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=FALSE>>=
+<<echo=TRUE,keep.source=TRUE,results=verbatim>>=
 params(or)
 @
 %\end{shaded}%
@@ -251,8 +254,8 @@ exp.biomass.mid() method:
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=TRUE>>=
-exp.biomass.mid(or,yrfrac = 0.5,virgin=TRUE)
+<<echo=TRUE,keep.source=TRUE,results=verbatim>>=
+exp.biomass.mid(or,yrfrac = 0.5,virgin=TRUE)[,1]
 @
 %\end{shaded}%
 \end{minipage}
@@ -265,7 +268,7 @@ the $calc.qhat()$ method:
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=TRUE>>=
+<<echo=TRUE,keep.source=TRUE,results=verbatim>>=
 calc.qhat(or)
 @
 %\end{shaded}%
@@ -275,29 +278,29 @@ calc.qhat(or)
 Francis reports the estimated value of $q_{hat}$ to be 0.59.
 
 \subsection{Estimating a probability distribution for $B_{0}$}
-Francis (REF) provides a Monte Carlo routine for estimating a probability
+Francis provides a Monte Carlo routine for estimating a probability
 distribution for $B_{0}$. The routine answers the question: "If this were
 the true $B_{0}$, how likely is it that we would get an estimate of virgin
 biomass as large as or greater than $B_{0}$HAT", where $B_{0}$ hat is
 the result from the simple deterministic assessment above. Following
-Francis(REF) the procedure is as follows:
-1) Choose a trial value of $B_{0}$.
-2) Calculate the biomass history for this trial $B_{0}$.
-3) Generate simulated indices by assuming that the indices are normally
+Francis the procedure is as follows:
+
+\begin{enumerate}
+\item Choose a trial value of $B_{0}$.
+\item Calculate the biomass history for this trial $B_{0}$.
+\item Generate simulated indices by assuming that the indices are normally
 distributed with a mean value equal to the corresponding value in the biomass
 history and with a CV of 19\% (estimated by Francis).
-4) Calculate the value of $B_{0sim}$ that maximises the likelihood estimate
+\item Calculate the value of $B_{0sim}$ that maximises the likelihood estimate
 for the simulated survey indices.
-5) Repeat steps 1-4 100 times and calculate the proportion of the $B_{0sim}$
+\item Repeat steps 1-4 100 times and calculate the proportion of the $B_{0sim}$
 estimates that are greater than $B_{0}$HAT.
-6) Repeat steps 1-5 for a range of trial of $B_{0}$ values.
+\item Repeat steps 1-5 for a range of trial of $B_{0}$ values.
+\end{enumerate}
 
 This process is relatively easy to carry out using $FLaspm$ because multiple
 iterations can be processed in parallel.
-It should be remembered that here
-$B_{0}$ is the virgin biomass at the start of the year whilst the index is
-the relative abundance midyear.
-A sequence of trial $B_{0mid}$ values and corresponding $B_{0trial}$ values at
+A sequence of $B_{0trial}$ values at
 the start of the year is calculated. These are looped over using a for loop.
 The midyear biomass history for each
 value of $B_{0}$ is calculated by setting the $params()$ value to the trial
@@ -305,15 +308,54 @@ $B_{0}$ value and using the $exp.biomass.mid()$ method.
 The simulated index is generated using the R function $rnorm()$. It is possible
 to generate all 100 iterations simultaneously. A new $FLaspm()$ is set up
 using the simulated index and the value of $B_{0sim}$ that maximises the
-likelihood for each iteration is calculated. The probability of this value
-of $B_{0sim}$ being greater than $B_{0trial}$ is calculated.
-The R code for this procedure using the New Zealand Orange Roughy
+likelihood for each iteration is calculated. The R code for this procedure using the New Zealand Orange Roughy
 data is shown below:
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=TRUE>>=
+<<echo=TRUE,keep.source=TRUE,results=hide,eval=FALSE>>=
+index.cv <- 0.19
+niters <- 100
+# Estimate the 'true' value of B0
+or_true <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
+model(or_true) <- aspm.Francis.C()
+or_true <- fmle(or_true)
+B0_true <- params(or_true)['B0',]
+# Set up another FLaspm object to calculate the biomass trajectory
+or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
+model(or) <- aspm.Francis.C()
+# Set up sequence of trial B0 values
+B0trial <- seq(from=300000,to=500000,length=10)
+# Array to store estimated B0 values
+B0store <- array(NA,dim=c(length(B0trial),niters))
+for (i in 1:length(B0trial))
+{
+  # set the B0 value and evalutate the midyear biomass trajectory
+  params(or)['B0',] <- B0trial[i]
+  or.traj.mid <- exp.biomass.mid(or,yrfrac=0.5,virgin=F)
+  # generate 100 random indices based on the biomass trajectory
+  index.sim <- rnorm(niters,or.traj.mid,index.cv*or.traj.mid)
+  # Set up an FLaspm object to fit all indices
+  or.sim <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+  model(or.sim) <- aspm.Francis.C()
+  # Fit all indices (takes a while...) and store the estimated value of B0
+  or.sim <- fmle(or.sim)
+  B0store[i,] <-(params(or.sim))
+}
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+% Sneakily load in previously prepared results and other parameters
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=FALSE,results=hide>>=
 index.cv <- 0.19
 niters <- 100
 or_true <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
@@ -324,26 +366,62 @@ B0_true <- params(or_true)['B0',]
 or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
 model(or) <- aspm.Francis.C()
-Bmidtrial <- seq(from=300000,to=500000,length=10)
-B0trial <- Bmidtrial*exp(0.5*M)
-B0iters <- array(NA,dim=c(length(B0trial),niters))
-for (i in 1:length(B0trial))
-{
-  params(or)['B0',] <- B0trial[i]
-  or.traj.mid <- exp.biomass.mid(or,yrfrac=0.5,virgin=F)
-  index.sim <- rnorm(niters,or.traj.mid,index.cv*or.traj.mid)
-  or.sim <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, amax=amax, amin=amin)
-  model(or.sim) <- aspm.Francis.C()
-  or.sim <- fmle(or.sim)
-  B0iters[i,] <-(params(or.sim))
-}
-
-
+B0trial <- seq(from=300000,to=500000,length=10)
+load("B0store.RData")
 @
 %\end{shaded}%
 \end{minipage}
 \end{center}
+
+
+The probability of the value of $B_{0sim}$ being greater than $B_{0trial}$
+cab then be calculated and plotted.
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=TRUE, fig=TRUE, keep.source=TRUE,results=hide>>=
+propB0 <- apply(B0store>=c(B0_true),1,sum) / niters
+plot(B0trial,propB0,type="l")
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+To estimate the probability distribution of $B_{0}$ Francis fits a
+Johnson Su distribution by maximum likelihood (REF Johnson and Kotz).
+The Johnson Su distribution and likelihood function are included in $FLaspm$.
+The area under the PDF curve between two value of $B_{0}$ is proportional to
+the confidence that the true value of $B_{0}$ lies between these two values.
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=TRUE, fig=TRUE, keep.source=TRUE,results=hide>>=
+initialparms <- c(g=-1,delta=1,xi=0,lambda=1)
+# Scale B0trial by 1000 to help the fit
+jcpars <- optim(par=initialparms,fn=Johnsonll,b=B0trial/1000,m=niters,p=propB0)$par
+B0plot <- seq(from=min(B0trial/1000), to = max(B0trial/1000), length=100)
+jp <- JohnsonPDF(jcpars,B0plot)
+plot(B0plot,jp,type="l")
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+\subsection{Sensitivity analysis}
+
+\subsection{Risk analysis}
+
+
+%\begin{center}
+%\begin{minipage}[H]{0.95\textwidth}%
+%%\begin{shaded}%
+%<<echo=TRUE, eval=FALSE>>=
+%@
+%%\end{shaded}%
+%\end{minipage}
+%\end{center}
 
 
 %\bibliography{flaspm_bib}{}
