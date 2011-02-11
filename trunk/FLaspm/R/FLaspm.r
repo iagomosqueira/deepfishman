@@ -402,6 +402,42 @@ age_to_weight <- function(age,Linf,k,t0,a,b)
   return(length_to_weight(age_to_length(age,Linf,k,t0),a,b))
 
 #********************************************************************************
+# Johnson SU distribution and likelihood functions
+# Used for estimating PDF of B0
+#********************************************************************************
+JohnsonCum <- function(parms,b)
+{
+  g <- parms["g"]
+  delta <- parms["delta"]
+  xi <- parms["xi"]
+  lambda <- parms["lambda"]
+  q <- g + delta*asinh((b-xi)/lambda)
+  pnorm(q,mean=0,sd=1)
+}
+
+JohnsonPDF <- function(parms,b)
+{
+  g <- parms["g"]
+  delta <- parms["delta"]
+  xi <- parms["xi"]
+  lambda <- parms["lambda"]
+  q <- g + delta*asinh((b-xi)/lambda)
+  return(dnorm(q,mean=0,sd=1))
+}
+
+Johnsonll <- function(parms,b,m,p)
+{
+  #browser()
+  g <- parms["g"]
+  delta <- parms["delta"]
+  xi <- parms["xi"]
+  lambda <- parms["lambda"]
+  jc <- JohnsonCum(parms,b)
+  ll <- m * p * log(jc) + m * (1 - p) * log(1 - jc)
+  return(-sum(ll))
+}
+
+#********************************************************************************
 # Plot
 #********************************************************************************
 # Multiple iters?

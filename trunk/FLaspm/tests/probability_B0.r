@@ -34,32 +34,140 @@ beta  <- 2.68
 mass_at_age <- age_to_weight(amin:amax,Linf,k,t0,alpha,beta)
 w <- FLQuant(mass_at_age, dimnames=list(age=amin:amax)) / 1e6
 
-index.cv <- 0.15
-niters <- 500
+#index.cv <- 0.15
+index.cv <- 0.19 # upper estimate
+niters <- 100
 
-# Deterministic projection
+or_true <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
+model(or_true) <- aspm.Francis.C()
+or_true <- fmle(or_true)
+B0_true <- params(or_true)['B0',]
 or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
 model(or) <- aspm.Francis.C()
-or <- fmle(or)
+#Bmidtrial <- seq(from=300000,to=500000,length=10)
+#B0trial <- seq(from=300000,to=500000,length=10)#Bmidtrial*exp(0.5*M)
+B0trial <- seq(from=350000,to=500000,length=20)
+B0trial <- c(B0_true)
+niters <- 500
+B0store <- array(NA,dim=c(length(B0trial),niters))
+for (i in 1:length(B0trial))
+{
+  cat("i: ", i, "\n")
+  params(or)['B0',] <- B0trial[i]
+  or.traj.mid <- exp.biomass.mid(or,yrfrac=0.5,virgin=F)
+  index.sim <- rnorm(niters,or.traj.mid,index.cv*or.traj.mid)
 
-B0det <- params(or)['B0',]
-profile(or)
+#  apply(index.sim,2,mean)
+#  cv(index.sim)
 
-# Set up simulated object
-orsim <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
+  or.sim <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+  model(or.sim) <- aspm.Francis.C()
+  or.sim <- fmle(or.sim)
+  B0store[i,] <-(params(or.sim))
+}
+
+# What would we expect to happen?
+iter(index.sim[,1] * exp(0.5*M),500)
+
+
+#save(B0store,file="C:/Projects/Deepfishman/deepfishman/trunk/B0store.Rdata")
+#load("C:/Projects/Deepfishman/deepfishman/trunk/B0iters.Rdata")
+propB0 <- apply(B0store>=c(B0_true),1,sum) / niters
+plot(B0trial,propB0,type="l")
+lines(x=c(B0_true,B0_true),y=c(0,1),lty=2)
+
+# Fit a Johnson's Su distribution to get the cumulative distribution function
+# Try fitting Johnson distribution with real data
+initialparms <- c(g=-1,delta=1,xi=0,lambda=1)
+jcpars <- optim(par=initialparms,fn=Johnsonll,b=B0trial/1000,m=niters,p=propB0)$par
+B0plot <- seq(from=min(B0trial/1000), to = max(B0trial/1000), length=100)
+jp <- JohnsonPDF(jcpars,B0plot)
+plot(B0plot,jp,type="l")
+lines(x=c(B0_true,B0_true)/1000,y=c(0,1),lty=2)
+
+
+
+# Reading from graph Francis has
+# Bmid   ~p    myP
+# 400    0.35   0.19
+# 450    0.8    0.97
+# 500    0.92   1.0
+
+
+
+
+
+#*******************************************************************
+# Deterministic projection
+or1 <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
-model(orsim) <- aspm.Francis.C()
+model(or1) <- aspm.Francis.C()
+or1 <- fmle(or1)
+
+# Index is the relative index of abundance
+# Bmid ~ I, Bmid = QI
+# So if set up the index to be same as the biomass, do I fit the same B0
+for1 <- calc.pop.dyn(or)[["harvest"]]
+bexpor1 <- calc.pop.dyn(or)[["bexp"]]
+bmidor1 <- bexpor1 * exp(-0.5*(for1+c(or@M)))
+
+
+or2 <- FLaspm(catch=catch, index=bmidor1, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
+model(or2) <- aspm.Francis.C()
+or2 <- fmle(or2)
+profile(or2,maxsteps=50)
+# Add parameter of first fit
+lines(x=c(params(or1)["B0",],params(or1)["B0",]),y=c(-1000,1000),lty=2)
+params(or2)
+params(or1)
+# The same
+calc.qhat(or2)
+# 1
+bexpor2 <- calc.pop.dyn(or2)[["bexp"]]
+for2 <- calc.pop.dyn(or2)[["harvest"]]
+bmidor2 <- bexpor2 * exp(-0.5*(for2+c(or2@M)))
+bmidor2
+bmidor1
+
+
+# Add noise to index, taking the best estimate of bmid as the index
+set.seed(0)
+# normally distributed, cv 15%, sd / mean
+niters <- 500
+index.sim <- rnorm(niters,bmidor1,index.cv*bmidor1)
+# check this is right
+apply(index.sim,2,mean)
+bmidor1
+# check sd and cv is right
+cv(index.sim)
+apply(index.sim,2,function(x)sd(x)/mean(x))
+
+or3 <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
+model(or3) <- aspm.Francis.C()
+or3 <- fmle(or3)
+vbmid <- c(params(or3)) * exp(-0.5*c(or@M))
+truehist(vbmid)
+mean(c(params(or3)))
+params(or1)
+length(which(c(params(or3)) >= c(params(or1)))) / niters
+# not 0.5
+# it won't be
+
+#*******************************************************************
 #model(orsim) <- aspm.Francis()
 # Choose a trial B0
 B0trial <- 600000
 B0trial <- 500000
 B0trial <- 450000
 B0trial <- 400000
-B0trial <- 350000 # bmid = 0? or 1e-9? 0.
-# what the hell is going on with h? it's like 2e31?
-B0trial <- 300000 # qhat limits at 1e10, good. But logl still goes to NaN. Why?
-# Because chat goes to inf
+B0trial <- 350000
+B0trial <- 300000
+B0trial <- 250000
 
 params(orsim)['B0',] <- B0trial
 # Get the population trajectory

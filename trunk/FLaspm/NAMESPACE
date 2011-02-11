@@ -6,6 +6,7 @@ export(
   "age_to_weight",
   "aspm.Edwards",
   "aspm.Edwards.C",
+  "aspm.Edwards.C.AD",
   "aspm.index.Edwards",
   "aspm.index.Edwards.C",
   "aspm.Francis",
@@ -15,7 +16,10 @@ export(
   "aspm.pdyn.Francis.C",
   "aspm.pdyn.Francis",
   "aspm.pdyn.Edwards.C",
-  "aspm.pdyn.Edwards"  )
+  "aspm.pdyn.Edwards",
+  "JohnsonCum",
+  "JohnsonPDF",
+  "Johnsonll")
 exportClasses(
 	"FLaspm")
 exportMethods(
@@ -27,5 +31,6 @@ exportMethods(
   "calc.qhat",
   "calc.sigma2",
   "calc.logl",
+  "calc.initial",
   "indexhat")
 	

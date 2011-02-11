@@ -1,9 +1,7 @@
 
 library(FLCore)
 library(FLaspm)
-#data(IOalbacore)                 # this doesn't work?
-load("../data/IOalbacore.RData")
-
+data(IOalbacore)
 
 # input required life history parameters
 
@@ -31,10 +29,12 @@ alb <- FLaspm(catch=IOalbacore$catch,
               index=IOalbacore$index,
               M=M,hh=hh,sel=as, mat=am,wght=mw,amax=amax, amin=amin)
 
-model(alb) <- aspm.Edwards()
+model(alb) <- aspm.Edwards.C()
 
 # calculate initial starting values
 alb@params <- calc.initial(alb)
+
+profile(alb)
 
 # check initial fit
 plot(alb)
@@ -43,13 +43,49 @@ plot(alb)
 alb <- fmle(alb)              # can we change the fitted_flags when we optimise?
                               # do we have to find the initial values again?
                               # currently re-calculates initival values for each fit...
+
+profile(alb,maxsteps=50)
+profile(alb,maxsteps=50,fixed=list(sigma2=0.07))
+
                               
 # check fit
 plot(alb)
+par(mfrow=c(2,1))
 plot(harvest(alb),type='l')
+plot(exp.biomass(alb),type="l")
+
+dat <- as.data.frame(FLQuants(h=harvest(alb),b=exp.biomass(alb)))
+xyplot(data ~ year | qname,data=dat,type="l",scale=list(relation="free"))
 
 # likelihood profile
 profile(alb)
+
+#alb <- fmle(alb,method="SANN")
+#alb <- fmle(alb,start=list(B0=params(alb)["B0",],sigma2=params(alb)["sigma2",]),always_eval_initial=FALSE)
+
+# Try AD
+albad <- FLaspm(catch=IOalbacore$catch,
+              index=IOalbacore$index,
+              M=M,hh=hh,sel=as, mat=am,wght=mw,amax=amax, amin=amin)
+
+model(albad) <- aspm.Edwards.C.AD()
+albad <- fmle(albad)
+profile(albad)
+#albad <- fmle(albad,start=list(B0=120,sigma2=0.12),always_eval_initial=FALSE)
+# Do we get a different hessian matrix
+alb@hessian
+albad@hessian
+
+# Not sure what all this is...
+chol(albad@hessian[,,1])
+chol(alb@hessian[,,1])
+chol2inv(albad@hessian[,,1])
+chol2inv(alb@hessian[,,1])
+# Look at variance covariance matrix
+alb@vcov
+albad@vcov
+# B0-sigma2 reference has opposite sign
+
 
 # more than one index
 
@@ -76,12 +112,13 @@ alb.it <- FLaspm(catch=IOalbacore$catch,
               index=IOalbacore$index,
               M=M,hh=hh.it,sel=as, mat=am,wght=mw,amax=amax, amin=amin)
 
-model(alb.it) <- aspm.Edwards()
+model(alb.it) <- aspm.Edwards.C()
 
 alb.it <- fmle(alb.it)
 
 boxplot(data~year,as.data.frame(exp.biomass(alb.it)),outline=F)
 boxplot(data~year,as.data.frame(harvest(alb.it)),outline=F)
+profile(alb.it)
 
 # likelihood profile
 
