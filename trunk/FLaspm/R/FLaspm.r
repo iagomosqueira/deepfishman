@@ -269,7 +269,8 @@ setMethod('calc.qhat', signature(object='FLaspm'),
       # Set up output object
       op <- FLQuants()
       for (flq in 1:length(object@index))
-        op[[flq]] <- FLQuant(NA,iter=dims(object@index[[flq]])$iter)
+        #op[[flq]] <- FLQuant(NA,iter=dims(object@index[[flq]])$iter)
+        op[[flq]] <- FLQuant(NA,iter=dims(object)$iter)
       for (it in 1:dims(object)$iter)
       {
         iter.args <- lapply(args,function(x,it)iter(x,it),it=it)
