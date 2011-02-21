@@ -7,6 +7,7 @@
 \usepackage{amsmath}
 \usepackage{hyperref}
 \usepackage{cite}
+\usepackage{url}
 \geometry{verbose,a4paper,tmargin=2cm,bmargin=1.5cm,lmargin=2cm,rmargin=3cm}
 \definecolor{shadecolor}{rgb}{0.9,0.9,0.9}
 \definecolor{darkblue}{rgb}{0,0,0.5}
@@ -27,20 +28,42 @@ Cefas, Lowestoft, UK}
 
 \section{Introduction}
 
+This package implements two age-strucutured production models based on
+~\cite{Francis92} and~\cite{Walters06},
+using the using the FLR library~\cite{FLRref}.
+
 Something interesting on ASPM
-% Implemented using the FLR library ~\cite{FLRref}
 
 \section{The Models}
 
-Start at equib.
-SRR
+Both models make the assumption that the initial population is at equilibrium.
+A Beverton Holt model is used for the stock recruitment relationship for both
+models.
 
-R version
-C version
+\begin{equation}
+R = A_{y-1} / (\alpha + \beta A_{y-1})
+\end{equation}
 
+Where A is the biomass of the mature fish. This relationship is reparameterised
+in terms of virgin recruitment, $R_0$, and steepness, $h$ (the number of
+recruits when the mature biomass is reduced to 20\% of its virgin level is
+$h R_0$):
 
+\begin{eqnarray}
+\alpha = (4 h R_0) / (5 h -1) \\
+\beta = (A_0 * (1-h)) / (5h-1)
+\end{eqnarray}
 
-Differences between the models
+In the package each model is implemented twice, one version uses pure R code,
+other also uses C code. The version that uses C code is considerably faster and
+it is recommended that this version is used. The pure R version is used by
+the developers to check the results (R code is much easier to debug than C!).
+Changing between the R and C versions is straightforward (see below).
+
+The main difference between the models is the timing of the fishing mortality.
+The Francis model assumes that fishing mortality occurs steadily throughout
+the year. The Edwards model assumes that the fishing mortality happens
+as a 'pulse' midway through the year. This is described in more detail below.
 
 \subsection{Francis}
 
@@ -53,7 +76,7 @@ Internally, the biomass used in the model is the biomass at the start of the yea
 The midyear biomass is calculated by:
 
 \begin{equation}
-B_{mid} = B_{start} e{0.5 (F + m)}
+B_{mid} = B_{start} e^{0.5 (F + m)}
 \end{equation}
 
 Where $B$ is the exploitable biomass, $F$ is the level of fishing in that year and $m$ is
@@ -66,7 +89,7 @@ results.
 The basic model equation is the standard Baranov equation:
 
 \begin{equation}
-N_{i,j} = N_{i-1,j-1} e{F_{i-1} + m}
+N_{i,j} = N_{i-1,j-1} e^{F_{i-1} + m}
 \end{equation}
 
 Where $N$ is the abundance of age $j$ at the start of year $i$. $F$ is only
@@ -120,7 +143,7 @@ the fishery and the age of maturity respectively, or they can be passed as
 age structured FLQuant objects that have maturity and selectivity at age.
 $wght$ must be passed as an FLQuant object.
 
-Here we will use the Orange Roughy data set from CITE FRANCIS.
+Here we will use the New Zealand Orange Roughy data set from~\cite{Francis92}.
 
 % The keep.source argument means that comments are kept in
 % results=hide, no output from R console is included
@@ -140,10 +163,10 @@ dimnames(index)
 # Enter the parameter values
 amin    <- 1
 amax    <- 70
-hh <- 0.95
-M <- 0.05
-mat_age <- 23
-sel_age <- 23
+hh <- 0.95 # steepness
+M <- 0.05 # natural mortality of all ages
+mat_age <- 23 # age of maturity
+sel_age <- 23 # age of selectivity by fishery
 @
 %\end{shaded}%
 \end{minipage}
@@ -164,7 +187,7 @@ t0    <- -0.346
 # length-weight
 alpha <- 0.0963 # grams
 beta  <- 2.68
-# Set up FLQuants for weights
+# Set up FLQuant objects for weights
 # Note that we convert the mass at age to tonnes
 mass_at_age <- age_to_weight(amin:amax,Linf,k,t0,alpha,beta)
 w <- FLQuant(mass_at_age, dimnames=list(age=amin:amax)) / 1e6
@@ -188,7 +211,7 @@ or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
 \end{center}
 
 The final stage is to set which model we will use: Francis or Edwards.
-As the data has come from CITE FRANCIS we will use the Francis model. Each model
+Here we will use the Francis model. As mentioned above, each model
 has two versions, one that is written in pure R, the other uses C. The results
 from both are the same. The C version is faster so it is better to use that:
 
@@ -203,7 +226,7 @@ model(or) <- aspm.Francis.C()
 \end{center}
 
 Setting the model also sets up a function to calculate the initial values for the fitted parameters (in
-this case $B_{0}$. It is possible to specify your own but unless you have a good
+this case $B_{0}$). It is possible to specify your own but unless you have a good
 reason to do so (such as problems with the fit) then you should the default
 setting. To estimate the parameters use the $fmle()$ method:
 
@@ -220,20 +243,34 @@ or <- fmle(or)
 After fitting it is essential to check the quality of the fit by looking
 at the likelihood profile. This can be done with the $profile()$ method. The
 range argument can be used to explore the likelihood either side of the estimated
-parameter value.
+parameter value. You should see that the value of the fitted parameter occurs at the
+maximum likelihood (see Figure~\ref{fig:or_profile}).
+
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=TRUE, fig=TRUE, keep.source=TRUE,results=hide>>=
+<<echo=TRUE, fig=FALSE, keep.source=TRUE,results=hide,eval=FALSE>>=
 profile(or,maxsteps=50,range=0.25)
 @
 %\end{shaded}%
 \end{minipage}
 \end{center}
 
-You should hopefully see that the value of the fitted parameter occurs at the
-maximum likelihood. The value of the fitted parameter can be seen with the
+
+\begin{figure}[!hb]
+\begin{center}
+%\begin{shaded}%
+<<echo=FALSE, fig=TRUE, results=hide>>=
+profile(or,maxsteps=50,range=0.25)
+@
+%\end{shaded}%
+\end{center}
+\caption{Profile plot for the Francis model with the New Zealand Orange Roughy data}
+\label{fig:or_profile}
+\end{figure}
+
+The value of the fitted parameter can be seen with the
 $params()$ method:
 
 \begin{center}
@@ -247,7 +284,7 @@ params(or)
 \end{center}
 
 Remember that $B_{0}$ is the virgin exploitable biomass at the start of the year.
-CITE Francis estimates $B_{0}$ midway through the year. We can compare our result
+Francis estimates $B_{0}$ midway through the year. We can compare our result
 with Francis by calculating the midyear exploitable virgin biomass with the
 exp.biomass.mid() method:
 
@@ -261,7 +298,8 @@ exp.biomass.mid(or,yrfrac = 0.5,virgin=TRUE)[,1]
 \end{minipage}
 \end{center}
 
-Francis estimates the value of midyear virgin biomass as 411000 tonnes. So our
+Francis estimates the value of midyear virgin biomass as 411000
+tonnes~\cite{Francis92}. So our
 estimate is pretty good. We can also check out estimated value of $q_{hat}$ with
 the $calc.qhat()$ method:
 
@@ -275,13 +313,13 @@ calc.qhat(or)
 \end{minipage}
 \end{center}
 
-Francis reports the estimated value of $q_{hat}$ to be 0.59.
+Francis reports the estimated value of $q_{hat}$ to be 0.59~\cite{Francis92}.
 
 \subsection{Estimating a probability distribution for $B_{0}$}
 Francis provides a Monte Carlo routine for estimating a probability
 distribution for $B_{0}$. The routine answers the question: "If this were
 the true $B_{0}$, how likely is it that we would get an estimate of virgin
-biomass as large as or greater than $B_{0}$HAT", where $B_{0}$ hat is
+biomass as large as or greater than $\hat{B_{0}}$", where $\hat{B_{0}}$ is
 the result from the simple deterministic assessment above. Following
 Francis the procedure is as follows:
 
@@ -294,7 +332,7 @@ history and with a CV of 19\% (estimated by Francis).
 \item Calculate the value of $B_{0sim}$ that maximises the likelihood estimate
 for the simulated survey indices.
 \item Repeat steps 1-4 100 times and calculate the proportion of the $B_{0sim}$
-estimates that are greater than $B_{0}$HAT.
+estimates that are greater than $\hat{B_{0}}$.
 \item Repeat steps 1-5 for a range of trial of $B_{0}$ values.
 \end{enumerate}
 
@@ -306,7 +344,7 @@ The midyear biomass history for each
 value of $B_{0}$ is calculated by setting the $params()$ value to the trial
 $B_{0}$ value and using the $exp.biomass.mid()$ method.
 The simulated index is generated using the R function $rnorm()$. It is possible
-to generate all 100 iterations simultaneously. A new $FLaspm()$ is set up
+to generate all 100 iterations simultaneously. A new $FLaspm$ object is set up
 using the simulated index and the value of $B_{0sim}$ that maximises the
 likelihood for each iteration is calculated. The R code for this procedure using the New Zealand Orange Roughy
 data is shown below:
@@ -375,12 +413,12 @@ load("B0store.RData")
 
 
 The probability of the value of $B_{0sim}$ being greater than $B_{0trial}$
-cab then be calculated and plotted.
+cab then be calculated and plotted (see Figure~\ref{fig:or_probB0_OR}).
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=TRUE, fig=TRUE, keep.source=TRUE,results=hide>>=
+<<echo=TRUE, fig=FALSE, eval=TRUE>>=
 propB0 <- apply(B0store>=c(B0_true),1,sum) / niters
 plot(B0trial,propB0,type="l")
 @
@@ -388,16 +426,29 @@ plot(B0trial,propB0,type="l")
 \end{minipage}
 \end{center}
 
+\begin{figure}[!hb]
+\begin{center}
+<<echo=FALSE, fig=TRUE, results=hide>>=
+plot(B0trial,propB0,type="l")
+@
+\end{center}
+\caption{Estimates of the probability that the true $B_{0}$, is less than
+given trial values}
+\label{fig:or_probB0_OR}
+\end{figure}
+
 To estimate the probability distribution of $B_{0}$ Francis fits a
-Johnson Su distribution by maximum likelihood (REF Johnson and Kotz).
-The Johnson Su distribution and likelihood function are included in $FLaspm$.
+Johnson Su distribution by maximum likelihood.
+The Johnson Su distribution and likelihood function are included in the
+$FLaspm$ package.
 The area under the PDF curve between two value of $B_{0}$ is proportional to
-the confidence that the true value of $B_{0}$ lies between these two values.
+the confidence that the true value of $B_{0}$ lies between these two values
+(see Figure ~\ref{fig:or_pdfB0_OR}).
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
-<<echo=TRUE, fig=TRUE, keep.source=TRUE,results=hide>>=
+<<echo=TRUE, fig=FALSE, keep.source=TRUE,results=hide>>=
 initialparms <- c(g=-1,delta=1,xi=0,lambda=1)
 # Scale B0trial by 1000 to help the fit
 jcpars <- optim(par=initialparms,fn=Johnsonll,b=B0trial/1000,m=niters,p=propB0)$par
@@ -409,7 +460,79 @@ plot(B0plot,jp,type="l")
 \end{minipage}
 \end{center}
 
+\begin{figure}[!hb]
+\begin{center}
+<<echo=FALSE, fig=TRUE, results=hide>>=
+plot(B0plot,jp,type="l")
+@
+\end{center}
+\caption{Estimated probability density function of $B_{0}$}
+\label{fig:or_pdfB0_OR}
+\end{figure}
+
+
 \subsection{Sensitivity analysis}
+
+Sensitivity analysis can be used to evaluate the effects of uncertainty
+in the model parameters. For example, Francis estimates biomass and yield
+for a range of values of natural mortality. This approach can be applied.
+Using the parameter values and code that was used in the deterministic
+assessment above, the only change is that natural mortality is now specified
+as a vector.
+
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=TRUE,keep.source=TRUE,results=hide>>=
+# Natural mortality is now a sequence from 0.025 to 0.1 in steps of 0.025
+Msens <- seq(from=0.025, to = 0.1, by = 0.025)
+or <- FLaspm(catch=catch, index=index, M=Msens,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+              model(or) <- aspm.Francis.C()
+# Look at natural mortality to see that it is now 4 different values
+c(or@M)
+# Fit all iterations
+or <- fmle(or)
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+Each value of M is treated as a seperate iteration. Consequently, there are
+now four values in the $params$ slot. These can be inspected:
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=TRUE,keep.source=TRUE,results=verbatim>>=
+# Use c() to split apart the iterations
+c(params(or))
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+Again, we can compare our result
+with Francis by calculating the midyear exploitable virgin biomass and
+looking at qhat:
+
+%calc.qhat(or) - broken for iterations
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=TRUE,keep.source=TRUE,results=verbatim>>=
+c(exp.biomass.mid(or,yrfrac = 0.5,virgin=TRUE)[,1])
+c(calc.qhat(or)[[1]])
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+Francis estimates the virgin biomass for these values of M to be
+452000, 411000, 372000 and 336000 respectively and for qhat to be
+0.52, 0.59, 0.67 and 0.77.
 
 \subsection{Risk analysis}
 
@@ -424,7 +547,8 @@ plot(B0plot,jp,type="l")
 %\end{center}
 
 
-%\bibliography{flaspm_bib}{}
-%\bibliographystyle{plain}
+%*************************************************************************
+\bibliography{flaspm_bib}{}
+\bibliographystyle{plain}
 
 \end{document}
