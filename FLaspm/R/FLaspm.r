@@ -43,7 +43,7 @@ setClass('FLaspm', representation(
   amax='numeric',
   amin='numeric',
   fitted_index = 'FLQuants',
-  fitted_flag = 'list',
+  fitted_flag = 'logical',
   residuals_index = 'FLQuants',
   pop.dyn = 'function',
   qhat = 'function'
@@ -88,20 +88,28 @@ setMethod('FLaspm', signature(model='missing'),
     # Test for mat and sel
     for (slot in c("mat","sel"))
     {
-      if (slot %in% arg_names & is.numeric(args[[slot]]) & length(args[[slot]]) == 1)
+      if (slot %in% arg_names & is.numeric(args[[slot]]))
       {
-        temp <- FLQuant(0, dimnames=list(age=amin:amax))
-        temp[(args[[slot]] - amin + 1):length(amin:amax),] <- 1
-        args[[slot]] <- temp
+        if (length(args[[slot]]) == 1) 
+        {
+          temp <- FLQuant(0, dimnames=list(age=amin:amax))
+          temp[(args[[slot]] - amin + 1):length(amin:amax),] <- 1
+          args[[slot]] <- temp
+        }
+        if (length(args[[slot]]) > 1) 
+        {
+          temp <- FLQuant(args[[slot]], dimnames=list(age=amin:amax))
+          args[[slot]] <- temp
+        }
       }
     }
     
     # test for mean weight
-    if ("wght" %in% arg_names & is.numeric(args[["wght"]]) & length(args[["wght"]]) == 1)
-      {
+    if ("wght" %in% arg_names & is.numeric(args[["wght"]]))
+    {
         temp <- FLQuant(args[["wght"]], dimnames=list(age=amin:amax))
         args[["wght"]] <- temp
-      }
+    }
 
     # Test for hh and M
     for (slot in c("hh","M"))
@@ -125,9 +133,9 @@ setMethod('FLaspm', signature(model='missing'),
     }
     
     # fill flags for fitting
-    temp <- vector('list',length(args[["index"]]))
+    temp <- vector('logical',length(args[["index"]]))
     names(temp) <- names(args[["index"]])
-    temp[] <- FALSE
+    temp[] <- TRUE
     args[["fitted_flag"]] <- temp
     
     res <- do.call(FLModel,c(list(class='FLaspm'), args))
@@ -445,14 +453,16 @@ Johnsonll <- function(parms,b,m,p)
 # Currently only for the first index
 setMethod('plot', signature(x='FLaspm'),
   function(x, ...) {
-
+     
     ihat <- indexhat(x)
+
     par(mfrow=c(length(x@index),1))
-    y.rng <- range(lapply(x@index,range,na.rm=TRUE),
-                   lapply(x@fitted_index,range,na.rm=TRUE))
-    
+    y.rng1 <- lapply(x@index,range,na.rm=TRUE)
+    y.rng2 <- try(lapply(x@fitted_index,range,na.rm=TRUE),silent=TRUE)
+    y.rng  <- ifelse(y.rng2 != 'try-error',range(y.rng1,y.rng2),y.rng1)
+     cat(y.rng,y.rng1,y.rng2)
     for(i in 1:length(x@index)) {
-      if(!x@fitted_flag[[i]]) x@fitted_index[[i]] <- ihat[[i]]
+      if(!x@fitted_flag[i]) x@fitted_index[[i]] <- ihat[[i]]
 
       plot(dimnames(x@index[[i]])$year,x@index[[i]],ylim = y.rng, main='Fit to index',xlab='Year',ylab=paste('Index (',units(x@index[[i]]),')',sep=''), ...)
       lines(dimnames(x@index[[i]])$year,x@fitted_index[[i]],lty=2, ...)
