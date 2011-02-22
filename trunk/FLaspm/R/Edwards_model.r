@@ -74,15 +74,8 @@ aspm.index.Edwards <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
     yr <- as.numeric(dimnames(catch)[['year']])
     dm <- dimnames(catch)
 
-    # Strip out the FLQuant to speed it up
-#    mat <- c(mat)
-#    sel <- c(sel)
-#    hh   <- c(hh)
-#    M   <- c(M)
-
-    index.hat <- FLQuants()        # loop over fitted indecies only using fitted_flag slot
+    index.hat <- FLQuants()     
     pdyn <- aspm.pdyn.Edwards(catch,B0,hh,M,mat,sel,wght,amin,amax)
-#    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax)
     bexp <- pdyn[["bexp"]]
 
     for (index.count in 1:length(index))
@@ -105,21 +98,17 @@ aspm.Edwards <- function()
     # set the likelihood function
     logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
     {
-      # pop.dyn to get bexp
-      # qhat - slot
-      # indexhat - call func
-      # calc logl
-
       # Get the FLQuants object with the estimated indices
       indexhat.quants <- aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
       log.indexhat.quants <- lapply(indexhat.quants,function(index) window(log(index),start=dims(index)$minyear,end=dims(index)$maxyear))
       total.logl <- 0
-      for (index.count in 1:length(index))
+      for (index.count in 1:length(index)) {
         total.logl <- total.logl + sum(dnorm(log(index[[index.count]]),log.indexhat.quants[[index.count]], sqrt(sigma2), TRUE),na.rm=T)
+      }
       return(total.logl)
     }
 
-    # qhat is geometric mean of index / b
+    # qhat is geometric mean of index / biomass
     qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
     {
       #browser()

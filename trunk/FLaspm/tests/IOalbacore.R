@@ -1,7 +1,8 @@
 
 library(FLCore)
 library(FLaspm)
-data(IOalbacore)
+#data(IOalbacore)        # still doesn't work; something wrong with my computer? get error message when loading package: 'files data/IOalbacore not found' ?????
+load('../data/IOalbacore.RData')
 
 # input required life history parameters
 
@@ -29,7 +30,7 @@ alb <- FLaspm(catch=IOalbacore$catch,
               index=IOalbacore$index,
               M=M,hh=hh,sel=as, mat=am,wght=mw,amax=amax, amin=amin)
 
-model(alb) <- aspm.Edwards.C()
+model(alb) <- aspm.Edwards()
 
 # calculate initial starting values
 alb@params <- calc.initial(alb)
