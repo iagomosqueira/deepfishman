@@ -51,13 +51,14 @@ $h R_0$):
 
 \begin{eqnarray}
 \alpha = (4 h R_0) / (5 h -1) \\
-\beta = (A_0 * (1-h)) / (5h-1)
+\beta = (A_0 (1-h)) / (5h-1)
 \end{eqnarray}
 
 In the package each model is implemented twice, one version uses pure R code,
-other also uses C code. The version that uses C code is considerably faster and
+the other uses C code that is called from R.
+The version that uses C code is considerably faster and
 it is recommended that this version is used. The pure R version is used by
-the developers to check the results (R code is much easier to debug than C!).
+the developers to check the results (R code is much easier to debug than C).
 Changing between the R and C versions is straightforward (see below).
 
 The main difference between the models is the timing of the fishing mortality.
@@ -65,14 +66,12 @@ The Francis model assumes that fishing mortality occurs steadily throughout
 the year. The Edwards model assumes that the fishing mortality happens
 as a 'pulse' midway through the year. This is described in more detail below.
 
-\subsection{Francis}
+\subsection{The Francis model}
 
 %Main reference ~\cite{Francis92}
 The Francis model assumes that the surveys are carried out at a time when it was
 reasonable to assume that about half the year's fishing mortality had occurred.
 Consequently, the midyear biomass is used when fitting the model.
-
-Internally, the biomass used in the model is the biomass at the start of the year.
 The midyear biomass is calculated by:
 
 \begin{equation}
@@ -93,7 +92,8 @@ N_{i,j} = N_{i-1,j-1} e^{F_{i-1} + m}
 \end{equation}
 
 Where $N$ is the abundance of age $j$ at the start of year $i$. $F$ is only
-applied to the exploitable fish.
+applied to the exploitable fish population, i.e. those at or greater than the
+age of selectivity.
 
 $F$ is calculated each year by solving the catch equation:
 
@@ -106,10 +106,10 @@ C_{i} = B_{i} (1 - e^{-F_{i}-m)} F_{i} / (F_{i} + m)
 Where $C$ is the catch. Internally, $F$ is estimated using a simple golden search
 algorithm.
 
-\subsection{Edwards}
+\subsection{The Edwards model}
 
 % Main reference ~\cite{Walters06}
-
+Need to finish this section
 Assumptions
 SRA is assuming a pulse of catches at the end of the year (i.e. after natural mortality), with H = Catch/Bexp
 
@@ -173,7 +173,8 @@ the natural mortality ($M$), the steepness of the SRR ($hh$), the selectivity ($
 the maturity ($mat$) and the mass-at-age ($wght$)).
 
 $amin$ and $amax$ are single numeric values. $catch$ must be an FLQuant. $index$
-must be an FLQuant or FLQuants object and the dimensions of the indices must
+must be an FLQuant, or if more than one index is provided, an FLQuants object.
+The year dimensions of the indices must
 be the same as the catch. Any empty years should be $NA$. $M$ and $hh$ can be passed
 as single numeric values (they are represented as FLQuant objects in the class).
 $sel$ and $mat$ can either be single numeric values that are the age of fish entering
@@ -265,7 +266,7 @@ model(or) <- aspm.Francis.C()
 
 Setting the model also sets up a function to calculate the initial values for the fitted parameters (in
 this case $B_{0}$). It is possible to specify your own but unless you have a good
-reason to do so (such as problems with the fit) then you should the default
+reason to do so (such as problems with the fit) then you should use the default
 setting. To estimate the parameters use the $fmle()$ method:
 
 \begin{center}
@@ -378,7 +379,7 @@ estimates that are greater than $\hat{B_{0}}$.
 This process is relatively easy to carry out using $FLaspm$ because multiple
 iterations can be processed in parallel.
 A sequence of $B_{0trial}$ values at
-the start of the year is calculated. These are looped over using a for loop.
+the start of the year is calculated. These are looped over using a $for$ loop.
 The midyear biomass history for each
 value of $B_{0}$ is calculated by setting the $params()$ value to the trial
 $B_{0}$ value and using the $exp.biomass.mid()$ method.
@@ -472,7 +473,7 @@ plot(B0trial,propB0,type="l")
 @
 \end{center}
 \caption{Estimates of the probability that the true $B_{0}$, is less than
-given trial values}
+the given trial values}
 \label{fig:or_probB0_OR}
 \end{figure}
 
@@ -513,8 +514,8 @@ plot(B0plot,jp,type="l")
 \subsection{Sensitivity analysis}
 
 Sensitivity analysis can be used to evaluate the effects of uncertainty
-in the model parameters. For example, Francis estimates biomass and yield
-for a range of values of natural mortality. This approach can be applied.
+in the model parameters. For example, Francis estimates biomass
+for a range of values of natural mortality. This approach is applied here.
 Using the parameter values and code that was used in the deterministic
 assessment above, the only change is that natural mortality is now specified
 as a vector.
@@ -589,7 +590,7 @@ duration of the projections).
 The procedure is as follows:
 \begin{enumerate}
 \item An initial value of virgin biomass, $B_0$ is chosen at random from
-the previously fitted Johnson SU probability distribution (see above).
+the previously fitted Johnson Su probability distribution (see above).
 \item The fishery is projected forward up to 1989 using determinsitic
 recruitment and the given catches.
 \item The projection continues to 1995 with catch values set as one of the
