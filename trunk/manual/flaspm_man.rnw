@@ -113,6 +113,44 @@ algorithm.
 Assumptions
 SRA is assuming a pulse of catches at the end of the year (i.e. after natural mortality), with H = Catch/Bexp
 
+\subsection{Fitting the model}
+
+For both models $FLaspm$ uses the $fmle()$ method to estimate the
+virgin exploitable biomass. The fitting is carried out in a two stage process.
+First, a simulated annealing method is used. The number of iterations performed
+is controlled by the control argument $maxit$ (see below for an example).
+The default is 10000 iterations which may take a long time, particularly when
+the pure R version is used. The second stage uses a quasi-Newton method (BFGS).
+Convergence criteria for this stage can be set by the user (see the help file
+for $optim$ in R for control parameters).
+
+Before fitting is attempted, initial values are calculated (although these may
+be set by the user). If multiple iterations are to be fitted, by default
+initial values are only calculated for the first iteration. When the argument
+$always\_eval\_initial$ is set to TRUE, initial values are calculated for each
+iteration. This increases the fitting time but may improve the quality of the
+fit.
+
+\subsection{Projecting forward}
+
+When the value of $B_0$ has been specified in the $params$ slot (either as
+a result of fitting the model to data, or by setting it by hand), the
+model can be projected forward using the given catch values. There are several
+methods available.
+The main method for projecting forward is $calc.pop.dyn()$. This returns the
+explotiable biomass and mature biomass at the start of the year, the abundances
+at age and the fishing mortality (or harvest rate for the Edwards model).
+These can also be calculated seperately using the methods $exp.biomass()$,
+$mat.biomass()$, $n$ and $harvest$. Other useful methods for calculating the
+midyear exploitable biomass, the log likelihood, $\hat{q}$, and indexhat are
+$exp.biomass.mid()$, $calc.logl()$, $calc.qhat()$ and $indexhat$ respectively.
+
+\subsection{Random recruitment}
+
+It is possible to multiply the recruitment by a vector of residuals
+using the $sr\_res$ slot. This can be used to simulate noisy
+recruitment or to impose a trend. By default the residuals are set to 1 in each
+year, i.e. the recruitment is deterministic. This is demonstrated below.
 
 \section{Demonstration}
 
@@ -286,7 +324,7 @@ params(or)
 Remember that $B_{0}$ is the virgin exploitable biomass at the start of the year.
 Francis estimates $B_{0}$ midway through the year. We can compare our result
 with Francis by calculating the midyear exploitable virgin biomass with the
-exp.biomass.mid() method:
+$exp.biomass.mid()$ method:
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
@@ -315,6 +353,7 @@ calc.qhat(or)
 
 Francis reports the estimated value of $q_{hat}$ to be 0.59~\cite{Francis92}.
 
+%****************************************************************************
 \subsection{Estimating a probability distribution for $B_{0}$}
 Francis provides a Monte Carlo routine for estimating a probability
 distribution for $B_{0}$. The routine answers the question: "If this were
@@ -470,7 +509,7 @@ plot(B0plot,jp,type="l")
 \label{fig:or_pdfB0_OR}
 \end{figure}
 
-
+%****************************************************************************
 \subsection{Sensitivity analysis}
 
 Sensitivity analysis can be used to evaluate the effects of uncertainty
@@ -532,11 +571,123 @@ c(calc.qhat(or)[[1]])
 
 Francis estimates the virgin biomass for these values of M to be
 452000, 411000, 372000 and 336000 respectively and for qhat to be
-0.52, 0.59, 0.67 and 0.77.
+0.52, 0.59, 0.67 and 0.77. Again, we have good agreement with Francis.
 
+%****************************************************************************
 \subsection{Risk analysis}
+Francis performs a simple risk analysis to evaluate the proposed strategy
+of reducing the TAC to a target level by a desired rate. A range of rates of
+reduction are tested. Risk is expressed as the probability that the fishery
+would collapse within five years. A collapsed fishery is said to have
+occurred if the fishing mortality >= 1 in any year.
+
+Two sources of uncertainty are used: initial virgin biomass and uncertainty
+in future recruitment. (NOTE: given that the age of selectivity is 23,
+I do not see how variable recruitment will impact the fishery within the
+duration of the projections).
+
+The procedure is as follows:
+\begin{enumerate}
+\item An initial value of virgin biomass, $B_0$ is chosen at random from
+the previously fitted Johnson SU probability distribution (see above).
+\item The fishery is projected forward up to 1989 using determinsitic
+recruitment and the given catches.
+\item The projection continues to 1995 with catch values set as one of the
+TAC schedules (with an additional 30\% increase in catch in keeping with assumed
+overrun). Random recruitment is generated as a lognormal random variable where
+the mean value is taken from the Beverton-Holt SRR and standard deviation of
+the log of the recruitment is 1.2.
+\item Steps 1 to 3 were repeated 200 times for each of the TAC schedules and
+the proportion of times the fishery collapsed was calculated.
+\end{enumerate}
+
+First we set up the additional parameters and TAC schedules:
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}
+<<echo=TRUE,keep.source=TRUE,results=hide,eval=TRUE>>=
+# Set up additional parameters
+iters <- 200
+sigmaR <- 1.2
+fcollapse <- 1
+# Set up future catch schedules as an array
+TAC_schedules <- array(NA,dim=c(5,6),dimnames=list(schedule=1:5,year=1990:1995))
+TAC_schedules[1,] <- c(28637,25637,22637,19637,16637,13637)
+TAC_schedules[2,] <- c(28637,23637,18637,13637,8637,7500)
+TAC_schedules[3,] <- c(28637,21637,14637,7637,7500,7500)
+TAC_schedules[4,] <- c(28637,19637,10637,7500,7500,7500)
+TAC_schedules[5,] <- c(28637,16637,7500,7500,7500,7500)
+prop_collapse <- rep(NA,dim(TAC_schedules)[1])
+@
+\end{minipage}
+\end{center}
+
+Now we loop over the TAC schedules and perform 200 simulations
+for each schedule
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+<<echo=TRUE, keep.source=TRUE,results=hide, eval=FALSE>>=
+for (schedule in 1:dim(TAC_schedules)[1])
+{
+  # Set up new catch
+  catch_proj <- window(catch,start=1978,end=1995)
+  catch_proj[,ac(1990:1995)] <- TAC_schedules[schedule,] * 1.3
+  # stretch index to fit catch - should add check for this in constructor
+  index_proj <- window(index,start=1978,end=1995)
+  # Set up random SRR residuals
+  sr_res <- FLQuant(1,dimnames=dimnames(catch_proj))
+  sr_res <- propagate(sr_res,iters)
+  sr_res[,ac(1990:1995)] <- rlnorm(iters * (1995-1990+1),meanlog=0,sdlog=sigmaR)
+  # Set up FLaspm object with the new catch and sr_res
+  or <- FLaspm(catch=catch_proj, index=index_proj, M=M,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin,sr_res=sr_res)
+  model(or) <- aspm.Francis.C()
+  # Set up B0 values from previously fitted Johnson distribution
+  # Remember we scaled B0 by 1000 for the fit
+  params(or) <- propagate(params(or),iters)
+  params(or)["B0",] <- rJohnson(iters,jcpars)*1000
+  # Project forward
+  or.proj <- calc.pop.dyn(or)
+  # Who has collapsed? (F >= 1)at any time during the projection
+  prop_collapse[schedule] <- length(which(apply(or.proj[["harvest"]]>=fcollapse,6,sum)>0))/iters
+}
+@
+\end{minipage}
+\end{center}
+
+% load in previously saved results
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+<<echo=FALSE, keep.source=FALSE,results=hide, eval=TRUE>>=
+load("prop_collapse.RData")
+@
+\end{minipage}
+\end{center}
 
 
+Now we can plot the probability of collapse against the rate of TAC reduction.
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+<<echo=TRUE, eval=FALSE, fig=FALSE>>=
+plot(x=c(3000,5000,7000,9000,12000),y=prop_collapse,type="l",ylim=c(0,1),
+  xlab="Rate of TAC reduction",ylab="Probability of collapse")
+@
+\end{minipage}
+\end{center}
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+<<echo=FALSE, eval=TRUE, fig=TRUE>>=
+plot(x=c(3000,5000,7000,9000,12000),y=prop_collapse,type="l",ylim=c(0,1),
+  xlab="Rate of TAC reduction",ylab="Probability of collapse")
+@
+\end{minipage}
+\end{center}
+
+
+
+%****************************************************************************
 %\begin{center}
 %\begin{minipage}[H]{0.95\textwidth}%
 %%\begin{shaded}%

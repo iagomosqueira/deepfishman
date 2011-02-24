@@ -36,6 +36,7 @@ setClass('FLaspm', representation(
   index='FLQuants',
   M = 'FLQuant',
   hh = 'FLQuant',
+  sr_res = 'FLQuant',
   sel='FLQuant',
   wght='FLQuant',
   mat='FLQuant',
@@ -137,8 +138,19 @@ setMethod('FLaspm', signature(model='missing'),
     names(temp) <- names(args[["index"]])
     temp[] <- TRUE
     args[["fitted_flag"]] <- temp
-    
+
+#browser()
+
+    # check sr_residuals
+    if (!("sr_res" %in% arg_names) & "catch" %in% arg_names)
+    {
+      sr_res <- FLQuant(1,dimnames=dimnames(args[["catch"]]))
+      args[["sr_res"]] <- sr_res
+    }
+
     res <- do.call(FLModel,c(list(class='FLaspm'), args))
+
+
 
     #res <- FLModel(..., class='FLaspm')
     return(res)
@@ -178,6 +190,8 @@ setMethod('calc.pop.dyn', signature(object='FLaspm'),
   par_args <- tapply(parnames_in_params, 1:length(parnames_in_params),function(x) object@params[x], simplify=FALSE)
   names(par_args) <- parnames_in_params
   args <- c(args,par_args)
+
+#browser()
 
 	for (i in 1:iters)
 	{
@@ -414,6 +428,17 @@ age_to_weight <- function(age,Linf,k,t0,a,b)
 # Johnson SU distribution and likelihood functions
 # Used for estimating PDF of B0
 #********************************************************************************
+rJohnson <- function(n,parms)
+{
+  g <- parms["g"]
+  delta <- parms["delta"]
+  xi <- parms["xi"]
+  lambda <- parms["lambda"]
+  Z <- rnorm(n,mean=0,sd=1)
+  B <- xi + lambda * sinh((Z-g)/delta)
+  return(B)
+}
+
 JohnsonCum <- function(parms,b)
 {
   g <- parms["g"]

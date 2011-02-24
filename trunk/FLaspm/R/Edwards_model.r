@@ -1,7 +1,7 @@
 
 # Population dynamics
 # Uses Charlie's formulation that uses h.
-aspm.pdyn.Edwards <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
+aspm.pdyn.Edwards <- function(catch,B0,hh,M,mat,sel,wght,amin,amax, sr_res) {
     
     # strip out FLQuants for speed
     mat <- as.vector(mat)
@@ -9,6 +9,7 @@ aspm.pdyn.Edwards <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
     hh  <- as.vector(hh)
     M   <- as.vector(M)
     C <- as.vector(catch)
+    sr_res <- as.vector(sr_res)
     
     nyr <- length(C)
     nag <- amax-amin+1
@@ -49,7 +50,7 @@ aspm.pdyn.Edwards <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
     for(y in 2:nyr) {
 
       n[1,y] <- alp * bmat[y-1]/(bet + bmat[y-1])
-
+      n[1,y] <- n[1,y] * sr_res[y]
 	   # adult dynamics
 	   for(a in 2:nag)
 	    n[a,y] <- n[a-1,y-1]*exp(-M)*(1-sel[a-1]*h[y-1])
@@ -68,14 +69,14 @@ aspm.pdyn.Edwards <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
 		    harvest=FLQuant(h,dimnames=dm, units="h") ))
 }
 
-aspm.index.Edwards <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+aspm.index.Edwards <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax, sr_res)
 {
     #browser()
     yr <- as.numeric(dimnames(catch)[['year']])
     dm <- dimnames(catch)
 
     index.hat <- FLQuants()     
-    pdyn <- aspm.pdyn.Edwards(catch,B0,hh,M,mat,sel,wght,amin,amax)
+    pdyn <- aspm.pdyn.Edwards(catch,B0,hh,M,mat,sel,wght,amin,amax, sr_res)
     bexp <- pdyn[["bexp"]]
 
     for (index.count in 1:length(index))
@@ -96,10 +97,10 @@ aspm.index.Edwards <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
 aspm.Edwards <- function()
 {
     # set the likelihood function
-    logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+    logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index, sr_res)
     {
       # Get the FLQuants object with the estimated indices
-      indexhat.quants <- aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+      indexhat.quants <- aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax, sr_res)
       log.indexhat.quants <- lapply(indexhat.quants,function(index) window(log(index),start=dims(index)$minyear,end=dims(index)$maxyear))
       total.logl <- 0
       for (index.count in 1:length(index)) {
@@ -109,17 +110,17 @@ aspm.Edwards <- function()
     }
 
     # qhat is geometric mean of index / biomass
-    qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
+    qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index, sr_res)
     {
       #browser()
-      pdyn <- aspm.pdyn.Edwards(catch,B0,hh,M,mat,sel,wght,amin,amax)
+      pdyn <- aspm.pdyn.Edwards(catch,B0,hh,M,mat,sel,wght,amin,amax, sr_res)
       bexp <- pdyn[["bexp"]]
       q <- lapply(index,function(x,b) exp(apply(log(sweep(x,2:6,b,"/")),c(1,6),mean,na.rm=T)), b=bexp)
       return(q)
     }
 
 
-    initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+    initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index, sr_res){
     
       # can this be changed so that it is only called when FLPar is empty?
       cat("getting initial values\n")
@@ -131,7 +132,7 @@ aspm.Edwards <- function()
       for (i in 1:nrow(llgrid))
       {
         # logl is still visible in the parent environment - seems a little dodgy to me...
-        llgrid[i,"ll"] <- logl(llgrid[i,"B0"],llgrid[i,"s2"],hh,M,mat,sel,wght,amin,amax,catch,index)
+        llgrid[i,"ll"] <- logl(llgrid[i,"B0"],llgrid[i,"s2"],hh,M,mat,sel,wght,amin,amax,catch,index, sr_res)
       }
       B0_max <- llgrid[which.max(llgrid[,"ll"]),"B0"]
       s2_max <- llgrid[which.max(llgrid[,"ll"]),"s2"]
@@ -146,7 +147,7 @@ aspm.Edwards <- function()
       upper=c(Inf, Inf)
     )
   
-    model <- index ~ aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+    model <- index ~ aspm.index.Edwards(catch,index,B0,hh,M,mat,sel,wght,amin,amax, sr_res)
     
     pop.dyn <- aspm.pdyn.Edwards
     
@@ -155,26 +156,26 @@ aspm.Edwards <- function()
 
 #*******************************************************************************
 # C Code
-aspm.pdyn.Edwards.C <- function(catch,index,B0,sigma2,hh,M,mat,sel,wght,amin,amax) {
+aspm.pdyn.Edwards.C <- function(catch,index,B0,sigma2,hh,M,mat,sel,wght,amin,amax, sr_res) {
     op <- .Call("aspm_ad", catch, index, B0, sigma2,
                 hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 1)
+                wght, amin, amax, dim(catch)[2], sr_res, 1)
     return(op)
 }
 
 aspm.Edwards.C <- function()
 {
   # set the likelihood function
-  logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+  logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index,sr_res)
   {
     total.logl <- .Call("aspm_ad", catch, index, B0, sigma2,
                 hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 1)[["logl"]]["logl"]
+                wght, amin, amax, dim(catch)[2], sr_res, 1)[["logl"]]["logl"]
     return(total.logl)
   }
 
     # initial parameter values
-  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index,sr_res){
 
     # Let's do something more sophisticated to get the start values
     B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=50)
@@ -186,7 +187,7 @@ aspm.Edwards.C <- function()
     
       llgrid[i,"ll"] <- .Call("aspm_ad", catch, index, llgrid[i,"B0"], llgrid[i,"s2"],
                             hh, M, mat, sel,
-                            wght, amin, amax, dim(catch)[2], 1)[["logl"]]["logl"]
+                            wght, amin, amax, dim(catch)[2], sr_res, 1)[["logl"]]["logl"]
     }
     B0_max <- llgrid[which.max(llgrid[,"ll"]),"B0"]
     s2_max <- llgrid[which.max(llgrid[,"ll"]),"s2"]
@@ -206,10 +207,10 @@ aspm.Edwards.C <- function()
     upper=c(Inf, Inf)
   )
 
-  qhat <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+  qhat <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index,sr_res)
   {
     q <- .Call("aspm_ad", catch, index, B0, sigma2, hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 1)[["qhat"]]
+                wght, amin, amax, dim(catch)[2], sr_res, 1)[["qhat"]]
     # returns a vector of qs
     # should return a list
     qlist <- FLQuants()
@@ -220,19 +221,19 @@ aspm.Edwards.C <- function()
   }
 
 
-  model <- index ~ aspm.index.Edwards.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+  model <- index ~ aspm.index.Edwards.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
 
   pop.dyn <- aspm.pdyn.Edwards.C
 
   return(list(logl=logl,model=model,initial=initial, pop.dyn=pop.dyn, qhat=qhat))
 } # }}}
 
-aspm.index.Edwards.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+aspm.index.Edwards.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
 {
   # sigma2 not needed so set to 1 in .Call
   indexhat_array <- .Call("aspm_ad", catch, index, B0, 1,
                 hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 1)[["indexhat"]]
+                wght, amin, amax, dim(catch)[2], sr_res, 1)[["indexhat"]]
   indexhat_flqs <- FLQuants()
   for (i in 1:length(index))
     indexhat_flqs[[i]] <- FLQuant(indexhat_array[i,],dimnames=dimnames(catch))
@@ -244,16 +245,16 @@ aspm.index.Edwards.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
 aspm.Edwards.C.AD <- function()
 {
   # set the likelihood function
-  logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+  logl <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index,sr_res)
   {
     total.logl <- .Call("aspm_ad", catch, index, B0, sigma2,
                 hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 1)[["logl"]]["logl"]
+                wght, amin, amax, dim(catch)[2], sr_res,1)[["logl"]]["logl"]
     return(total.logl)
   }
 
     # initial parameter values
-  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index,sr_res){
     # Let's do something more sophisticated to get the start values
     # Get a profile surface and pick the parameter values that give the max LL
     B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=50)
@@ -265,7 +266,7 @@ aspm.Edwards.C.AD <- function()
 
       llgrid[i,"ll"] <- .Call("aspm_ad", catch, index, llgrid[i,"B0"], llgrid[i,"s2"],
                             hh, M, mat, sel,
-                            wght, amin, amax, dim(catch)[2], 1)[["logl"]]["logl"]
+                            wght, amin, amax, dim(catch)[2], sr_res,1)[["logl"]]["logl"]
     }
     B0_max <- llgrid[which.max(llgrid[,"ll"]),"B0"]
     s2_max <- llgrid[which.max(llgrid[,"ll"]),"s2"]
@@ -285,16 +286,16 @@ aspm.Edwards.C.AD <- function()
     upper=c(Inf, Inf)
   )
 
-gr <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index)
+gr <- function(B0,sigma2,hh,M,mat,sel,wght,amin,amax,catch,index,sr_res)
   {
     grads <-  .Call("aspm_ad", catch, index, B0, sigma2,
                 hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 1)[["logl"]][c("logl_grad_B0","logl_grad_sigma2")]
+                wght, amin, amax, dim(catch)[2], sr_res,1)[["logl"]][c("logl_grad_B0","logl_grad_sigma2")]
     return(grads)
   }
 
 
-  model <- index ~ aspm.index.Edwards.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+  model <- index ~ aspm.index.Edwards.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
 
   return(list(logl=logl,model=model,initial=initial,gr=gr))
 } # }}}
