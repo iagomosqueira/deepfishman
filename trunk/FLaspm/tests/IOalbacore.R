@@ -30,7 +30,7 @@ alb <- FLaspm(catch=IOalbacore$catch,
               index=IOalbacore$index,
               M=M,hh=hh,sel=as, mat=am,wght=mw,amax=amax, amin=amin)
 
-model(alb) <- aspm.Edwards()
+model(alb) <- aspm.Edwards.C()
 
 # calculate initial starting values
 alb@params <- calc.initial(alb)
@@ -41,12 +41,12 @@ profile(alb)
 plot(alb)
 
 # now run optimisation        # note that alb@fitted_index does not contain headers for each list item  
-alb <- fmle(alb)              # can we change the fitted_flags when we optimise?
-                              # do we have to find the initial values again?
-                              # currently re-calculates initival values for each fit...
+alb <- fmle(alb)              
+                              
+
 
 profile(alb,maxsteps=50)
-profile(alb,maxsteps=50,fixed=list(sigma2=0.07))
+profile(alb,maxsteps=50,fixed=list(sigma2=params(alb)[[2]]))
 
                               
 # check fit
@@ -90,16 +90,19 @@ albad@vcov
 
 # more than one index
 
-index1 <- IOalbacore$index * rlnorm(dim(alb@index[[1]])[2],0,sqrt(log(1 + 0.1)^2))
-index2 <- IOalbacore$index * rlnorm(dim(alb@index[[1]])[2],0,sqrt(log(1 + 0.1)^2))
+index1 <- IOalbacore$index * rlnorm(dim(IOalbacore$index)[2],0,sqrt(log(1 + 0.1)^2))
+index2 <- IOalbacore$index * rlnorm(dim(IOalbacore$index)[2],0,sqrt(log(1 + 0.1)^2))
 
 alb.mi <- FLaspm(catch=IOalbacore$catch,
               index=FLQuants(index1=index1,index2=index2),
               M=M,hh=hh,sel=as, mat=am,wght=mw,amax=amax, amin=amin)
 
-model(alb.mi) <- aspm.Edwards()
+model(alb.mi) <- aspm.Edwards.C()
 
 alb.mi <- fmle(alb.mi)
+
+profile(alb.mi,maxsteps=50)
+profile(alb.mi,maxsteps=50,fixed=list(sigma2=params(alb)[[2]]))
 
 plot(alb.mi)
 plot(harvest(alb.mi),type='l')
