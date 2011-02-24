@@ -482,12 +482,12 @@ setMethod('plot', signature(x='FLaspm'),
     ihat <- indexhat(x)
 
     par(mfrow=c(length(x@index),1))
-    y.rng1 <- lapply(x@index,range,na.rm=TRUE)
-    y.rng2 <- try(lapply(x@fitted_index,range,na.rm=TRUE),silent=TRUE)
-    y.rng  <- ifelse(y.rng2 != 'try-error',range(y.rng1,y.rng2),y.rng1)
-     cat(y.rng,y.rng1,y.rng2)
     for(i in 1:length(x@index)) {
-      if(!x@fitted_flag[i]) x@fitted_index[[i]] <- ihat[[i]]
+      x@fitted_index[[i]] <- ihat[[i]]
+      
+      y.rng1 <- range(x@index[[i]],na.rm=TRUE)
+      y.rng2 <- range(x@fitted_index[[i]],na.rm=TRUE)
+      y.rng  <- range(y.rng1,y.rng2)
 
       plot(dimnames(x@index[[i]])$year,x@index[[i]],ylim = y.rng, main='Fit to index',xlab='Year',ylab=paste('Index (',units(x@index[[i]]),')',sep=''), ...)
       lines(dimnames(x@index[[i]])$year,x@fitted_index[[i]],lty=2, ...)
