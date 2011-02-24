@@ -165,10 +165,11 @@ model(ed) <- aspm.Edwards()
 ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, amax=amax, amin=amin)
 model(ed.C) <- aspm.Edwards.C()
 
-ed <- fmle(ed)
+# limit iterations for SANN - takes forever otherwise
+ed <- fmle(ed,control=list(maxit=100))
 ed@params
 
-ed.C <- fmle(ed.C)
+ed.C <- fmle(ed.C,control=list(maxit=100))
 ed.C@params
 
 # Fit any good?
@@ -184,10 +185,10 @@ model(fr) <- aspm.Francis()
 fr.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w, amax=amax, amin=amin)
 model(fr.C) <- aspm.Francis.C()
 
-fr <- fmle(fr)
+fr <- fmle(fr,control=list(maxit=100))
 fr@params
 
-fr.C <- fmle(fr.C)
+fr.C <- fmle(fr.C,control=list(maxit=100))
 fr.C@params
 
 # Francis gets 411000
@@ -257,6 +258,91 @@ par(mfrow=c(2,1))
 profile(fr,maxsteps=30)
 profile(fr.C,maxsteps=30)
 
+#****************************************************************************
+# SR Residuals and multiple iterations
+library(FLCore)
+library(FLaspm)
+data(NZOR)
+catch <- NZOR[["catch"]]
+index <- NZOR[["index"]]
+amin    <- 1
+amax    <- 70
+hh <- FLQuant(0.95)
+M <- FLQuant(0.05)
+Linf  <- 42.5 #cm
+k     <- 0.059
+t0    <- -0.346
+alpha <- 0.0963 # grams
+beta  <- 2.68
+am <- 23
+as <- 23
+w <- FLQuant(age_to_weight(amin:amax,Linf,k,t0,alpha,beta), dimnames=list(age=amin:amax)) / 1e6 # convert to tonnes
+
+# Set up three iterations of sr_res
+sr_res <- FLQuant(NA,dimnames=dimnames(catch))
+sr_res <- propagate(sr_res,3)
+sr_res[] <- rlnorm(dims(sr_res)$year*dims(sr_res)$iter,meanlog=0,sdlog=1.2)
+
+# Create the FLaspm objects - R and C version
+ed <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w,amax=amax, amin=amin,sr_res=sr_res)
+model(ed) <- aspm.Edwards()
+
+ed.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w,amax=amax, amin=amin,sr_res=sr_res)
+model(ed.C) <- aspm.Edwards.C()
+
+fr <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w,amax=amax, amin=amin,sr_res=sr_res)
+model(fr) <- aspm.Francis()
+
+fr.C <- FLaspm(catch=catch, index=FLQuants(index1 = index), M=M,hh=hh,sel=as, mat=am, wght=w,amax=amax, amin=amin,sr_res=sr_res)
+model(fr.C) <- aspm.Francis.C()
+
+#Project fr
+params(fr)["B0",] <- 500000
+params(fr.C)["B0",] <- 500000
+fr.pop.R <- calc.pop.dyn(fr)
+fr.pop.C <- calc.pop.dyn(fr.C)
+fr.pop.R[["bexp"]]
+fr.pop.C[["bexp"]]
+# bexp unaffected by recruitment variability because sel age is 23 - too short to see
+# what about n?
+fr.pop.R[["n"]][1:10,]
+fr.pop.C[["n"]][1:10,]
+all.equal(c(fr.pop.R[["n"]]),c(fr.pop.C[["n"]]))
+
+# Project ed
+params(ed)["B0",] <- 500000
+params(ed.C)["B0",] <- 500000
+ed.pop.R <- calc.pop.dyn(ed)
+ed.pop.C <- calc.pop.dyn(ed.C)
+ed.pop.R[["bexp"]]
+ed.pop.C[["bexp"]]
+# bexp unaffected by recruitment variability because sel age is 23 - too short to see
+# what about n?
+ed.pop.R[["n"]][1:10,]
+ed.pop.C[["n"]][1:10,]
+all.equal(c(ed.pop.R[["n"]]),c(ed.pop.C[["n"]]))
+ed.pop.R[["n"]][1:10,,,,,1]
+
+# Fit Francis
+fr <- fmle(fr,control=list(maxit=100),always_eval_initial=TRUE)
+fr.C <- fmle(fr.C,control=list(maxit=100),always_eval_initial=TRUE)
+c(params(fr))
+c(params(fr.C))
+# The same when same initial values - else tiny differences
+# All iters the same as ten years is not enough time to see differences in bexp
+# from recruitment variability
+
+# Fit Edwards
+ed <- fmle(ed,control=list(maxit=100),always_eval_initial=TRUE)
+ed.C <- fmle(ed.C,control=list(maxit=100),always_eval_initial=TRUE)
+params(ed)
+params(ed.C)
+c(params(ed)["B0",])
+c(params(ed.C)["B0",])
+c(params(ed)["sigma2",])
+c(params(ed.C)["sigma2",])
+# Tiny differences - not sure why. Bexp should be unaffected
+# Could be simulated annealing - randomness?
 
 #****************************************************************************
 # STOP

@@ -69,12 +69,12 @@ void calc_index_hat (adouble* bexp, adouble* qhat, adouble** indexhat,
 void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
                 double* Catch, adouble B0,
                 double steepness, double M, double* mat,
-                double* sel, double* wght, int amin, int amax, int nyrs);
+                double* sel, double* wght, int amin, int amax, int nyrs, double* sr_res);
 
 void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
                 double* Catch, adouble B0,
                 double steepness, double M, double* mat,
-                double* sel, double* wght, int amin, int amax, int nyrs);
+                double* sel, double* wght, int amin, int amax, int nyrs, double* sr_res);
 
 void pop_dyn_common(int nages, int nyrs, adouble* alpha, adouble* beta, adouble** n,
                     adouble* b, adouble* bexp, double M, double* sel,
@@ -297,7 +297,7 @@ adouble simpleNRtogetf(adouble f, double M, double Catch, adouble bexp)
 void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
                 double* Catch, adouble B0,
                 double steepness, double M, double* mat,
-                double* sel, double* wght, int amin, int amax, int nyrs)
+                double* sel, double* wght, int amin, int amax, int nyrs, double* sr_res)
 {
   // temp vars for loops and such
   int i,j, yrcount, fp;
@@ -336,6 +336,7 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
     // and n is already half way through year.
     bmat_end_last = b[yrcount-1]*exp(-M-f[yrcount-1]);
     n[0][yrcount] = *alpha * bmat_end_last / (*beta + bmat_end_last);
+    n[0][yrcount] = n[0][yrcount] * sr_res[yrcount];
     // adult dynamics
     for (i=1; i<nages; i++)
       //n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1] * h[yrcount-1]);
@@ -417,11 +418,11 @@ adouble calc_logl_Francis(double** index, adouble* bexp, adouble* qhat,
 //******************************************************************************
 // Edwards functions
 //******************************************************************************
-// Project population using h as Charlie's original - not sure that this is right
+// Project population using h as Charlie's original
 void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
                 double* Catch, adouble B0,
                 double steepness, double M, double* mat,
-                double* sel, double* wght, int amin, int amax, int nyrs)
+                double* sel, double* wght, int amin, int amax, int nyrs, double* sr_res)
 {
   // temp vars for loops and such
   int i,j, yrcount, fp;
@@ -449,6 +450,7 @@ void pop_dyn_Edwards(adouble* bexp, adouble* b, adouble* h, adouble** n,
     {
 	// recruitment
 	n[0][yrcount] = *alpha * b[yrcount-1] / (*beta + b[yrcount-1]);
+    n[0][yrcount] = n[0][yrcount] * sr_res[yrcount];
 	// adult dynamics
 	for (i=1; i<nages; i++)
 	    n[i][yrcount] = n[i-1][yrcount-1] * exp(-M) * (1-sel[i-1] * h[yrcount-1]);
@@ -498,7 +500,8 @@ adouble calc_logl_Edwards(double** index, adouble** index_hat, adouble sigma2,
 //******************************************************************************
 extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SEXP sigma2SEXP,
                 SEXP steepnessSEXP, SEXP MSEXP, SEXP matSEXP, SEXP selSEXP,
-                SEXP wghtSEXP, SEXP aminSEXP, SEXP amaxSEXP, SEXP nyrsSEXP, SEXP modelSEXP)
+                SEXP wghtSEXP, SEXP aminSEXP, SEXP amaxSEXP, SEXP nyrsSEXP,
+                SEXP sr_resSEXP, SEXP modelSEXP)
 {
 
     // loop and other junk vars
@@ -519,6 +522,7 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     // 1D vector of doubles
     // set them up
     double* Catch = new double[nyrs];
+    double* sr_res = new double[nyrs];
     double M = asReal(MSEXP);
     double* mat = new double[nages];
     double* sel = new double[nages];
@@ -532,8 +536,10 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     }
 
     for (i=0; i<nyrs; i++)
+    {
       Catch[i] = REAL(CatchSEXP)[i];
-
+      sr_res[i] = REAL(sr_resSEXP)[i];
+    }
     // Set up index as 2D array
     // coming in as an FLQuants object which extends a list
     int nindices = length(indexSEXP);
@@ -593,7 +599,7 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     B0.setADValue(1);
     sigma2.setADValue(0);
 
-    pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
+    pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs, sr_res);
     calc_qhat_geomean(bexp, index, qhat, nindices, nyrs, 0, M, h);
     calc_index_hat (bexp, qhat, index_hat, nindices, nyrs, 0, M, h);
     total_logl = calc_logl_Edwards(index, index_hat, sigma2, nindices, nyrs);
@@ -603,7 +609,7 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     B0.setADValue(0);
     sigma2.setADValue(1);
 
-    pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
+    pop_dyn_Edwards(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs, sr_res);
     calc_qhat_geomean(bexp, index, qhat, nindices, nyrs, 0, M, h);
     calc_index_hat (bexp, qhat, index_hat, nindices, nyrs, 0, M, h);
     total_logl = calc_logl_Edwards(index, index_hat, sigma2, nindices, nyrs);
@@ -617,7 +623,7 @@ extern "C" SEXPDLLExport aspm_ad(SEXP CatchSEXP, SEXP indexSEXP, SEXP B0SEXP, SE
     // Set up B0 deriv
     B0.setADValue(1);
     sigma2.setADValue(0);
-    pop_dyn_Francis(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs);
+    pop_dyn_Francis(bexp, b, h, n, Catch, B0, steepness, M, mat, sel, wght, amin, amax, nyrs, sr_res);
 
 //for (i=0; i<12; i++)
 //{

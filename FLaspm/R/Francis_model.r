@@ -8,7 +8,7 @@
 #********************************************************************************
 # Population dynamics
 # Has to estimate f using ratner_search from bexp and catch
-aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
+aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax,sr_res) {
     #cat("Current B0: ", B0, "\n")
     #browser()
     # Set up stuff
@@ -22,6 +22,7 @@ aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
     sel <- c(sel)
     hh   <- c(hh)
     M   <- c(M)
+    sr_res <- c(sr_res)
 
     C <- as.vector(catch)
     nyr <- length(C)
@@ -75,6 +76,8 @@ aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
 	# recruitment using biomass at end of last year
 	bmat_end_last <- bmat[y-1]*exp(-M-f[y-1])
 	n[1,y] <-  (bmat_end_last * alp) / (bet + bmat_end_last)
+  # Multiply by residuals
+	n[1,y] <- n[1,y] * sr_res[y]
 	# adults
 	n[2:nag,y] <- n[1:(nag-1),y-1] * exp(-M - f[y-1]*sel[1:(nag-1)])
 	# plus group
@@ -111,7 +114,7 @@ aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax) {
 
 # Clean this up
 # May not actually need this
-aspm.index.Francis <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+aspm.index.Francis <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
 {
     #browser()
     # Francis calculates qhat and sigma using the midyear biomass
@@ -133,7 +136,7 @@ aspm.index.Francis <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
     M   <- c(M)
 
     index.hat <- FLQuants()
-    pdyn <- aspm.pdyn.Francis(catch,B0,hh,M,mat,sel,wght,amin,amax)
+    pdyn <- aspm.pdyn.Francis(catch,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
     bexp <- pdyn[["bexp"]]
     for (index.count in 1:length(index))
     { 
@@ -167,7 +170,7 @@ aspm.index.Francis <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
 aspm.Francis <- function()
 {
   # set the likelihood function
-  logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
+  logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index,sr_res)
   {
     #browser()
     mat <- c(mat)
@@ -176,7 +179,7 @@ aspm.Francis <- function()
     M   <- c(M)
     # get the population trajectory given B0
     #pdyn <- aspm.pdyn.Francis(catch,B0,hh,M,mat,sel,wght,amin,amax)
-    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax)
+    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
     bexp <- pdyn[["bexp"]]
     bmid <- bexp*exp(-0.5*(M+pdyn[["harvest"]]))
     # if overfished bmid goes to 0 which kills qhat calculation later on.
@@ -206,16 +209,16 @@ aspm.Francis <- function()
   }
 
   # qhat is mean of index / b
-  qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
+  qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index,sr_res)
   {
-    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax)
+    pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
     bexp <- pdyn[["bexp"]]
     bmid <- bexp*exp(-0.5*sweep(pdyn[["harvest"]],c(1,3:6),M,"+"))
     q <- lapply(index,function(x,b) apply(sweep(x,2:6,b,"/"),c(1,6),mean,na.rm=T), b=bmid)
     return(q)
   }
 
-initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index,sr_res){
   #browser()
     cat("getting initial values\n")
     # Let's do something more sophisticated to get the start values
@@ -225,7 +228,7 @@ initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
     for (i in 1:length(llseq))
     {
       # logl is still visible in the parent environment - seems a little dodgy to me...
-      llseq[i] <- logl(B0seq[i],hh,M,mat,sel,wght,amin,amax,catch,index)
+      llseq[i] <- logl(B0seq[i],hh,M,mat,sel,wght,amin,amax,catch,index,sr_res)
     }
     B0_max <- B0seq[which.max(llseq)]
     
@@ -256,7 +259,7 @@ initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
 #	upper=1e12
 #   )
 
-    model <- index ~ aspm.index.Francis(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+    model <- index ~ aspm.index.Francis(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
 
     pop.dyn <- aspm.pdyn.Francis
     
@@ -315,10 +318,10 @@ ratner_search <- function(func,x,abstol=1e-9,...)
 #*******************************************************************************
 # C bits
 
-aspm.pdyn.Francis.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax) {
+aspm.pdyn.Francis.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax, sr_res) {
     op <- .Call("aspm_ad", catch, index, B0, 1,
                 hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 2)
+                wght, amin, amax, dim(catch)[2], sr_res, 2)
     return(op)
 }
 
@@ -326,22 +329,22 @@ aspm.Francis.C <- function()
 {
   # set the likelihood function
   # no sigma2 so set to 1 in .Call
-  logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
+  logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index,sr_res)
   {
-    allop <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+    allop <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
     total.logl <- allop[["logl"]]["logl"]
 #    total.logl <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)[["logl"]]["logl"]
     #cat("B0: ", B0, " loglC: ", total.logl, " qhatC: ", allop[["qhat"]], "\n")
     return(total.logl)
   }
 
-  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index){
+  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index,sr_res){
         B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=50)
         llout <- rep(NA,length(B0seq))
         for (i in 1:length(B0seq))
           llout[i] <- .Call("aspm_ad", catch, index, B0seq[i], 1,
                 hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 2)[["logl"]]["logl"]
+                wght, amin, amax, dim(catch)[2], sr_res, 2)[["logl"]]["logl"]
         B0_max <- B0seq[which.max(llout)]
         #cat("Got initial value of B0: ", B0_max, "\n")
         return(FLPar(B0 = B0_max))
@@ -356,12 +359,12 @@ aspm.Francis.C <- function()
     upper=Inf
   )
 
-  model <- index ~ aspm.index.Francis.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+  model <- index ~ aspm.index.Francis.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
 
-  qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index)
+  qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index, sr_res)
   {
     q <- .Call("aspm_ad", catch, index, B0, 1, hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 2)[["qhat"]]
+                wght, amin, amax, dim(catch)[2], sr_res, 2)[["qhat"]]
     # returns a vector of qs
     # should return a list
     qlist <- FLQuants()
@@ -379,12 +382,12 @@ aspm.Francis.C <- function()
 } # }}}
 
 
-aspm.index.Francis.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax)
+aspm.index.Francis.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
 {
   # sigma2 not needed so set to 1 in .Call
   indexhat_array <- .Call("aspm_ad", catch, index, B0, 1,
                 hh, M, mat, sel,
-                wght, amin, amax, dim(catch)[2], 2)[["indexhat"]]
+                wght, amin, amax, dim(catch)[2], sr_res, 2)[["indexhat"]]
   indexhat_flqs <- FLQuants()
   for (i in 1:length(index))
     indexhat_flqs[[i]] <- FLQuant(indexhat_array[i,],dimnames=dimnames(catch))

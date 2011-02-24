@@ -17,6 +17,7 @@ export(
   "aspm.pdyn.Francis",
   "aspm.pdyn.Edwards.C",
   "aspm.pdyn.Edwards",
+  "rJohnson",
   "JohnsonCum",
   "JohnsonPDF",
   "Johnsonll")
