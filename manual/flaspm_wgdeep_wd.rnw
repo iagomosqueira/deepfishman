@@ -36,18 +36,22 @@ code is freely available at \url{http://code.google.com/p/deepfishman/}).
 $FLaspm$ is part of the $FLR$ project~\cite{FLRref} and requires that the
 package $FLCore$ is also installed (v > 2.3).
 
-This package implements two age structured production models (also called
-stock reduction models~\cite{quinn_deriso}) based on
+This package implements two age structured production models based on
 ~\cite{Francis92} and~\cite{Walters06}, hereafter referred to as Francis and
-Walters. The latter model has not yet been
-properly tested and so the demonstration below focusses on the Francis model.
-The package is still in development and any results generated using it
+Walters. The package is still in development and any results generated using it
 should be treated with caution.
 
-The software can be used for projecting stock abundances forward
-and also for estimating the virgin biomass of the stock. Given the flexibility
-of the R environment, it is also possible to easily perform sensitivity and
-risk analysis with the results.
+Age structure population models track the number of fish per age cohort forward
+over time. The models implemented here describe a relatively simple
+parameterisation known as a stock reduction model~\cite{quinn_deriso}.
+All life history parameters (specifically growth, age specific natural
+mortality and recruitment) are assumed known with associated uncertainty.
+Commerical catch and selectivity is assumed complete and known without error.
+For both the Francis and Walters models the intention is to estimate the
+spawning biomass at equilibrium from one or more indices of abundance, so that
+the stock trajectory can be reconstructed using the catch series and selectivity.
+Given the flexibility of the R environment, it is also possible to easily
+perform sensitivity and risk analysis with the results.
 
 \section{The Models}
 
@@ -79,7 +83,7 @@ Changing between the R and C versions is straightforward (see below).
 The main difference between the models is the timing of the fishing mortality.
 The Francis model assumes that fishing mortality occurs steadily throughout
 the year. The Walters model assumes that the fishing mortality happens
-as a 'pulse' midway through the year. This is described in more detail below.
+as a 'pulse' at the end of the year. This is described in more detail below.
 
 \subsection{The Francis model}
 
@@ -119,7 +123,27 @@ C_{i} = B_{i} (1 - e^{-F_{i}-m)} F_{i} / (F_{i} + m)
 Where $C$ is the catch. Internally, $F$ is estimated using a simple golden search
 algorithm.
 
-\subsection{Fitting the model}
+\subsection{The Walters model}
+
+% Main reference ~\cite{Walters06}
+The Walters model uses an approximation to the Baranov catch equation, assuming
+that fishing takes place as a single pulse at the end of the year (after natural mortality).  The
+recruited dynamics are therefore defined as follows:
+
+\begin{equation}
+N_{i,j} = N_{i-1,j-1} e^{- m}(1 - s_{j-1}h_{i-1})
+\end{equation}
+
+The harvest rate $h_{i}$ is defined as the ratio of the catch to the exploitable biomass:
+\begin{equation}
+h_{i} = \frac{C_{i}}{\sum_{j}{w_{j}s_{j}N_{i,j}}}
+\end{equation}
+where $w_{i}$ and $s_{i}$ are the weight and selectivity at age vectors respectively.
+
+In addition to $B_0$, the model also estimates the observation uncertainty around
+the abundance ($\sigma^2$).
+
+\subsection{Fitting a model with $FLaspm$}
 
 For both models $FLaspm$ uses the $fmle()$ method to estimate the
 virgin exploitable biomass. The fitting is carried out in a two stage process.
@@ -519,7 +543,7 @@ The Johnson Su distribution and likelihood function are included in the
 $FLaspm$ package.
 The area under the PDF curve between two value of $B_{0}$ is proportional to
 the confidence that the true value of $B_{0}$ lies between these two values
-(see Figure ~\ref{fig:or_pdfB0_OR}).
+(see Figure~\ref{fig:or_pdfB0_OR}).
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
@@ -731,6 +755,115 @@ exactly the same. This is to be expected given the difference in the estimated
 PDF of $B_0$ (see above).
 
 %****************************************************************************
+\subsection{Fitting to multiple indicies}
+
+We use the Walters model applied to albacore data from the Indian Ocean to
+demonstrate a simple fit to multiple indicies.
+
+First we load the libraries, data and life history parameters
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+<<echo=TRUE,keep.source=TRUE,eval=TRUE,results=hide>>=
+library(FLCore)
+library(FLaspm)
+data(IOalbacore)
+# age for model
+amax <- 9
+amin <- 1
+# steepness
+hh <- 0.75
+# natural mortality
+M <- 0.34
+# mean weight (tonnes)
+mw <- 0.014/1e3
+# age at commercial selectivity
+as <- 5
+# age at maturity
+am <- 5
+@
+\end{minipage}
+\end{center}
+
+There is only one index in the data set so we artificially create an additional
+index (for demonstration purposes only) by adding log-normal noise with a $CV$ of $10\%$.
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+<<echo=TRUE, eval=TRUE, results=hide>>=
+index1 <- IOalbacore$index * rlnorm(dim(IOalbacore$index)[2],0,sqrt(log(1 + 0.1)^2))
+index2 <- IOalbacore$index * rlnorm(dim(IOalbacore$index)[2],0,sqrt(log(1 + 0.1)^2))
+@
+\end{minipage}
+\end{center}
+
+We can then create the $FLaspm$ object.
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+<<echo=TRUE, eval=TRUE, results=hide>>=
+alb.mi <- FLaspm(catch=IOalbacore$catch,
+              index=FLQuants(index1=index1,index2=index2),
+              M=M,hh=hh,sel=as, mat=am,wght=mw,amax=amax, amin=amin)
+model(alb.mi) <- aspm.Edwards.C()
+@
+\end{minipage}
+\end{center}
+
+Finally we fit the model
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+<<echo=TRUE, eval=TRUE,results=hide>>=
+alb.mi <- fmle(alb.mi)
+@
+\end{minipage}
+\end{center}
+
+and plot the results (Figure~\ref{fig:alb_predI}).
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+<<echo=TRUE, eval=FALSE, results=hide, fig=FALSE>>=
+plot(alb.mi)
+@
+\end{minipage}
+\end{center}
+
+\begin{figure}
+\begin{center}
+<<echo=FALSE, results=hide, eval=TRUE, fig=TRUE>>=
+plot(alb.mi)
+@
+\end{center}
+\caption{Fitted CPUE indicies for Indian Ocean albacore}
+\label{fig:alb_predI}
+\end{figure}
+
+We can check the model estimates of $B_0$ and $\sigma^2$ using a two
+dimensional likelihood plot (Figure~\ref{fig:alb_profLk}).
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+<<echo=TRUE, eval=FALSE, results=hide, fig=FALSE>>=
+profile(alb.mi,maxsteps=50)
+@
+\end{minipage}
+\end{center}
+
+\begin{figure}
+\begin{center}
+<<echo=FALSE, results=hide, eval=TRUE, fig=TRUE>>=
+profile(alb.mi,maxsteps=50)
+@
+\end{center}
+\caption{Two dimensional profile likelihood of $B0$ and $\sigma^2$ model estimates for Indian Ocean albacore}
+\label{fig:alb_profLk}
+\end{figure}
+
+The profile plot suggests that the esimated values of $B_0$ and $\sigma^2$ are
+those which maximise the likelihood.
+
+%****************************************************************************
 
 \section{Conclusion}
 
@@ -758,7 +891,6 @@ R is at the users disposal. There are other advantages in using R too. For examp
 writing a script to perform an assessment it is possible to quickly rerun
 the assessment with different parameter values or data. Every stage of the
 assessment is recorded, increasing the transparency of the process.
-
 
 
 
