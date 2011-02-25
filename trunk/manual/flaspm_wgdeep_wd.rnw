@@ -360,6 +360,30 @@ calc.qhat(or)
 
 Francis reports the estimated value of $q_{hat}$ to be 0.59~\cite{Francis92}.
 
+The results of fit can be plotted using the generic $plot()$ method
+(Figure~\ref{fig:or_fit_plot}):
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+%\begin{shaded}%
+<<echo=TRUE,keep.source=FALSE,results=hide>>=
+plot(or)
+@
+%\end{shaded}%
+\end{minipage}
+\end{center}
+
+\begin{figure}
+\begin{center}
+%\begin{shaded}%
+<<echo=FALSE, fig=TRUE, results=hide>>=
+plot(or)
+@
+%\end{shaded}%
+\end{center}
+\caption{Fitted index compared to actual index for New Zealand Orange Roughy}
+\label{fig:or_fit_plot}
+\end{figure}
+
 %****************************************************************************
 \subsection{Estimating a probability distribution for $B_{0}$}
 Francis provides a Monte Carlo routine for estimating a probability
