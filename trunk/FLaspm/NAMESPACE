@@ -11,6 +11,7 @@ export(
   "aspm.index.Edwards.C",
   "aspm.Francis",
   "aspm.Francis.C",
+  "aspm.Francis.CAD",
   "aspm.index.Francis",
   "aspm.index.Francis.C",
   "aspm.pdyn.Francis.C",

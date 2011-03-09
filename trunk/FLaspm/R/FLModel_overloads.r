@@ -17,7 +17,8 @@ setMethod('fmle',
   function(object, start, method='L-BFGS-B', fixed=list(),
     control=list(trace=1), lower=rep(-Inf, dim(params(object))[1]),
     upper=rep(Inf, dim(params(object))[1]), seq.iter=TRUE, autoParscale=TRUE,
-    tiny_number=1e-6, relAutoParscale=TRUE, always_eval_initial=FALSE,...)
+    tiny_number=1e-6, relAutoParscale=TRUE, always_eval_initial=FALSE,
+    SANN_maxit = 0,...)
   {
 
   if(missing(start)) orig_start_is_missing <- TRUE
@@ -280,18 +281,18 @@ diff_logl <-  abs(1/(((logl_bump1 - logl_bump2) / (2 * unlist(start) * tiny_numb
         control <- c(control, list(parscale=diff_logl))
       }
 
-#if (it==2) browser()
-#browser()
-
       # TODO protect environment
       #browser()
-      cat("Running SANN\n")
-      out <- do.call('optim', c(list(par=unlist(start), fn=loglfoo, method="SANN",
-			      #hessian=TRUE, control=control, lower=lower, upper=upper, gr=gr)))
-        hessian=TRUE, control=c(control,trace=0))))
+      if (SANN_maxit > 0)
+      {
+        cat("Running SANN\n")
+        out <- do.call('optim', c(list(par=unlist(start), fn=loglfoo, method="SANN",
+          hessian=TRUE, control=c(control,trace=0,maxit=SANN_maxit))))
+          start<-out$par
+      }
+#browser()
 
-      cat("Running Other Method\n")
-      start<-out$par
+      cat(paste("Running ", method,"\n"),sep="")
       out <- do.call('optim', c(list(par=unlist(start), fn=loglfoo, method=method,
 			      #hessian=TRUE, control=control, lower=lower, upper=upper, gr=gr)))
         hessian=TRUE, control=control, lower=lower, upper=upper, gr=grfoo)))
@@ -313,7 +314,7 @@ diff_logl <-  abs(1/(((logl_bump1 - logl_bump2) / (2 * unlist(start) * tiny_numb
       object@vcov[,,it] <-
         if (length(coef))
         {
-          if(det(out$hessian) != 0)
+          if(det(out$hessian) != 0 & all(!is.nan(out$hessian)))
           {
             tmphess <- try(solve(out$hessian), silent=TRUE)
             if(class(tmphess) =='try-error')

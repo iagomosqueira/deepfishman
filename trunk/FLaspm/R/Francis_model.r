@@ -10,7 +10,7 @@
 # Has to estimate f using ratner_search from bexp and catch
 aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax,sr_res) {
     #cat("Current B0: ", B0, "\n")
-    #browser()
+#    browser()
     # Set up stuff
     # Strip out FLQuants for speed
 
@@ -53,7 +53,8 @@ aspm.pdyn.Francis <- function(catch,B0,hh,M,mat,sel,wght,amin,amax,sr_res) {
     #f[] <-0
     # from WG report
     #f <- c(0.67, 0.669, 0.305, 0.142, 0.091, 0.088, 0.109, 0.075)
-    maxf <- 1e9
+    #maxf <- 1e9
+    maxf <- 100
     f[1] <- ratner_search(func=fobj,x=c(0,1,maxf),m=M,catch=C[1],biomass=bexp[1])
     # What happens if f maxes out?
     #    if(all.equal(maxf,f[1])==TRUE)
@@ -182,6 +183,23 @@ aspm.Francis <- function()
     pdyn <- pop.dyn(catch,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
     bexp <- pdyn[["bexp"]]
     bmid <- bexp*exp(-0.5*(M+pdyn[["harvest"]]))
+
+  # OPTION 1 - results in ski slope - bad for solver and fails
+  # For years where f >= fmax, set bmid to 0
+  f <- pdyn[["harvest"]]
+  bmid[f>=(100-1)] <- 0
+
+  # OPTION 2 - set to very small - results in valley in logl - solver will find
+  # max depending on start position which could be on lhs - unsafe
+  #f <- pdyn[["harvest"]]
+  #bmid[f>=(100-1)] <- 1e-9
+
+  # OPTION 3 - if any of years goes extinct, set ALL Bmid to 1e-9
+  # similar problems to OPtion 2 - valley at high index levels
+  #f <- pdyn[["harvest"]]
+  #if(any(f>=(100-1))) bmid[] <- 1e-9
+
+
     # if overfished bmid goes to 0 which kills qhat calculation later on.
     # Set to something small
     #bmid[bmid==0] <- 1e-9
@@ -189,10 +207,11 @@ aspm.Francis <- function()
     # qhat is still massive, but bmid/qhat is tiny
     # has weird effect that being just under min B0 gives worse logl than when B0 is very much less than minB0
     # This is risky: if ANY bmid == 0, set all to 0
-    if(any(bmid==0)) bmid[] <- 1e-9
+#    if(any(bmid==0)) bmid[] <- 1e-9
     # Gives a flat likelihood - impossible to solve over
+    # Might be better to let logl be NA and use BFGS
     total.logl <- 0
-
+#browser()
     for (index.count in 1:length(index))
     {
       nonnaindexyears <- !is.na(index[[index.count]])
@@ -204,7 +223,9 @@ aspm.Francis <- function()
       chat2 <- apply((index[[index.count]] / sweep(bmid,1,qhat,"*") - 1)^2,c(1,6),sum,na.rm=T) / (n-2)
 	    total.logl <- total.logl + (-n*log(sqrt(chat2)) -n*log(qhat) -apply(log(bmid[nonnaindexyears]),c(1,6),sum))
     }
-  #cat("B0: ", B0, " loglR: ", total.logl,"\n")
+  #cat("B0: ", B0, " loglR: ", total.logl, "qhatR: ", qhat, "\n")
+  # brutal hack to avoid NA
+#  if(is.na(total.logl)) total.logl <- -1e9
   return(total.logl)
   }
 
@@ -222,7 +243,7 @@ initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index,sr_res){
   #browser()
     cat("getting initial values\n")
     # Let's do something more sophisticated to get the start values
-    B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=10)
+    B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=50)
     llseq <- rep(NA,length(B0seq))
 
     for (i in 1:length(llseq))
@@ -235,7 +256,7 @@ initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index,sr_res){
 
     #browser()
     #cat("Got initial guess\n")
-    cat("Initial B0: ", B0_max, "\n")
+    #cat("Initial B0: ", B0_max, "\n")
     return(FLPar(B0=B0_max))
     },
 
@@ -334,11 +355,13 @@ aspm.Francis.C <- function()
     allop <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
     total.logl <- allop[["logl"]]["logl"]
 #    total.logl <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)[["logl"]]["logl"]
-    #cat("B0: ", B0, " loglC: ", total.logl, " qhatC: ", allop[["qhat"]], "\n")
+#    cat("B0: ", B0, " loglC: ", total.logl, " qhatC: ", allop[["qhat"]], "\n")
     return(total.logl)
   }
 
   initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index,sr_res){
+  #browser()
+        #B0seq <- seq(from = c(catch)[1], to = 500*max(catch),length=50)
         B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=50)
         llout <- rep(NA,length(B0seq))
         for (i in 1:length(B0seq))
@@ -346,7 +369,7 @@ aspm.Francis.C <- function()
                 hh, M, mat, sel,
                 wght, amin, amax, dim(catch)[2], sr_res, 2)[["logl"]]["logl"]
         B0_max <- B0seq[which.max(llout)]
-        #cat("Got initial value of B0: ", B0_max, "\n")
+#        cat("Got initial value of B0: ", B0_max, "\n")
         return(FLPar(B0 = B0_max))
   },
     # initial parameter values
@@ -394,3 +417,72 @@ aspm.index.Francis.C <- function(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_r
   return(indexhat_flqs)
 }
 
+#*******************************************************************************
+# Gradient option
+aspm.Francis.CAD <- function()
+{
+  # set the likelihood function
+  # no sigma2 so set to 1 in .Call
+  logl <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index,sr_res)
+  {
+    allop <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
+    total.logl <- allop[["logl"]]["logl"]
+#    total.logl <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)[["logl"]]["logl"]
+#    cat("B0: ", B0, " loglC: ", total.logl, " qhatC: ", allop[["qhat"]], "\n")
+    return(total.logl)
+  }
+
+  grad <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index,sr_res)
+  {
+    allop <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
+    total.logl <- allop[["logl"]]["logl_grad_B0"]
+#    total.logl <- pop.dyn(catch,index,B0,hh,M,mat,sel,wght,amin,amax)[["logl"]]["logl"]
+#    cat("B0: ", B0, " loglC: ", total.logl, " qhatC: ", allop[["qhat"]], "\n")
+    return(total.logl)
+  }
+
+
+  initial <- structure(function(hh,M,mat,sel,wght,amin,amax,catch,index,sr_res){
+  #browser()
+        #B0seq <- seq(from = c(catch)[1], to = 500*max(catch),length=50)
+        B0seq <- seq(from = c(catch)[1], to = 100*max(catch),length=50)
+        llout <- rep(NA,length(B0seq))
+        for (i in 1:length(B0seq))
+          llout[i] <- .Call("aspm_ad", catch, index, B0seq[i], 1,
+                hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], sr_res, 2)[["logl"]]["logl"]
+        B0_max <- B0seq[which.max(llout)]
+#        cat("Got initial value of B0: ", B0_max, "\n")
+        return(FLPar(B0 = B0_max))
+  },
+    # initial parameter values
+#  initial <- structure(function(catch){
+#    return(FLPar(B0=100*max(catch)))
+#    },
+    # lower and upper limits for optim()
+    # Could run profile to get the min B
+    lower=1,
+    upper=Inf
+  )
+
+  model <- index ~ aspm.index.Francis.C(catch,index,B0,hh,M,mat,sel,wght,amin,amax,sr_res)
+
+  qhat <- function(B0,hh,M,mat,sel,wght,amin,amax,catch,index, sr_res)
+  {
+    q <- .Call("aspm_ad", catch, index, B0, 1, hh, M, mat, sel,
+                wght, amin, amax, dim(catch)[2], sr_res, 2)[["qhat"]]
+    # returns a vector of qs
+    # should return a list
+    qlist <- FLQuants()
+    for (i in 1:length(q))
+      qlist[[i]] <- FLQuant(q[i])
+    names(qlist) <- names(index)
+    return(qlist)
+  }
+
+
+
+#  pop.dyn <- aspm.Francis.C
+  pop.dyn <- aspm.pdyn.Francis.C
+  return(list(logl=logl,model=model,initial=initial,pop.dyn=pop.dyn, qhat=qhat, gr=grad))
+} # }}}

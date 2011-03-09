@@ -34,101 +34,101 @@ beta  <- 2.68
 mass_at_age <- age_to_weight(amin:amax,Linf,k,t0,alpha,beta)
 w <- FLQuant(mass_at_age, dimnames=list(age=amin:amax)) / 1e6
 
-#index.cv <- 0.15
-index.cv <- 0.19 # upper estimate
-niters <- 100
+index.cv <- 0.15 # upper estimate 0.19
+niters <- 500
 
 or_true <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
-model(or_true) <- aspm.Francis.C()
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+model(or_true) <- aspm.Francis.CAD()
 or_true <- fmle(or_true,method="BFGS")
 B0_true <- params(or_true)['B0',]
+
 or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
-model(or) <- aspm.Francis.C()
-#Bmidtrial <- seq(from=300000,to=500000,length=10)
-Bmidtrial <- seq(from=300000,to=600000,by=25000)
-#Bmidtrial <- c(350000,380000,400000,450000,500000,
-#B0trial <- seq(from=300000,to=500000,length=10)#Bmidtrial*exp(0.5*M)
-#B0trial <- seq(from=350000,to=500000,length=20)
-#B0trial <- c(B0_true)
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+model(or) <- aspm.Francis.CAD()
+
+Bmidtrial <- seq(from=350000,to=600000,by=25000)
 B0trial <- Bmidtrial*exp(0.5*M)
-niters <- 500
 B0store <- array(NA,dim=c(length(B0trial),niters))
 
-# Autoparscale is a problem.
-#  because of NA?
-# Check for NA in the parscale routine
-
-# And Bmidtrial = 300000, fitted param = > B0_true
-# How?
-# why isn't or.traj.mid = 0?
-# because that only happens in logl calc - not in project B calc
-# get logl
+set.seed(0)
+#na.years <- dimnames(index)$year[which(is.na(index))]
+# one more year
+na.years <- as.character(1978:1982)
+# two more
+na.years <- as.character(1978:1981)
+# 3 more
+na.years <- as.character(1978:1980)
+# 4 more
+na.years <- as.character(1978:1979)
+# 5 more
+na.years <- as.character(1978)
 
 for (i in 1:length(B0trial))
 {
   cat("i: ", i, "\n")
   params(or)['B0',] <- B0trial[i]
   or.traj.mid <- exp.biomass.mid(or,yrfrac=0.5,virgin=F)
-# force 0 as a test
-or.traj.mid[,c(11,12)] <- 0
 
-  index.sim <- rnorm(niters,or.traj.mid,index.cv*or.traj.mid)
+  # Cannot fit with a trajectory that goes extinct so see if
+  # F has maxed out over index years
+  if(all(harvest(or)<100))
+  {
+    index.sim <- rnorm(niters,or.traj.mid,index.cv*or.traj.mid)
+    # index.sim should have same years as original index
+#    index.sim[,na.years] <- NA
+    # apply(index.sim,2,mean)
+    # cv(index.sim)
 
-  # index.sim should have same years as original index?
-  #index.sim[is.na(index)] <- NA
-  na.years <- dimnames(index)$year[which(is.na(index))]
-  index.sim[,na.years] <- NA
-  #index.sim[,as.character(c(1978:1982,1989))] <- NA
-#  apply(index.sim,2,mean)
-#  cv(index.sim)
-
-# Problematic iter 6
-# hessian fails - added hack to check for NaN in hessian
-#  or.sim <- FLaspm(catch=catch, index=iter(index.sim,6), M=M,hh=hh,sel=sel_age,
-#              mat=mat_age, wght=w, amax=amax, amin=amin)
-#  model(or.sim) <- aspm.Francis.C()
-#  or.sim <- fmle(or.sim,always_eval_initial=TRUE,SANN_maxit=0,method="BFGS",autoParscale=FALSE)
-
-  or.sim <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
+    or.sim <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, amax=amax, amin=amin)
-  model(or.sim) <- aspm.Francis.C()
-#  model(or.sim) <- aspm.Francis()
-  #or.sim <- fmle(or.sim,always_eval_initial=TRUE,SANN_maxit=0,control=list(trace=0))
-  or.sim <- fmle(or.sim,always_eval_initial=TRUE,SANN_maxit=0,
-                  control=list(trace=0),method="BFGS",autoParscale=FALSE)
-  B0store[i,] <-(params(or.sim))
+    model(or.sim) <- aspm.Francis.CAD()
+    #model(or.sim) <- aspm.Francis()
+    #or.sim <- fmle(or.sim,always_eval_initial=TRUE,SANN_maxit=0,control=list(trace=0))
+    or.sim <- fmle(or.sim,always_eval_initial=TRUE,method="BFGS")
+    B0store[i,] <-(params(or.sim))
+  }
 }
 
-# What would we expect to happen?
-#iter(index.sim[,1] * exp(0.5*M),500)
 
 
-#save(B0store,index.sim,file="C:/Projects/Deepfishman/deepfishman/trunk/B0store.Rdata")
+#save(B0store,B0trial,file="C:/Projects/Deepfishman/deepfishman/trunk/B0storeAD.Rdata")
+save(B0store,na.years,B0trial,file="C:/Projects/Deepfishman/deepfishman/trunk/B0storeAD_plus6.Rdata")
 #load("C:/Projects/Deepfishman/deepfishman/trunk/B0store.Rdata")
+
 propB0 <- apply(B0store>=c(B0_true),1,sum) / niters
 plot(B0trial,propB0,type="l")
 lines(x=c(B0_true,B0_true),y=c(0,1),lty=2)
 
+Bmid_true <- B0_true * exp(-0.5*M)
+Bmidstore <- B0store * exp(-0.5*M)
+propBmid <- apply(Bmidstore>=c(Bmid_true),1,sum) / niters
+plot(Bmidtrial,propBmid,type="l")
+lines(x=c(Bmid_true,Bmid_true),y=c(0,1),lty=2)
+
+# Cut off NA
+Bmidtrial <- Bmidtrial[!is.na(propB0)]
+propB0 <- propB0[!is.na(propB0)]
+propBmid <- propBmid[!is.na(propBmid)]
 # Fit a Johnson's Su distribution to get the cumulative distribution function
 # Try fitting Johnson distribution with real data
 initialparms <- c(g=-1,delta=1,xi=0,lambda=1)
-jcpars <- optim(par=initialparms,fn=Johnsonll,b=B0trial/1000,m=niters,p=propB0)$par
-B0plot <- seq(from=min(B0trial/1000), to = max(B0trial/1000), length=100)
+jcpars <- optim(par=initialparms,fn=Johnsonll,b=Bmidtrial/1000,m=niters,p=propB0)$par
+B0plot <- seq(from=min(Bmidtrial/1000), to = max(Bmidtrial/1000), length=100)
+B0plot <- seq(from=300,to=600,length=100)
 jp <- JohnsonPDF(jcpars,B0plot)
 plot(B0plot,jp,type="l")
-lines(x=c(B0_true,B0_true)/1000,y=c(0,1),lty=2)
-
-
+lines(x=c(Bmid_true,Bmid_true)/1000,y=c(0,1),lty=2)
 
 # Reading from graph Francis has
-# Bmid   ~p    myP_index_all_years myP_index_with_NA_years
-# 400    0.35   0.192               0.37
-# 450    0.8    0.97
-# 500    0.92   1.0
+# Bmid   ~p    myP_index_all_years myP_index_with_NA_years c = 0.19
+# 350    0                          0.01 0
+# 380    0.08                       0.11 0.06
+# 400    0.35   0.192               0.35 0.32
+# 450    0.8    0.97                0.71 0.78
+# 500    0.92   1.0                 0.87 0.96
 
-
+rbind(Bmidtrial,propBmid)
 
 
 
