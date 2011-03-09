@@ -489,7 +489,9 @@ setMethod('plot', signature(x='FLaspm'),
       y.rng2 <- range(x@fitted_index[[i]],na.rm=TRUE)
       y.rng  <- range(y.rng1,y.rng2)
 
-      plot(dimnames(x@index[[i]])$year,x@index[[i]],ylim = y.rng, main='Fit to index',xlab='Year',ylab=paste('Index (',units(x@index[[i]]),')',sep=''), ...)
+      plot(dimnames(x@index[[i]])$year,x@index[[i]],ylim = y.rng,
+              main=paste('Fit to index: ', names(x@index)[i]),xlab='Year',
+              ylab=paste('Index (',units(x@index[[i]]),')',sep=''), ...)
       lines(dimnames(x@index[[i]])$year,x@fitted_index[[i]],lty=2, ...)
     
     }

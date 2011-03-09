@@ -208,12 +208,14 @@ void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, 
   // surveytime - when should bexp be compared to index, i.e. when was survey done?
   // For Francis it is mid year, indextime = 0.5
   //	qhat <- apply(index[[index.count]]/bmid,c(1,6),sum,na.rm=T) / n
+
+  // If population goes extinct (fmax) in any year - set all bmid to 1e-9
   int i, j, nonnanyrs;
   int extinction = 0;
   adouble mean_ind_over_bexp;
   adouble bmid;
   for (j=0; j<nyrs; j++)
-    if (f[j].getValue() == 100) extinction = 1;
+    if (f[j].getValue() >= (100-1)) extinction = 1;
 
   for (i = 0; i<nindices; i++)
   {
@@ -227,17 +229,20 @@ void calc_qhat_mean(adouble* bexp, double** index, adouble* qhat, int nindices, 
 	    {
         nonnanyrs++;
         bmid = bexp[j]*exp(-indextime*(M+f[j]));
-        if (extinction == 1) bmid = 1e-9;
+        // if pop goes extinct in that year, set to 0
+        if (f[j].getValue() >= (100-1)) bmid=0;
+        //if (extinction == 1) bmid = 1e-9;
 		    mean_ind_over_bexp = mean_ind_over_bexp + (index[i][j] / (bmid));
       }
     }
     // Cast from int to double? nonnanyrs?
   	qhat[i] = mean_ind_over_bexp / nonnanyrs;
+
   	// qhat sometimes goes to NaN because bmid has gone to 1e-9
   	// So set up some hack for qhat to max out at 1e10 if NaN or Inf
-  	if(__isnan(qhat[i].getValue())) qhat[i] = 1e10;
-  	if (qhat[i].getValue() == INFINITY) qhat[i] = 1e10;
-  	//if(!isfinite(qhat[i].getValue())) qhat[i] = 1e10;
+//  	if(__isnan(qhat[i].getValue())) qhat[i] = 1e10;
+//  	if (qhat[i].getValue() == INFINITY) qhat[i] = 1e10;
+
     //Rprintf("end mean log ind grad: %f\n", mean_log_ind_over_bexp.getADValue());
   }
 }
@@ -304,6 +309,7 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
   // more interesting vars
   int nages = amax-amin+1;
   adouble fmax = 100;
+  //adouble fmax = 1e9;
   adouble* alpha = new adouble;
   adouble* beta = new adouble;
   adouble bmat_end_last;
@@ -360,18 +366,17 @@ void pop_dyn_Francis(adouble* bexp, adouble* b, adouble* f, adouble** n,
 adouble calc_logl_Francis(double** index, adouble* bexp, adouble* qhat,
                           int nindices, int nyrs, double indextime, double M, adouble* h)
 {
-      //chat2 <- apply((index[[index.count]] / sweep(bmid,1,qhat,"*") - 1)^2,c(1,6),sum,na.rm=T) / (n-2)
-	    //total.logl <- total.logl + (-n*log(sqrt(chat2)) -n*log(qhat) -apply(log(bmid[nonnaindexyears]),c(1,6),sum))
-// This is the current check I am using - bad!
-// if(any(bmid==0)) bmid[] <- 1e-9
+// Any extinct time series to return NA
+// This can be handled by BGFS solver in R, not L-BFGS-B
 
   adouble chat2, total_logl, log_bmid, bmid;
-  int i, j, index_count;
+  int i, j, k, index_count;
   int extinction = 0;
   total_logl = 0;
-  // if harvest has maxed out set all bmids to 1e-9
+  // if harvest has maxed out set flag that at some point the stock
+  // went extinct
   for (j=0; j<nyrs; j++)
-    if (h[j].getValue() == 100) extinction = 1;
+    if (h[j].getValue() >= (100-1)) extinction = 1;
 
 
   for (i=0; i < nindices; i++)
@@ -385,14 +390,17 @@ adouble calc_logl_Francis(double** index, adouble* bexp, adouble* qhat,
       {
         index_count++;
         bmid = bexp[j]*exp(-indextime*(M+h[j]));
-        // this is dangerous
-//        Rprintf("bmid: %f\n", bmid.getValue());
-//        if(__isnan(bmid.getValue())) Rprintf("Yes, I am a nan\n");
-        if(__isnan(bmid.getValue())) bmid = 1e-9;
-        if (extinction == 1) bmid = 1e-9;
 
-        //Rprintf("bmid again: %f\n", bmid.getValue());
-        //bmid = max(bmid,1e-9);
+        // if harvest == Fmax set bmid to 0
+        // This is to get around different fmaxes affecting bmid (and hence logl)
+        if (h[j].getValue() >= (100-1)) bmid=0;
+
+//        if(__isnan(bmid.getValue())) bmid = 1e-9;
+        // If stock goes extinct at any time then set all bmids to 1e-9
+        //if (extinction == 1) bmid = 1e-9;
+        // If stock goes extinct at any time then set all bmids to 0
+//        if (extinction == 1) bmid = 0;
+
         // qhat can also be NaN
         chat2 = chat2 + pow((index[i][j] / (qhat[i] * bmid)) - 1,2);
         //if (chat2==INFINITY)
@@ -405,13 +413,17 @@ adouble calc_logl_Francis(double** index, adouble* bexp, adouble* qhat,
 //          Rprintf("qhat[%i]: %f\n", i,qhat[i].getValue());
         //}
         log_bmid = log_bmid + log(bmid);
-        //Rprintf("log_bmid: %f", log_bmid.getValue());
+//        Rprintf("log_bmid: %f", log_bmid.getValue());
       }
     }
     chat2 = chat2 / (index_count-2);
-    //Rprintf("chat2: %f\n", chat2.getValue());
+//    Rprintf("chat2: %f\n", chat2.getValue());
+//    Rprintf("qhat[0]: %f\n", qhat[0].getValue());
+//    Rprintf("log_bmid: %f\n", log_bmid.getValue());
     total_logl = total_logl + (-index_count*log(sqrt(chat2)) - index_count*log(qhat[i]) - log_bmid);
   }
+  // brutal hack to avoid NA
+  //if (__isnan(total_logl.getValue())) total_logl = -1e9;
   return total_logl;
 }
 
