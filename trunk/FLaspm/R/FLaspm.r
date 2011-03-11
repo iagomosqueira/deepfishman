@@ -455,8 +455,11 @@ JohnsonPDF <- function(parms,b)
   delta <- parms["delta"]
   xi <- parms["xi"]
   lambda <- parms["lambda"]
-  q <- g + delta*asinh((b-xi)/lambda)
-  return(dnorm(q,mean=0,sd=1))
+  z <- (b - xi) / lambda
+  return((delta / (lambda * sqrt(2*pi) * sqrt(z^2 + 1))) *
+        exp(-0.5*(g + delta*asinh(z))^2))
+#  q <- g + delta*asinh((b-xi)/lambda)
+#  return(dnorm(q,mean=0,sd=1))
 }
 
 Johnsonll <- function(parms,b,m,p)
