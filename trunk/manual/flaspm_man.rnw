@@ -72,7 +72,12 @@ The Francis model assumes that fishing mortality occurs steadily throughout
 the year. The Walters model assumes that the fishing mortality happens
 as a 'pulse' at the end of the year. This is described in more detail below. 
 
-%The models also differ in the parameters estimated....
+The models also differ in the parameters estimated. The Francis model only
+estimates $B_0$ ($\sigma^2$ and $\hat{q}$ are approximated) whereas the Walters model 
+estimates both $B_0$ and $\sigma^2$ ($\hat{q}$ is still approximated).
+
+Statistical uncertainty is dealt with differently too. MORE HERE.
+
 % B0, q and F for francis
 % B0, q and sigma2 for walters
 
@@ -148,20 +153,25 @@ distribution around the abundance index.
 
 % likelihood function
 
-The fitting is carried out in a two stage process.
-First, a simulated annealing method is used. The number of iterations performed
-is controlled by the control argument $maxit$ (see below for an example).
-The default is 10000 iterations which may take a long time, particularly when
-the pure R version is used. The second stage uses a quasi-Newton method (BFGS).
-Convergence criteria for this stage can be set by the user (see the help file
-for $optim$ in R for control parameters).
-
 Before fitting is attempted, initial values are calculated (although these may
 be set by the user). If multiple iterations are to be fitted, by default
 initial values are only calculated for the first iteration. When the argument
 $always\_eval\_initial$ is set to TRUE, initial values are calculated for each
 iteration. This increases the fitting time but may improve the quality of the
 fit.
+
+The fitting is carried out in a two stage process.
+First, a simulated annealing method may be used. The number of iterations performed
+is controlled by the control argument $SANN_maxit$ (see below for an example).
+By default this is set to zero iterations and simulated annealing is not performed.
+Using simulated annealing may take a long time, particularly when
+the pure R version of the models are used. The second stage uses a quasi-Newton method (BFGS).
+Convergence criteria for this stage can be set by the user (see the help file
+for $optim$ in R for control parameters). By default the BFGS method is bounded
+(the optim method $L-BFGS-B$). However, this method is unable to cope with values that are not
+finite. The likelihood function for the Francis model is undefined for cases
+where the population goes extinct through fishing pressure. For this reason
+the unbounded $BFGS$ method must be used for this model.
 
 \subsection{Projecting forward}
 
@@ -191,21 +201,21 @@ First you need to load the $FLaspm$ library
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
-<<quiet=TRUE,echo=TRUE,results=verbatim>>=
+\begin{shaded}%
+<<quiet=TRUE,echo=TRUE,results=hide>>=
 library(FLaspm)
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
 To create an $FLaspm$ object you need to supply: the minimum and maximum ages
-($amin$ and $amax$) the $catch$, the $indices$,
+($amin$ and $amax$) the $catch$, the biomass $indices$,
 the natural mortality ($M$), the steepness of the SRR ($hh$), the selectivity ($sel$),
 the maturity ($mat$) and the mass-at-age ($wght$)).
 
-$amin$ and $amax$ are single numeric values. $catch$ must be an FLQuant. $index$
-must be an FLQuant, or if more than one index is provided, an FLQuants object.
+$amin$ and $amax$ are single numeric values. $catch$ must be an $FLQuant$. $index$
+must be an FLQuant, or if more than one index is provided, an $FLQuants$ object.
 The year dimensions of the indices must
 be the same as the catch. Any empty years should be $NA$. $M$ and $hh$ can be passed
 as single numeric values (they are represented as FLQuant objects in the class).
@@ -221,7 +231,7 @@ Here we will use the New Zealand Orange Roughy data set from~\cite{Francis92}.
 % Not sure about the quiet argument
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=hide>>=
 # Load the data - here's some I prepared earlier
 data(NZOR)
@@ -230,16 +240,16 @@ index <- NZOR[["index"]]
 # Check the dimensions are OK
 dimnames(catch)
 dimnames(index)
-# Note that index has NA in some years
+# Note that index has NA in some years but number of years is same as catch
 # Enter the parameter values
-amin    <- 1
-amax    <- 70
+amin    <- 1 # minimum age
+amax    <- 70 # maximum age
 hh <- 0.95 # steepness
 M <- 0.05 # natural mortality of all ages
 mat_age <- 23 # age of maturity
 sel_age <- 23 # age of selectivity by fishery
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
@@ -249,21 +259,21 @@ and then create an age structured FLQuant for the masses.
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=hide>>=
 # age-length parameters
 Linf  <- 42.5 #cm
 k     <- 0.059
 t0    <- -0.346
 # length-weight
-alpha <- 0.0963 # grams
+alpha <- 0.0963
 beta  <- 2.68
 # Set up FLQuant objects for weights
 # Note that we convert the mass at age to tonnes
 mass_at_age <- age_to_weight(amin:amax,Linf,k,t0,alpha,beta)
 w <- FLQuant(mass_at_age, dimnames=list(age=amin:amax)) / 1e6
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
@@ -272,63 +282,69 @@ passing the data:
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=hide>>=
 or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, amax=amax, amin=amin)
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
-The final stage is to set which model we will use: Francis or Edwards.
+The final stage is to set which model we will use: Francis or Walters.
 Here we will use the Francis model. As mentioned above, each model
 has two versions, one that is written in pure R, the other uses C. The results
-from both are the same. The C version is faster so it is better to use that:
+from both are the same. The C version is faster so it is better to use that.
+Additionally, the C version uses automatic differentiation (REF ADOLC) to
+accurately calculate the gradients used by the solver. This assists the solver.
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=hide>>=
-model(or) <- aspm.Francis.C()
+model(or) <- aspm.Francis.CAD()
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
 Setting the model also sets up a function to calculate the initial values for the fitted parameters (in
 this case $B_{0}$). It is possible to specify your own but unless you have a good
 reason to do so (such as problems with the fit) then you should use the default
-setting. To estimate the parameters use the $fmle()$ method:
+setting. To estimate the parameters use the $fmle()$ method. As mentioned above
+for the Francis model we need to specify that the unbounded BFGS method is used.
+In this example, we also do not use simmulated annealing (the default number of
+iterations for the $SANN$ solver is 0).
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=hide>>=
-or <- fmle(or)
+or <- fmle(or,method="BFGS")
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
 After fitting it is essential to check the quality of the fit by looking
 at the likelihood profile. This can be done with the $profile()$ method. The
-range argument can be used to explore the likelihood either side of the estimated
-parameter value. You should see that the value of the fitted parameter occurs at the
+$range$ argument can be used to explore the likelihood either side of the estimated
+parameter value. You should see that the value of the fitted parameter (the dot
+on the plot) occurs at the
 maximum likelihood (see Figure~\ref{fig:or_profile}).
 
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE, fig=FALSE, keep.source=TRUE,results=hide,eval=FALSE>>=
 profile(or,maxsteps=50,range=0.25)
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
-
+% Produces the plot and captions it
 \begin{figure}[!hb]
 \begin{center}
 %\begin{shaded}%
@@ -346,11 +362,11 @@ $params()$ method:
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=verbatim>>=
 params(or)
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
@@ -361,30 +377,30 @@ $exp.biomass.mid()$ method:
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=verbatim>>=
 exp.biomass.mid(or,yrfrac = 0.5,virgin=TRUE)[,1]
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
 Francis estimates the value of midyear virgin biomass as 411000
 tonnes~\cite{Francis92}. So our
-estimate is pretty good. We can also check out estimated value of $q_{hat}$ with
+estimate is pretty good. We can also check out estimated value of $\hat{q}$ with
 the $calc.qhat()$ method:
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=verbatim>>=
 calc.qhat(or)
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
-Francis reports the estimated value of $q_{hat}$ to be 0.59~\cite{Francis92}.
+Francis reports the estimated value of $\hat{q}$ to be 0.59~\cite{Francis92}.
 
 %****************************************************************************
 \subsection{Estimating a probability distribution for $B_{0}$}
@@ -400,7 +416,7 @@ Francis the procedure is as follows:
 \item Calculate the biomass history for this trial $B_{0}$.
 \item Generate simulated indices by assuming that the indices are normally
 distributed with a mean value equal to the corresponding value in the biomass
-history and with a CV of 19\% (estimated by Francis).
+history and with a CV of 15\% (estimated by Francis).
 \item Calculate the value of $B_{0sim}$ that maximises the likelihood estimate
 for the simulated survey indices.
 \item Repeat steps 1-4 100 times and calculate the proportion of the $B_{0sim}$
@@ -412,35 +428,41 @@ This process is relatively easy to carry out using $FLaspm$ because multiple
 iterations can be processed in parallel.
 A sequence of $B_{0trial}$ values at
 the start of the year is calculated. These are looped over using a $for$ loop.
-The midyear biomass history for each
+The history of biomass in the middle of the year for each
 value of $B_{0}$ is calculated by setting the $params()$ value to the trial
 $B_{0}$ value and using the $exp.biomass.mid()$ method.
 The simulated index is generated using the R function $rnorm()$. It is possible
-to generate all 100 iterations simultaneously. A new $FLaspm$ object is set up
+to generate all 100 iterations simultaneously.
+The simulated index should only have data in the years which the original index series had data.
+A new $FLaspm$ object is set up
 using the simulated index and the value of $B_{0sim}$ that maximises the
 likelihood for each iteration is calculated. The R code for this procedure using the New Zealand Orange Roughy
-data is shown below:
+data is shown below. This may take a little while to run.
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=hide,eval=FALSE>>=
-index.cv <- 0.19
+index.cv <- 0.15
 niters <- 100
 # Estimate the 'true' value of B0
 or_true <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
-model(or_true) <- aspm.Francis.C()
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+model(or_true) <- aspm.Francis.CAD()
 or_true <- fmle(or_true)
 B0_true <- params(or_true)['B0',]
 # Set up another FLaspm object to calculate the biomass trajectory
 or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
-model(or) <- aspm.Francis.C()
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+model(or) <- aspm.Francis.CAD()
 # Set up sequence of trial B0 values
-B0trial <- seq(from=300000,to=500000,length=10)
+Bmidtrial <- seq(from=350000,to=600000,by=25000)
+B0trial <- Bmidtrial*exp(0.5*M)
 # Array to store estimated B0 values
 B0store <- array(NA,dim=c(length(B0trial),niters))
+# Set up the years for which is there should be no index data
+na.years <- dimnames(index)$year[which(is.na(index))]
+# Loop over each value of B0
 for (i in 1:length(B0trial))
 {
   # set the B0 value and evalutate the midyear biomass trajectory
@@ -448,16 +470,18 @@ for (i in 1:length(B0trial))
   or.traj.mid <- exp.biomass.mid(or,yrfrac=0.5,virgin=F)
   # generate 100 random indices based on the biomass trajectory
   index.sim <- rnorm(niters,or.traj.mid,index.cv*or.traj.mid)
+  # Set the appropriate index years to NA
+  index.sim[,na.years] <- NA
   # Set up an FLaspm object to fit all indices
   or.sim <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, amax=amax, amin=amin)
-  model(or.sim) <- aspm.Francis.C()
+  model(or.sim) <- aspm.Francis.CAD()
   # Fit all indices (takes a while...) and store the estimated value of B0
-  or.sim <- fmle(or.sim)
+  or.sim <- fmle(or.sim,method="BFGS")
   B0store[i,] <-(params(or.sim))
 }
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
@@ -466,18 +490,22 @@ for (i in 1:length(B0trial))
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
 <<echo=FALSE,results=hide>>=
-index.cv <- 0.19
+index.cv <- 0.15
 niters <- 100
+# Estimate the 'true' value of B0
 or_true <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
-model(or_true) <- aspm.Francis.C()
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+model(or_true) <- aspm.Francis.CAD()
 or_true <- fmle(or_true)
 B0_true <- params(or_true)['B0',]
+# Set up another FLaspm object to calculate the biomass trajectory
 or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin)
-model(or) <- aspm.Francis.C()
-B0trial <- seq(from=300000,to=500000,length=10)
-load("B0store.RData")
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+model(or) <- aspm.Francis.CAD()
+# Set up sequence of trial B0 values
+Bmidtrial <- seq(from=350000,to=600000,by=25000)
+B0trial <- Bmidtrial*exp(0.5*M)
+load("B0storeAD.RData")
 @
 %\end{shaded}%
 \end{minipage}
@@ -489,12 +517,12 @@ cab then be calculated and plotted (see Figure~\ref{fig:or_probB0_OR}).
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE, fig=FALSE, eval=TRUE>>=
 propB0 <- apply(B0store>=c(B0_true),1,sum) / niters
 plot(B0trial,propB0,type="l")
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
@@ -516,31 +544,34 @@ $FLaspm$ package.
 The area under the PDF curve between two value of $B_{0}$ is proportional to
 the confidence that the true value of $B_{0}$ lies between these two values
 (see Figure ~\ref{fig:or_pdfB0_OR}).
+To allow comparison with Francis we use the midyear biomasses here (the
+probabilities will be the same).
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE, fig=FALSE, keep.source=TRUE,results=hide>>=
 initialparms <- c(g=-1,delta=1,xi=0,lambda=1)
-# Scale B0trial by 1000 to help the fit
-jcpars <- optim(par=initialparms,fn=Johnsonll,b=B0trial/1000,m=niters,p=propB0)$par
-B0plot <- seq(from=min(B0trial/1000), to = max(B0trial/1000), length=100)
-jp <- JohnsonPDF(jcpars,B0plot)
-plot(B0plot,jp,type="l")
+jcpars <- optim(par=initialparms,fn=Johnsonll,b=Bmidtrial/1000,m=niters,p=propB0)$par
+Bmidplot <- seq(from=300,to=600,length=100)
+jp <- JohnsonPDF(jcpars,Bmidplot)
+plot(Bmidplot,jp,type="l",xlab="Mid year biomass (000 t)", ylab="Probability")
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
 \begin{figure}[!hb]
 \begin{center}
 <<echo=FALSE, fig=TRUE, results=hide>>=
-plot(B0plot,jp,type="l")
+plot(Bmidplot,jp,type="l",xlab="Mid year biomass (000 t)", ylab="Probability")
 @
 \end{center}
 \caption{Estimated probability density function of $B_{0}$}
 \label{fig:or_pdfB0_OR}
 \end{figure}
+
+The plotted PDF is equivalent to that published by Francis.
 
 %****************************************************************************
 \subsection{Sensitivity analysis}
@@ -555,19 +586,19 @@ as a vector.
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=hide>>=
 # Natural mortality is now a sequence from 0.025 to 0.1 in steps of 0.025
 Msens <- seq(from=0.025, to = 0.1, by = 0.025)
 or <- FLaspm(catch=catch, index=index, M=Msens,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, amax=amax, amin=amin)
-              model(or) <- aspm.Francis.C()
+              model(or) <- aspm.Francis.CAD()
 # Look at natural mortality to see that it is now 4 different values
 c(or@M)
 # Fit all iterations
-or <- fmle(or)
+or <- fmle(or, method="BFGS")
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
@@ -576,12 +607,12 @@ now four values in the $params$ slot. These can be inspected:
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=verbatim>>=
 # Use c() to split apart the iterations
 c(params(or))
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
@@ -589,16 +620,15 @@ Again, we can compare our result
 with Francis by calculating the midyear exploitable virgin biomass and
 looking at qhat:
 
-%calc.qhat(or) - broken for iterations
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=verbatim>>=
 c(exp.biomass.mid(or,yrfrac = 0.5,virgin=TRUE)[,1])
 c(calc.qhat(or)[[1]])
 @
-%\end{shaded}%
+\end{shaded}%
 \end{minipage}
 \end{center}
 
@@ -638,9 +668,10 @@ First we set up the additional parameters and TAC schedules:
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}
+\begin{shaded}%
 <<echo=TRUE,keep.source=TRUE,results=hide,eval=TRUE>>=
 # Set up additional parameters
-iters <- 200
+iters <- 500
 sigmaR <- 1.2
 fcollapse <- 1
 # Set up future catch schedules as an array
@@ -652,14 +683,16 @@ TAC_schedules[4,] <- c(28637,19637,10637,7500,7500,7500)
 TAC_schedules[5,] <- c(28637,16637,7500,7500,7500,7500)
 prop_collapse <- rep(NA,dim(TAC_schedules)[1])
 @
+\end{shaded}%
 \end{minipage}
 \end{center}
 
 Now we loop over the TAC schedules and perform 200 simulations
-for each schedule
+for each schedule. This may take a little while.
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}
 <<echo=TRUE, keep.source=TRUE,results=hide, eval=FALSE>>=
 for (schedule in 1:dim(TAC_schedules)[1])
 {
@@ -674,21 +707,24 @@ for (schedule in 1:dim(TAC_schedules)[1])
   sr_res[,ac(1990:1995)] <- rlnorm(iters * (1995-1990+1),meanlog=0,sdlog=sigmaR)
   # Set up FLaspm object with the new catch and sr_res
   or <- FLaspm(catch=catch_proj, index=index_proj, M=M,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, fpm=1, amax=amax, amin=amin,sr_res=sr_res)
-  model(or) <- aspm.Francis.C()
+              mat=mat_age, wght=w, amax=amax, amin=amin,sr_res=sr_res)
+  model(or) <- aspm.Francis.CAD()
   # Set up B0 values from previously fitted Johnson distribution
-  # Remember we scaled B0 by 1000 for the fit
+  # Remember we scaled B0 by 1000 for the fit and that the probability
+  # distribution was for Bmid
   params(or) <- propagate(params(or),iters)
-  params(or)["B0",] <- rJohnson(iters,jcpars)*1000
+  Bmid <- rJohnson(iters,jcpars)*1000
+  params(or)["B0",] <- Bmid*exp(0.5*M)
   # Project forward
   or.proj <- calc.pop.dyn(or)
   # Who has collapsed? (F >= 1)at any time during the projection
   prop_collapse[schedule] <- length(which(apply(or.proj[["harvest"]]>=fcollapse,6,sum)>0))/iters
 }
 @
+\end{shaded}
 \end{minipage}
 \end{center}
-
+% save(prop_collapse,file="~/Work/deepfishman/trunk/manual/prop_collapse.RData")
 % load in previously saved results
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
