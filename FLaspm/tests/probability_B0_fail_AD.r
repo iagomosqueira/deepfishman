@@ -35,7 +35,8 @@ mass_at_age <- age_to_weight(amin:amax,Linf,k,t0,alpha,beta)
 w <- FLQuant(mass_at_age, dimnames=list(age=amin:amax)) / 1e6
 
 index.cv <- 0.15 # upper estimate 0.19
-niters <- 500
+#index.cv <- 0.19
+niters <- 250
 
 or_true <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, amax=amax, amin=amin)
@@ -52,17 +53,17 @@ B0trial <- Bmidtrial*exp(0.5*M)
 B0store <- array(NA,dim=c(length(B0trial),niters))
 
 set.seed(0)
-#na.years <- dimnames(index)$year[which(is.na(index))]
-# one more year
-na.years <- as.character(1978:1982)
-# two more
-na.years <- as.character(1978:1981)
-# 3 more
-na.years <- as.character(1978:1980)
-# 4 more
-na.years <- as.character(1978:1979)
-# 5 more
-na.years <- as.character(1978)
+na.years <- dimnames(index)$year[which(is.na(index))]
+## one more year
+#na.years <- as.character(1978:1982)
+## two more
+#na.years <- as.character(1978:1981)
+## 3 more
+#na.years <- as.character(1978:1980)
+## 4 more
+#na.years <- as.character(1978:1979)
+## 5 more
+#na.years <- as.character(1978)
 
 for (i in 1:length(B0trial))
 {
@@ -76,16 +77,16 @@ for (i in 1:length(B0trial))
   {
     index.sim <- rnorm(niters,or.traj.mid,index.cv*or.traj.mid)
     # index.sim should have same years as original index
-#    index.sim[,na.years] <- NA
-    # apply(index.sim,2,mean)
-    # cv(index.sim)
+    index.sim[,na.years] <- NA
+    #apply(index.sim,2,mean)
+    #    cv(index.sim)
 
     or.sim <- FLaspm(catch=catch, index=index.sim, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, amax=amax, amin=amin)
     model(or.sim) <- aspm.Francis.CAD()
     #model(or.sim) <- aspm.Francis()
     #or.sim <- fmle(or.sim,always_eval_initial=TRUE,SANN_maxit=0,control=list(trace=0))
-    or.sim <- fmle(or.sim,always_eval_initial=TRUE,method="BFGS")
+    or.sim <- fmle(or.sim,always_eval_initial=TRUE,method="BFGS",control=list(trace=0))
     B0store[i,] <-(params(or.sim))
   }
 }
@@ -93,7 +94,8 @@ for (i in 1:length(B0trial))
 
 
 #save(B0store,B0trial,file="C:/Projects/Deepfishman/deepfishman/trunk/B0storeAD.Rdata")
-save(B0store,na.years,B0trial,file="C:/Projects/Deepfishman/deepfishman/trunk/B0storeAD_plus6.Rdata")
+#save(B0store,na.years,B0trial,file="C:/Projects/Deepfishman/deepfishman/trunk/B0storeAD_plus6.Rdata")
+save(B0store,na.years,B0trial,file="~/Work/deepfishman/trunk/B0storeAD.Rdata")
 #load("C:/Projects/Deepfishman/deepfishman/trunk/B0store.Rdata")
 
 propB0 <- apply(B0store>=c(B0_true),1,sum) / niters
@@ -113,20 +115,19 @@ propBmid <- propBmid[!is.na(propBmid)]
 # Fit a Johnson's Su distribution to get the cumulative distribution function
 # Try fitting Johnson distribution with real data
 initialparms <- c(g=-1,delta=1,xi=0,lambda=1)
-jcpars <- optim(par=initialparms,fn=Johnsonll,b=Bmidtrial/1000,m=niters,p=propB0)$par
-B0plot <- seq(from=min(Bmidtrial/1000), to = max(Bmidtrial/1000), length=100)
-B0plot <- seq(from=300,to=600,length=100)
-jp <- JohnsonPDF(jcpars,B0plot)
-plot(B0plot,jp,type="l")
+jcpars <- optim(par=initialparms,fn=Johnsonll,b=Bmidtrial/1000,m=niters,p=propBmid)$par
+Bmidplot <- seq(from=300,to=600,length=100)
+jp <- JohnsonPDF(jcpars,Bmidplot)
+plot(Bmidplot,jp,type="l")
 lines(x=c(Bmid_true,Bmid_true)/1000,y=c(0,1),lty=2)
 
 # Reading from graph Francis has
-# Bmid   ~p    myP_index_all_years myP_index_with_NA_years c = 0.19
-# 350    0                          0.01 0
-# 380    0.08                       0.11 0.06
-# 400    0.35   0.192               0.35 0.32
-# 450    0.8    0.97                0.71 0.78
-# 500    0.92   1.0                 0.87 0.96
+# Bmid   ~p    me c = 0.15
+# 350    0      0       
+# 380    0.08   0.76      
+# 400    0.35   0.35
+# 450    0.8    0.77
+# 500    0.92   0.92
 
 rbind(Bmidtrial,propBmid)
 
