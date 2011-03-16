@@ -162,7 +162,7 @@ fit.
 
 The fitting is carried out in a two stage process.
 First, a simulated annealing method may be used. The number of iterations performed
-is controlled by the control argument $SANN_maxit$ (see below for an example).
+is controlled by the control argument $SANN\_maxit$ (see below for an example).
 By default this is set to zero iterations and simulated annealing is not performed.
 Using simulated annealing may take a long time, particularly when
 the pure R version of the models are used. The second stage uses a quasi-Newton method (BFGS).
@@ -295,7 +295,8 @@ The final stage is to set which model we will use: Francis or Walters.
 Here we will use the Francis model. As mentioned above, each model
 has two versions, one that is written in pure R, the other uses C. The results
 from both are the same. The C version is faster so it is better to use that.
-Additionally, the C version uses automatic differentiation (REF ADOLC) to
+Additionally, the C version uses automatic differentiation, implemented using the
+ADOL-C library~\cite{ADOLC}, to
 accurately calculate the gradients used by the solver. This assists the solver.
 
 \begin{center}
@@ -402,6 +403,93 @@ calc.qhat(or)
 
 Francis reports the estimated value of $\hat{q}$ to be 0.59~\cite{Francis92}.
 
+A basic $plot$ method has been created for $FLaspm$ objects. This plots the
+estimated index against the fitted index (see Figure~\ref{fig:or_plot})
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<echo=TRUE,eval=FALSE,results=hide>>=
+plot(or)
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+\begin{figure}[!hb]
+\begin{center}
+%\begin{shaded}%
+<<echo=FALSE, fig=TRUE, results=hide>>=
+plot(or)
+@
+%\end{shaded}%
+\end{center}
+\caption{Basic plot for the fitted Orange Roughy model}
+\label{fig:or_plot}
+\end{figure}
+%****************************************************************************
+\subsection{Sensitivity analysis}
+
+Sensitivity analysis can be used to evaluate the effects of uncertainty
+in the model parameters. For example, Francis estimates biomass
+for a range of values of natural mortality. This approach is applied here.
+Using the parameter values and code that was used in the deterministic
+assessment above, the only change is that natural mortality is now specified
+as a vector.
+
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<echo=TRUE,keep.source=TRUE,results=hide>>=
+# Natural mortality is now a sequence from 0.025 to 0.1 in steps of 0.025
+Msens <- seq(from=0.025, to = 0.1, by = 0.025)
+or <- FLaspm(catch=catch, index=index, M=Msens,hh=hh,sel=sel_age,
+              mat=mat_age, wght=w, amax=amax, amin=amin)
+              model(or) <- aspm.Francis.CAD()
+# Look at natural mortality to see that it is now 4 different values
+c(or@M)
+# Fit all iterations
+or <- fmle(or, method="BFGS")
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+Each value of M is treated as a seperate iteration. Consequently, there are
+now four values in the $params$ slot. These can be inspected:
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<echo=TRUE,keep.source=TRUE,results=verbatim>>=
+# Use c() to split apart the iterations
+c(params(or))
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+Again, we can compare our result
+with Francis by calculating the midyear exploitable virgin biomass and
+looking at qhat:
+
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<echo=TRUE,keep.source=TRUE,results=verbatim>>=
+c(exp.biomass.mid(or,yrfrac = 0.5,virgin=TRUE)[,1])
+c(calc.qhat(or)[[1]])
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+Francis estimates the virgin biomass for these values of M to be
+452000, 411000, 372000 and 336000 respectively and for qhat to be
+0.52, 0.59, 0.67 and 0.77. Again, we have good agreement with Francis.
+
 %****************************************************************************
 \subsection{Estimating a probability distribution for $B_{0}$}
 Francis provides a Monte Carlo routine for estimating a probability
@@ -490,13 +578,36 @@ for (i in 1:length(B0trial))
 \begin{minipage}[H]{0.95\textwidth}%
 %\begin{shaded}%
 <<echo=FALSE,results=hide>>=
+catch <- NZOR[["catch"]]
+index <- NZOR[["index"]]
+# Check the dimensions are OK
+dimnames(catch)
+dimnames(index)
+# Note that index has NA in some years but number of years is same as catch
+# Enter the parameter values
+amin    <- 1 # minimum age
+amax    <- 70 # maximum age
+hh <- 0.95 # steepness
+M <- 0.05 # natural mortality of all ages
+mat_age <- 23 # age of maturity
+sel_age <- 23 # age of selectivity by fishery
+Linf  <- 42.5 #cm
+k     <- 0.059
+t0    <- -0.346
+# length-weight
+alpha <- 0.0963
+beta  <- 2.68
+# Set up FLQuant objects for weights
+# Note that we convert the mass at age to tonnes
+mass_at_age <- age_to_weight(amin:amax,Linf,k,t0,alpha,beta)
+w <- FLQuant(mass_at_age, dimnames=list(age=amin:amax)) / 1e6
 index.cv <- 0.15
-niters <- 100
+niters <- 250
 # Estimate the 'true' value of B0
 or_true <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
               mat=mat_age, wght=w, amax=amax, amin=amin)
 model(or_true) <- aspm.Francis.CAD()
-or_true <- fmle(or_true)
+or_true <- fmle(or_true,method="BFGS")
 B0_true <- params(or_true)['B0',]
 # Set up another FLaspm object to calculate the biomass trajectory
 or <- FLaspm(catch=catch, index=index, M=M,hh=hh,sel=sel_age,
@@ -505,7 +616,7 @@ model(or) <- aspm.Francis.CAD()
 # Set up sequence of trial B0 values
 Bmidtrial <- seq(from=350000,to=600000,by=25000)
 B0trial <- Bmidtrial*exp(0.5*M)
-load("B0storeAD.RData")
+load("B0storeAD.Rdata")
 @
 %\end{shaded}%
 \end{minipage}
@@ -574,69 +685,6 @@ plot(Bmidplot,jp,type="l",xlab="Mid year biomass (000 t)", ylab="Probability")
 The plotted PDF is equivalent to that published by Francis.
 
 %****************************************************************************
-\subsection{Sensitivity analysis}
-
-Sensitivity analysis can be used to evaluate the effects of uncertainty
-in the model parameters. For example, Francis estimates biomass
-for a range of values of natural mortality. This approach is applied here.
-Using the parameter values and code that was used in the deterministic
-assessment above, the only change is that natural mortality is now specified
-as a vector.
-
-
-\begin{center}
-\begin{minipage}[H]{0.95\textwidth}%
-\begin{shaded}%
-<<echo=TRUE,keep.source=TRUE,results=hide>>=
-# Natural mortality is now a sequence from 0.025 to 0.1 in steps of 0.025
-Msens <- seq(from=0.025, to = 0.1, by = 0.025)
-or <- FLaspm(catch=catch, index=index, M=Msens,hh=hh,sel=sel_age,
-              mat=mat_age, wght=w, amax=amax, amin=amin)
-              model(or) <- aspm.Francis.CAD()
-# Look at natural mortality to see that it is now 4 different values
-c(or@M)
-# Fit all iterations
-or <- fmle(or, method="BFGS")
-@
-\end{shaded}%
-\end{minipage}
-\end{center}
-
-Each value of M is treated as a seperate iteration. Consequently, there are
-now four values in the $params$ slot. These can be inspected:
-
-\begin{center}
-\begin{minipage}[H]{0.95\textwidth}%
-\begin{shaded}%
-<<echo=TRUE,keep.source=TRUE,results=verbatim>>=
-# Use c() to split apart the iterations
-c(params(or))
-@
-\end{shaded}%
-\end{minipage}
-\end{center}
-
-Again, we can compare our result
-with Francis by calculating the midyear exploitable virgin biomass and
-looking at qhat:
-
-
-\begin{center}
-\begin{minipage}[H]{0.95\textwidth}%
-\begin{shaded}%
-<<echo=TRUE,keep.source=TRUE,results=verbatim>>=
-c(exp.biomass.mid(or,yrfrac = 0.5,virgin=TRUE)[,1])
-c(calc.qhat(or)[[1]])
-@
-\end{shaded}%
-\end{minipage}
-\end{center}
-
-Francis estimates the virgin biomass for these values of M to be
-452000, 411000, 372000 and 336000 respectively and for qhat to be
-0.52, 0.59, 0.67 and 0.77. Again, we have good agreement with Francis.
-
-%****************************************************************************
 \subsection{Risk analysis}
 Francis performs a simple risk analysis to evaluate the proposed strategy
 of reducing the TAC to a target level by a desired rate. A range of rates of
@@ -645,9 +693,13 @@ would collapse within five years. A collapsed fishery is said to have
 occurred if the fishing mortality >= 1 in any year.
 
 Two sources of uncertainty are used: initial virgin biomass and uncertainty
-in future recruitment. (NOTE: given that the age of selectivity is 23,
+in future recruitment.
+
+NOTE: given that the age of selectivity is 23,
 I do not see how variable recruitment will impact the fishery within the
-duration of the projections).
+duration of the projections.
+The results look similar to those reported by Francis but sufficiently different to
+raise suspicions.
 
 The procedure is as follows:
 \begin{enumerate}
@@ -738,10 +790,12 @@ load("prop_collapse.RData")
 Now we can plot the probability of collapse against the rate of TAC reduction.
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}
 <<echo=TRUE, eval=FALSE, fig=FALSE>>=
 plot(x=c(3000,5000,7000,9000,12000),y=prop_collapse,type="l",ylim=c(0,1),
   xlab="Rate of TAC reduction",ylab="Probability of collapse")
 @
+\end{shaded}
 \end{minipage}
 \end{center}
 
@@ -763,33 +817,27 @@ demonstrate a simple fit to multiple indicies.
 First we load the libraries, data and life history parameters
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-<<echo=TRUE, eval=FALSE, fig=FALSE>>=
+\begin{shaded}
+<<echo=TRUE, eval=TRUE, fig=FALSE>>=
 library(FLCore)
 library(FLaspm)
-
 load('IOalbacore.RData')
-
 #data(IOalbacore)        
-
 # age for model
 amax <- 9
 amin <- 1
-
 # steepness
 hh <- 0.75
-
 # natural mortality
 M <- 0.34
-
 # mean weight (tonnes)
 mw <- 0.014/1e3
-
 # age at commercial selectivity
 as <- 5
-
 # age at maturity
 am <- 5
 @
+\end{shaded}
 \end{minipage}
 \end{center}
 
@@ -798,10 +846,12 @@ index (for demonstration purposes only) by adding log-normal noise with a $CV$ o
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-<<echo=TRUE, eval=FALSE, fig=FALSE>>=
+\begin{shaded}
+<<echo=TRUE, eval=TRUE, fig=FALSE>>=
 index1 <- IOalbacore$index * rlnorm(dim(IOalbacore$index)[2],0,sqrt(log(1 + 0.1)^2))
 index2 <- IOalbacore$index * rlnorm(dim(IOalbacore$index)[2],0,sqrt(log(1 + 0.1)^2))
 @
+\end{shaded}
 \end{minipage}
 \end{center}
 
@@ -809,31 +859,46 @@ We can then create the $FLaspm$ object.
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-<<echo=TRUE, eval=FALSE, fig=FALSE>>=
+\begin{shaded}
+<<echo=TRUE, eval=TRUE, fig=FALSE>>=
 alb.mi <- FLaspm(catch=IOalbacore$catch,
               index=FLQuants(index1=index1,index2=index2),
               M=M,hh=hh,sel=as, mat=am,wght=mw,amax=amax, amin=amin)
 
 model(alb.mi) <- aspm.Edwards.C()
 @
+\end{shaded}
 \end{minipage}
 \end{center}
 
-Finally we fit the model 
+Finally we fit the model using fmle. As we are attempting to estimate two parameters it is safer to
+also include some simulated annealing at the start of the fitting process: 
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
-<<echo=TRUE, eval=FALSE, fig=FALSE>>=
-alb.mi <- fmle(alb.mi)
+\begin{shaded}
+<<echo=TRUE, eval=TRUE, fig=FALSE, results=hide>>=
+alb.mi <- fmle(alb.mi, SANN_maxit=5000)
 @
+\end{shaded}
 \end{minipage}
 \end{center}
 
-and plot the results (Figure \ref{fig:alb_predI}).
+and plot the results with the $plot$ method. (Figure \ref{fig:alb_predI}).
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}
+<<echo=TRUE, eval=FALSE, fig=FALSE>>=
+plot(alb.mi)
+@
+\end{shaded}
+\end{minipage}
+\end{center}
 
 \begin{figure}
 \begin{center}
-<<echo=TRUE, eval=TRUE, fig=TRUE>>=
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide>>=
 plot(alb.mi)
 @
 \end{center}
@@ -844,17 +909,26 @@ plot(alb.mi)
 We can check the model estimates of $B0$ and $\sigma^2$ using a two
 dimensional likelihood plot (Figure \ref{fig:alb_profLk}).
 
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}
+<<echo=TRUE, eval=FALSE, fig=FALSE>>=
+profile(alb.mi,maxsteps=50)
+@
+\end{shaded}
+\end{minipage}
+\end{center}
+
+
 \begin{figure}
 \begin{center}
-<<echo=TRUE, eval=TRUE, fig=TRUE>>=
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide>>=
 profile(alb.mi,maxsteps=50)
 @
 \end{center}
 \caption{Two dimensional profile likelihood of $B0$ and $\sigma^2$ model estimates for Indian Ocean albacore}
 \label{fig:alb_profLk}
 \end{figure}
-
-
 
 
 
