@@ -2,7 +2,7 @@
 # Looks same as *nix one
 PKG_CPPFLAGS = -I../inst/include -Ic:/R/library/Rcpp/include
 PKG_CFLAGS = -I../inst/include
-#PKG_LIBS = $(SUBLIBS) $(R_HOME)/library/FLCore/libs/i386/FLCore.dll
+PKG_LIBS = $(SUBLIBS) $(shell $(R_HOME)/bin/${R_ARCH}/Rterm.exe --slave -e 'cat(system.file("lib", package="Rcpp"))')/${R_ARCH}/libRcpp.a
 
 
 MkInclude = $(RHOME)/etc/Makeconf
