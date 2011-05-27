@@ -4,7 +4,7 @@ Version: 0.1
 Author: Finlay Scott <finlay.scott@cefas.co.uk>
 Description: Surplus Production Models
 Depends: FLCore(>= 2.2)
-LinkingTo: FLCore
+LinkingTo: FLCore, Rcpp
 Maintainer: Finlay Scott <finlay.scott@cefas.co.uk>
 License: GPL 2.0
 lazyLoad: Yes
