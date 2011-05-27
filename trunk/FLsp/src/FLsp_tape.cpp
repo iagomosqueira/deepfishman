@@ -1,8 +1,10 @@
 // FLsp
 
-#define ADOLC_TAPELESS // Going to use the tapeless method
-#include "adouble.h" // only this is needed for tapeless
-typedef adtl::adouble adouble; // necessary for tapeless - see manual
+//#define ADOLC_TAPELESS // Going to use the tapeless method
+//#include "adouble.h" // only this is needed for tapeless
+//typedef adtl::adouble adouble; // necessary for tapeless - see manual
+
+#include <adolc.h>
 #include <stdlib.h>
 
 // use Rcpp
@@ -23,18 +25,10 @@ void q_obs_mult_log(adouble* B, adouble* q, NumericVector I);
 void ll_obs(adouble* B, NumericVector C, NumericVector I, adouble* q, adouble* Ihat, adouble* sigma2, adouble* ll);
 
 
-RcppExport SEXP testflspCpp(SEXP C_sexp)
-{
-  //Rprintf("In testflspCpp\n");
-  NumericVector C(C_sexp);
-  C(0) = C(0) * 2;
-  return wrap(C);
-}
-
-RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP k_sexp)
+RcppExport SEXP flspCpp_tape(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP k_sexp)
 {
   //Rprintf("In flspCpp\n");
-  int i;
+  int i, j;
 
   NumericVector C(C_sexp);
   NumericVector I(I_sexp);
@@ -46,78 +40,88 @@ RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP
   // Make a vector for Biomass, same size as the Catch
   //NumericVector B(clone(C));
   NumericVector B(nyrs);
-  adouble* B_ad = new adouble[nyrs];
   NumericVector Ihat(nyrs);
   NumericVector res(nyrs);
   NumericVector res_grad_r(nyrs);
   NumericVector res_grad_k(nyrs);
-  adouble* Ihat_ad = new adouble[nyrs];
-
-  // We could estimate Binit, r, k and q
-  // But Binit and q are impossible to estimate
-  // So Binit = k and q is estimated depending on error structure
-  adouble r_ad, k_ad;
-  adouble* q = new adouble;
-  *q = 0;
-  adouble* sigma2 = new adouble;
-  *sigma2 = 0;
-  adouble* ll = new adouble;
-  *ll = 0;
-
-
-  // initialise
-  r_ad = as<double>(r_sexp);
-  k_ad = as<double>(k_sexp);
-
     double ll_grad_r;
     double ll_grad_k;
+    double ll;
+    int tag=0;
 
-// Tapeless evaluation
-// Might be quicker to do this taped rather than repeating the code
-// Evaluate with r
-  r_ad.setADValue(1);
-  k_ad.setADValue(0);
+  // Active variables
+  adouble* B_ad = new adouble[nyrs];
+  adouble* Ihat_ad = new adouble[nyrs];
+  adouble r_ad, k_ad;
+  adouble* rk = new adouble[2];
+  adouble* q = new adouble;
+  adouble* sigma2 = new adouble;
+  adouble* ll_ad = new adouble;
+
+  
+  // Start the tape
+    trace_on(tag);
+    
+  // initialise
+    r_ad <<= as<double>(r_sexp);
+    k_ad <<= as<double>(k_sexp);
+    //rk[0] <<= as<double>(r_sexp);
+    //rk[1] <<= as<double>(k_sexp);
+
   // initialise B0 - should be part of the solving loop?
   B_ad[0] = k_ad;
-  project_biomass(B_ad, C, p, r_ad, k_ad);
+  *q = 0;
+  *sigma2 = 0;
+  *ll_ad = 0;
+    project_biomass(B_ad, C, p, r_ad, k_ad);
+    //project_biomass(B_ad, C, p, rk[0], rk[1]);
+
   q_obs_mult_log(B_ad, q, I);
-  ll_obs(B_ad, C, I, q, Ihat_ad, sigma2, ll);
-  ll_grad_r = (*ll).getADValue();
-  for (i=0; i<C.size(); i++)
-    res_grad_r(i) = (I(i) - Ihat_ad[i]).getADValue();
+  ll_obs(B_ad, C, I, q, Ihat_ad, sigma2, ll_ad);
+  *ll_ad >>= ll;
+  
+  trace_off();
 
-// Evaluate with k
-  r_ad.setADValue(0);
-  k_ad.setADValue(1);
-  // initialise B0 - should be part of the solving loop?
-  B_ad[0] = k_ad;
-  project_biomass(B_ad, C, p, r_ad, k_ad);
-  q_obs_mult_log(B_ad, q, I);
-  ll_obs(B_ad, C, I, q, Ihat_ad, sigma2, ll);
-  ll_grad_k = (*ll).getADValue();
-  for (i=0; i<C.size(); i++)
-    res_grad_k(i) = (I(i) - Ihat_ad[i]).getADValue();
+  // interrogate tape
+  // get gradients (d ll / d r and d ll / dk)
 
+  double* indeps = new double[2];
+  indeps[0] = as<double>(r_sexp);
+  indeps[1] = as<double>(k_sexp);
+  double* grads = new double[2];
 
+  gradient(tag,2,indeps,grads);
+
+  // get hessian
+  double** H = new double*[2];
+  for (i=0; i<2; i++)
+     H[i] = new double[2]; 
+  hessian(tag,2,indeps,H);
+  NumericMatrix Hout(2,2);
+  for (i=0;i<2;i++)
+      for(j=0;j<2;j++)
+	  Hout(i,j) = H[i][j];
 
   for (i=0; i<C.size(); i++)
   {
-    B(i) = B_ad[i].getValue();
-    Ihat(i) = Ihat_ad[i].getValue();
+    B(i) = B_ad[i].value();
+    Ihat(i) = Ihat_ad[i].value();
     res(i) = I(i) - Ihat(i);
   }
+ 
+//return List::create(Named("I",I));
 
 return List::create(Named("B",B),
                     Named("Ihat",Ihat),
-                    Named("qhat",(*q).getValue()),
-                    Named("sigma2",(*sigma2).getValue()),
-                    Named("ll",(*ll).getValue()),
-                    Named("ll_grad_r",ll_grad_r),
-                    Named("ll_grad_k",ll_grad_k),
-		    Named("res",res),
-		    Named("res_grad_r",res_grad_r),
-		    Named("res_grad_k",res_grad_k)
+                    Named("qhat",(*q).value()),
+                    Named("sigma2",(*sigma2).value()),
+                    Named("ll",ll),
+                    Named("ll_grad_r",grads[0]),
+                    Named("ll_grad_k",grads[1]),
+		    Named("hessian",Hout),
+		    Named("res",res)
                     );
+
 }
 
 void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k)
@@ -128,7 +132,6 @@ void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k
   for (yr = 1; yr<C.size(); yr++)
   {
     B[yr] = B[yr-1] + (r / p) * B[yr-1] * (1 - pow((B[yr-1] / k),p)) - C(yr-1);
-    //if (B[yr] <= 0) B[yr] = 1e-9;
     B[yr] = fmax(B[yr],1e-9);
   }
   //Rprintf("Leaving project biomass\n");
@@ -148,12 +151,14 @@ void q_obs_mult_log(adouble* B, adouble* q, NumericVector I)
   *q = 0;
   n = 0;
   for (yr = 0; yr<I.size(); yr++)
+  {
     // check if index has a value
-    if (!__isnan(I(yr)))
-    {
+    //if (!__isnan(I(yr)))
+    //{
       n++;
       *q = *q + log(I(yr) / B[yr]);
-    }
+    //}
+  }
   *q = exp(*q / n);
 }
 
@@ -177,24 +182,28 @@ void ll_obs(adouble* B, NumericVector C, NumericVector I, adouble* q, adouble* I
   n = 0;
   *sigma2 = 0;
   for (yr = 0; yr<C.size(); yr++)
+  {
     // check if index has a value
-    if (!__isnan(I(yr)))
-    {
+    //if (!__isnan(I(yr)))
+    //{
       n++;
       vhat_ad[yr] = log(I(yr) / Ihat[yr]);
       *sigma2 = *sigma2 + pow(vhat_ad[yr],2);
-    }
+    //}
+  }
   *sigma2 = *sigma2 / n;
 
   n = 0;
   *ll = 0;
   for (yr = 0; yr<C.size(); yr++)
+  {
     // check if index has a value
-    if (!__isnan(I(yr)))
-    {
+    //if (!__isnan(I(yr)))
+    //{
       n++;
       *ll = *ll - pow(vhat_ad[yr],2) / (2 * *sigma2);
-    }
+    //}
+  }
     *ll = *ll - n * log (sqrt(2*pi* *sigma2));
 }
 
