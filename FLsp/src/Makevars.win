@@ -9,7 +9,7 @@ MkInclude = $(RHOME)/etc/Makeconf
 CFLAGS = -O0 -ggdb -Wall
 CXXFLAGS = -O0 -ggdb -Wall
 
-SOURCES_C = FLsp.cpp
+SOURCES_C = FLsp.cpp FLsp_tape.cpp
 
 OBJECTS = $(SOURCES_C:.cpp=.o)
 
