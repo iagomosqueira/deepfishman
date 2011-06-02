@@ -1,4 +1,10 @@
 useDynLib("FLsp")
 import("FLCore",
 	"Rcpp")
-	
+exportClasses(
+	"FLsp")
+exportMethods(
+  "FLsp")
+export(
+	"sp")
+
