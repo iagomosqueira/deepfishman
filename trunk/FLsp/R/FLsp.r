@@ -3,7 +3,10 @@
 # Fitting function
 # methods for returning qhat, ll, sigma2 and so on
 # a plot
-
+# fix the model in the function - looks horrible
+# Fix fitted and residuals
+# predict
+# fixed
 
 # Surplus production model class
 # class FLsp
@@ -60,20 +63,43 @@ setMethod('FLsp', signature(model='missing'),
 sp <- function()
 {
   logl <- function(r, k, catch, index)
-		.Call("flspCpp",catch,index[[1]],r,1,k)[["ll"]]
-
+  {
+		res <- .Call("flspCpp",catch,index[[1]],r,1,k)[["ll"]]
+		if (is.nan(res)) res <- Inf # Fix for DEoptim
+  	if (is.na(res)) res <- Inf
+  	return(res)
+	}
 
   initial <- structure(function(catch)
 	{
-		# The function to provide initial values, probably never used
-    return(FLPar(r=1, k=c(max(catch)/10)))
+		# The function to provide initial values
+		# DEoptim does not use start values
+    return(FLPar(r=NA, k=NA))
 	},
 
   # lower and upper limits for optim()
 	lower=rep(1e-9, 2),
-	upper=rep(Inf, 2))
+	upper=rep(1e9, 2))
 
-	model  <- biomass ~ .Call("flspCpp",catch,index[[1]],r,1,k)[["B"]]
+	# awkward
+	model  <- index ~ indexhat(catch,index,r,k)
 
 	return(list(logl=logl, model=model, initial=initial))
 }
+
+#*******************************************************************************
+# Accessor things
+indexhat <- function(catch, index, r, k)
+{
+	res <- .Call("flspCpp",catch,index[[1]],r,1,k)
+	ihat <- FLQuant(res[["qhat"]]*res[["B"]])
+  indexhat_flqs <- FLQuants()
+#  for (i in 1:length(index))
+#    indexhat_flqs[[i]] <- FLQuant(indexhat_array[i,],dimnames=dimnames(catch))
+	indexhat_flqs[[1]] <- ihat
+  return(indexhat_flqs)
+}
+
+
+
+
