@@ -80,7 +80,35 @@ dktiny <- simple_diff(r,k+tiny)
 dll2dk2 <- (dktiny[2]-dorig[2])/tiny
 dll2drk <-(dktiny[1]-dorig[1])/tiny
 dll2dkr <-(drtiny[2]-dorig[2])/tiny
-# Hessian looks pretty damn good
+# My approximate Hessian looks pretty damn good
+#*******************************************************************************
+# Fit with DEoptim
+library(DEoptim)
+
+ll_objfun <- function(params,catch,cpue)
+{
+  r <- exp(params[1])
+  k <- exp(params[2])
+  #r <- exp(params[1])
+  #k <- exp(params[2])
+  res <- .Call("flspCpp",catch,cpue,r,1,k)
+  if (is.nan(res[["ll"]])) res[["ll"]] <- -Inf
+  if (is.na(res[["ll"]])) res[["ll"]] <- -Inf
+  cat("r: ", r, "\n")
+  cat("k: ", k, "\n")
+  cat("ll: ", -res[["ll"]], "\n")
+  return(-res[["ll"]])
+}
+
+testde <- DEoptim(fn=ll_objfun,lower=log(c(1e-9,1e-9)),upper=log(c(1e9,1e9)),control=DEoptim.control(trace=TRUE),catch=data$catch,cpue=data$cpue)
+#testde <- DEoptim(fn=ll_objfun,lower=(c(1e-9,1e-9)),upper=(c(1e9,1e9)),control=DEoptim.control(trace=TRUE),catch=data$catch,cpue=data$cpue)
+exp(testde$optim$bestmem)
+r <- exp(testde$optim$bestmem)[1]
+k <- exp(testde$optim$bestmem)[2]
+# Get the hessian at this point
+hess <- .Call("flspCpp_tape",data$catch,data$cpue,r,1,k)[["hessian"]]
+
+hess[1,2] <- hess[2,1]
 
 #*******************************************************************************
 # Uncertainty stuff from wiki
@@ -89,25 +117,57 @@ dll2dkr <-(drtiny[2]-dorig[2])/tiny
 # from which we can derive standard errors and correlation:
 
 # What is approximate hessian from optim
-test <- optim(log(c(r,k)),fn=ll_objfun,gr=ll_gradfun,method="BFGS", hessian = TRUE, catch=data$catch,cpue=data$cpue)
-test$hessian
-tape[["hessian"]]
+#test <- optim(log(c(r,k)),fn=ll_objfun,gr=ll_gradfun,method="BFGS", hessian = TRUE, catch=data$catch,cpue=data$cpue)
+#test$hessian
+#tape[["hessian"]]
 # very different. optim approx is awful (see approximation above)
 
 mu <- c(r,k)
-vcov.matrix <- tape[["hessian"]]
+vcov.matrix <- hess
 # Tape only returns bottom left matrix. top right = bottom left
-vcov.matrix[1,2] <- vcov.matrix[2,1]
-#vcov.matrix <- test$hessian
-## derive the correlation matrix from covariance matrix
 ## derive the correlation matrix from covariance matrix
 cor.matrix <- vcov.matrix
 diag(cor.matrix)[] <- 1
 cor.matrix[1,2] <- cor.matrix[1,2] / sqrt(prod(diag(vcov.matrix)))
 cor.matrix[2,1] <- cor.matrix[1,2]
 ## the cholesky decomposition of the co matrix
-Psi <- chol(cor.matrix)
-# eh?
+#Psi <- chol(cor.matrix)
+Psi <- t(chol(cor.matrix))
+
+# Reconstruct covariance matrix (why?)
+vcov.matrix2 <- vcov.matrix
+vcov.matrix2[1,2] <- cor.matrix[1,2] * sqrt(prod(vcov.matrix))
+vcov.matrix2[2,1] <- cor.matrix[2,1] * sqrt(prod(vcov.matrix))
+
+## Individual SD of parameters
+param.sd <- sqrt(diag(vcov.matrix))
+# Need to be +ve?
+param.sd <- sqrt(abs(diag(vcov.matrix)))
+
+## number of Monte Carlo samples
+nsam <- 1000
+
+## set up theta matrix of samples
+theta <- matrix(nrow=nsam,ncol=length(param.sd))
+theta[,1] <- rnorm(nsam)
+theta[,2] <- rnorm(nsam)
+
+## use apply to "entrain" the correlation into the samples
+theta <- t(apply(theta,1,function(x,Psi){x <- Psi%*%x},Psi))
+
+## rescale to the appropriate mean and variance
+theta[,1] <- r+theta[,1]*param.sd[1]
+theta[,2] <- k+theta[,2]*param.sd[2]
+colnames(theta) <- c("r","k")
+
+# check
+cor(theta)
+cor.matrix
+
+cov(theta)
+vcov.matrix
+
+# Actually not bad but what is going with theta?
 
 #*******************************************************************************
 # Fitting with optim

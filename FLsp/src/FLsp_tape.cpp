@@ -96,7 +96,8 @@ RcppExport SEXP flspCpp_tape(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp,
   double** H = new double*[2];
   for (i=0; i<2; i++)
      H[i] = new double[2]; 
-  hessian(tag,2,indeps,H);
+
+	hessian(tag,2,indeps,H);
   NumericMatrix Hout(2,2);
   for (i=0;i<2;i++)
       for(j=0;j<2;j++)

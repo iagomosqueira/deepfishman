@@ -4,7 +4,10 @@ import("FLCore",
 exportClasses(
 	"FLsp")
 exportMethods(
-  "FLsp")
+  "FLsp",
+	"predict",
+	"fitsp")
 export(
-	"sp")
+	"sp",
+	"indexhat")
 
