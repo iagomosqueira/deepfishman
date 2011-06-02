@@ -3,7 +3,7 @@ Title: Surplus Model for FLR
 Version: 0.1
 Author: Finlay Scott <finlay.scott@cefas.co.uk>
 Description: Surplus Production Models
-Depends: FLCore(>= 2.2)
+Depends: R(>= 2.13.0), FLCore(>= 2.2), DEoptim
 LinkingTo: FLCore, Rcpp
 Maintainer: Finlay Scott <finlay.scott@cefas.co.uk>
 License: GPL 2.0
