@@ -9,7 +9,7 @@ setGeneric('fitsp', function(object, ...)
 setMethod('fitsp',
 	signature(object="FLsp"),
 	function(object, fixed=list(),
-    control = DEoptim.control(trace=10), lower=NULL,
+    control = DEoptim.control(trace=50), lower=NULL,
     upper=NULL, seq.iter=TRUE, ...)
 	{
 	    #browser()
@@ -81,6 +81,8 @@ setMethod('fitsp',
 	if(seq.iter)
     {
       iter <- dims(object)$iter
+      # Problem in that dims doesn't include the dims in index
+
       # iters in fixed
       if(length(fixnm) >= 1)
       {
@@ -118,14 +120,33 @@ setMethod('fitsp',
     residuals(object) <- propagate(residuals(object), iter)
 
     # vcov
-    object@vcov <- array(NA, dim=c(rep(length(parnm)-length(fixed),2), iter),
-      dimnames=list(parnm[!parnm%in%names(fixed)],parnm[!parnm%in%names(fixed)],
-      iter=1:iter))
-    object@hessian <- object@vcov
+    #object@vcov <- array(NA, dim=c(rep(length(parnm)-length(fixed),2), iter),
+    #  dimnames=list(parnm[!parnm%in%names(fixed)],parnm[!parnm%in%names(fixed)],
+    #  iter=1:iter))
+    #object@hessian <- object@vcov
+    object@hessian <- array(NA,dim=c(2,2,iter),dimnames=list(c("r","k"),c("r","k"),iter=1:iter))
 
 
-		for (it in 1:iter)
+    #browser()
+    # We're solving on the log scale so upper and lower need to be logged
+	    lower <- log(lower)
+	    upper <- log(upper)
+
+# Not picked up iters
+# Set up fitted_index and residual_index slots
+for (index.count in 1:length(object@index))
+{
+    index_dmns <- dimnames(object@index[[index.count]])
+    object@fitted_index[[index.count]] <- propagate(FLQuant(NA,dimnames=index_dmns),iter)
+    object@residuals_index[[index.count]] <- propagate(FLQuant(NA,dimnames=index_dmns),iter)
+}
+
+
+    for (it in 1:iter)
     {
+
+    cat("iter: ", it, "\n")
+
       # data
       if(seq.iter)
         data <- lapply(alldata, iter, it)
@@ -161,12 +182,13 @@ setMethod('fitsp',
 #        hessian=TRUE, control=control, lower=lower, upper=upper, gr=gr)))
 
     #browser()
-	    lower <- log(lower)
-	    upper <- log(upper)
 
 	    out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
 
-			names(out$optim$bestmem) <- names(start)
+	    #if (it ==2) browser()
+
+
+	    names(out$optim$bestmem) <- names(start)
       # output
       # place out$par in right iter dim
       iter(object@params[names(out$optim$bestmem),], it) <- exp(out$optim$bestmem)
@@ -181,6 +203,8 @@ setMethod('fitsp',
       object@logLik[it] <- -out$optim$bestval
       attr(object@logLik, 'nobs') <- length(data[[1]])
 
+
+      #browser()
 
     # fitted & residuals
     # No iter <- methods for FLQuants so a bit hacky
@@ -197,7 +221,7 @@ setMethod('fitsp',
 	tape_res$hessian[1,2] <- tape_res$hessian[2,1]
 	object@hessian[,,it] <- tape_res$hessian
 
-
+	#browser()
     }
     # force dimnames[1:5] in 'fitted' and 'residuals' to match
     #dimnames(fitted(object))[1:5] <- dimnames(do.call(as.character(
@@ -212,6 +236,124 @@ setMethod('fitsp',
 
 #*******************************************************************************
 # Also overloading predict
+#setMethod('predict', signature(object='FLsp'),
+#  function(object, ...)
+#  {
+#      #browser()
+##stop("in predict for FLaspm")
+#    args <- list(...)
+#    if(length(args) > 0 && is.null(names(args)))
+#      stop('FLQuant or FLCohort inputs must be named to apply formula')
+#    # call
+#    call <- as.list(object@model)[[3]]
+#    fittedSlot <- as.list(object@model)[[2]]
+#
+#
+#    # check vars in call match input in args
+#    if(length(args) > 0 & !any(names(args)%in%all.vars(call)))
+#      warning(paste("Input names do not match those in model formula: '",
+#        paste(names(args)[!names(args)%in%all.vars(call)], collapse=','), "'", sep=""))
+#
+#    # create list of input data
+#    #   get FLQuant/FLCohort slots' names
+#    datanm <- getSlotNamesClass(object, 'FLArray')
+#    datanm <- c(datanm, getSlotNamesClass(object, 'FLQuants'))
+#    datanm <- c(datanm, getSlotNamesClass(object, 'numeric'))
+#
+#    # add dimnames if used
+#    dimna <- dimnames(slot(object, datanm[1]))[names(slot(object, datanm[1]))%in%
+#      all.vars(object@model)]
+#    # get them in the right shape
+#    dimdat <- lapply(dimna, function(x)
+#      {
+#        out <- slot(object, datanm[1])
+#        out[] <- as.numeric(x)
+#        return(out)
+#      })
+#
+#    # iterations
+#    #   from object
+#    iter <- max(unlist(qapply(object, function(x) dims(x)$iter)))
+#    #   from extra input
+#    if(length(args) > 0)
+#    {
+#      iterarg <- lapply(args, function(x) {
+#        itera <- try(dims(x)$iter)
+#        if(class(iter) =='try-error')
+#          return(1)
+#        else
+#          return(itera)
+#      })
+#      iterarg <- max(unlist(iterarg))
+#    }
+#    else
+#      iterarg <- 1
+#    #   decision
+#    if (iter == iterarg)
+#      iters <- iter
+#    else if(iter > iterarg && iterarg == 1)
+#      iters <- iter
+#    else if(iterarg > iter && iter == 1)
+#      iters <- iterarg
+#    else
+#      stop("Iter for object and input arguments do not match")
+#
+#    fitted_index <- FLQuants()
+#    for (index.count in 1:length(object@index))
+#    {
+#
+#      for (it in 1:iters)
+#      {
+#      obj <- iter(object, it)
+#
+#      #   input data
+#        data <- list()
+#        for (i in datanm)
+#          data[[i]] <- slot(obj, i)
+#
+#        # add covar if defined and available
+#        if('covar' %in% slotNames(obj))
+#        {
+#          covarnm <- names(obj@covar)
+#          if(length(covarnm))
+#            data <- c(data, covar(obj)[covarnm])
+#        }
+#
+#        # add newdata
+#        data[names(args)] <- lapply(args, iter, it)
+#
+#        params <- as.vector(obj@params@.Data)
+#        names(params) <- dimnames(obj@params)[['params']]
+#
+#        # get right dimnames
+#        if(length(args) > 0)
+#          dimnames <- dimnames(args[[1]])
+#        else
+#          dimnames <- dimnames(slot(obj, fittedSlot)[[index.count]])
+#
+#                #browser()
+#      # check inputs
+#        if(it == 1)
+#        {
+#          res <- propagate(eval(call,envir=c(params, data, dimdat))[[index.count]], iters, fill.iter=FALSE)
+#          dimnames(res)[1:5] <- dimnames[1:5]
+#        }
+#        else
+#        {
+#          iter(res, it) <- eval(call,envir=c(params, data, dimdat))[[index.count]]
+#        }
+#      } # end iter count
+#      fitted_index[[index.count]] <- res
+#    } # end index.count
+#  return(fitted_index)
+#  }
+#)   # }}}
+#
+#
+#
+
+
+#predict from aspm
 setMethod('predict', signature(object='FLsp'),
   function(object, ...)
   {
@@ -326,4 +468,18 @@ setMethod('predict', signature(object='FLsp'),
 )   # }}}
 
 
+# Also overloading dims()
+# overload dims() for FLaspm
+# original dims in FLComp does not count FLQuants
+# We need to here because index slot is FLQuants and can be multi iter
+
+setMethod("dims", signature(obj="FLsp"),
+    # Returns a list with different parameters
+    function(obj, ...)
+	{
+    res <- callNextMethod()
+    iters_in_index_slot <- max(unlist(lapply(obj@index,function(x)dim(x)[6])))
+    res$iter <- max(res$iter,iters_in_index_slot)
+    return(res)
+	})
 

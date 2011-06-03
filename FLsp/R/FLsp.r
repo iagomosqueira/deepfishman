@@ -2,6 +2,7 @@
 # Multiple indices
 # a plot
 # iter check
+# rewrite dims method
 # tests
 
 # Surplus production model class
@@ -110,6 +111,9 @@ ihat <- function(catch, index, r, k)
 
 #*******************************************************************************
 # Methods
+
+# Fix iter to include FLQuants
+
 if (!isGeneric("evalC"))
     setGeneric("evalC", function(object, ...)
     standardGeneric("evalC"))
@@ -215,6 +219,16 @@ setMethod('indexhat', signature(object='FLsp'),
       return(indexhat)
 })
 
+# Need to overload this so that FLQuants slots are included
+setMethod("dims", signature(obj="FLsp"),
+    # Returns a list with different parameters
+    function(obj, ...)
+	{
+    res <- callNextMethod()
+    iters_in_index_slot <- max(unlist(lapply(obj@index,function(x)dim(x)[6])))
+    res$iter <- max(res$iter,iters_in_index_slot)
+    return(res)
+	})
 
 
 
