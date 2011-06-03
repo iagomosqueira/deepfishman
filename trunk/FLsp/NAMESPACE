@@ -15,5 +15,5 @@ exportMethods(
     "ll")
 export(
 	"sp",
-	"indexhat")
+	"ihat")
 
