@@ -4,9 +4,15 @@ import("FLCore",
 exportClasses(
 	"FLsp")
 exportMethods(
-  "FLsp",
-	"predict",
-	"fitsp")
+    "FLsp",
+    "predict",
+    "fitsp",
+    "evalC",
+    "biomass",
+    "qhat",
+    "sigma2",
+    "indexhat",
+    "ll")
 export(
 	"sp",
 	"indexhat")

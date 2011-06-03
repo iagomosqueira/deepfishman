@@ -12,7 +12,7 @@ setMethod('fitsp',
     control = DEoptim.control(trace=10), lower=NULL,
     upper=NULL, seq.iter=TRUE, ...)
 	{
-		#browser()
+	    #browser()
 
     args <- list(...)
     call <- sys.call(1)
@@ -51,11 +51,11 @@ setMethod('fitsp',
 		gr <- NULL
 		
 	  loglfoo <- function(par) {
-			#browser()
+	      #browser()
     	pars <- as.list(par)
     	names(pars) <- names(start)
-    	pars[fixnm] <- lapply(fixed, iter, it)
     	pars <- lapply(pars,exp)
+    	pars[fixnm] <- lapply(fixed, iter, it)
     	return(-1*(do.call(logl, args=c(pars, data))))
     }
 
@@ -123,6 +123,7 @@ setMethod('fitsp',
       iter=1:iter))
     object@hessian <- object@vcov
 
+
 		for (it in 1:iter)
     {
       # data
@@ -131,8 +132,7 @@ setMethod('fitsp',
       else
         data <- alldata
 
-#browser()
-			# We don't have start values
+	# We don't have start values but we need to set some because they are used by loglfoo
       # start values
 #      if(missing(start)) {
 #        # add call to @initial
@@ -160,11 +160,11 @@ setMethod('fitsp',
 #      out <- do.call('optim', c(list(par=unlist(start), fn=loglfoo, method=method,
 #        hessian=TRUE, control=control, lower=lower, upper=upper, gr=gr)))
 
-			#browser()
-			lower <- log(lower)
-			upper <- log(upper)
+    #browser()
+	    lower <- log(lower)
+	    upper <- log(upper)
 
-			out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
+	    out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
 
 			names(out$optim$bestmem) <- names(start)
       # output
@@ -177,36 +177,27 @@ setMethod('fitsp',
       #object@details <- list(call=call, value=out$value, count=out$counts,
       #  convergence=out$convergence, message=out$message)
 
-			# vcov & hessian
-#      coef <- out$par
-#      object@vcov[,,it] <-
-#        if (length(coef))
-#        {
-#          if(det(out$hessian) != 0)
-#          {
-#            tmphess <- try(solve(out$hessian), silent=TRUE)
-#            if(class(tmphess) =='try-error')
-#            {
-#              matrix(numeric(0), length(coef), length(coef), dimnames=list(names(coef),
-#                names(coef)))
-#            } else
-#            tmphess
-#          } else
-#            0
-#        } else
-#          0
-#      object@hessian[,,it] <- -out$hessian
-
       # logLik
       object@logLik[it] <- -out$optim$bestval
       attr(object@logLik, 'nobs') <- length(data[[1]])
 
-			# Get other bits
 
-      # fitted & residuals
-#      iter(fitted(object), it) <- predict(iter(object, it))
-#      iter(residuals(object), it) <- iter(slot(object,
-#        as.list(object@model)[[2]]),it) - iter(fitted(object), it)
+    # fitted & residuals
+    # No iter <- methods for FLQuants so a bit hacky
+	for (i in 1:length(object@index))
+	{
+	    object@fitted_index[[i]][,,,,,it] <- predict(iter(object, it))[[i]]
+	    object@residuals_index[[i]][,,,,,it] <- iter(object@index[[i]],it) - iter(object@fitted_index[[i]], it)
+	}
+
+	# Load up the hessian slots
+	#browser()
+	tape_res <- .Call("flspCpp_tape",iter(object@catch,it),iter(object@index[[1]],it),iter(object@params["r"],it),1,iter(object@params["k"],it))
+	# fix the upper right part of hessian
+	tape_res$hessian[1,2] <- tape_res$hessian[2,1]
+	object@hessian[,,it] <- tape_res$hessian
+
+
     }
     # force dimnames[1:5] in 'fitted' and 'residuals' to match
     #dimnames(fitted(object))[1:5] <- dimnames(do.call(as.character(

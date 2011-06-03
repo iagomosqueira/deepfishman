@@ -1,12 +1,8 @@
 # To Do
 # Multiple indices
-# Fitting function
-# methods for returning qhat, ll, sigma2 and so on
 # a plot
-# fix the model in the function - looks horrible
-# Fix fitted and residuals
-# predict
-# fixed
+# iter check
+# tests
 
 # Surplus production model class
 # class FLsp
@@ -29,7 +25,9 @@ setClass('FLsp', representation(
   'FLModel',
   catch='FLQuant',
   biomass='FLQuant',
-  index='FLQuants'
+  index='FLQuants',
+  fitted_index='FLQuants',
+  residuals_index='FLQuants'
 ),
 	validity=validFLsp
 )
@@ -38,21 +36,31 @@ setGeneric("FLsp", function(model, ...){
 		standardGeneric("FLsp")
 })
 
-setMethod('FLsp', signature(model='ANY'),
-  function(model, ...)
-  {
-		#browser()
-    res <- FLModel(model, ..., class='FLsp')
-    return(res)
-  }
-)
-
+#setMethod('FLsp', signature(model='ANY'),
+#  function(model, ...)
+#  {
+#		#browser()
+#    res <- FLModel(model, ..., class='FLsp')
+#    return(res)
+#  }
+#)
+#
 setMethod('FLsp', signature(model='missing'),
   function(...)
   {
     #browser()
     res <- FLModel(..., class='FLsp')
     model(res) <- sp
+    # set up fitted_index and residuals index
+    # Have to be the same dims as index slot - but empty
+    # Why doesn't this work?
+    #res@fitted_index <- lapply(res@index,function(x)x[] <- NA)
+    res@residuals_index <- res@index
+    for (i in 1:length(res@index))
+	res@residuals_index[[i]][] <- NA
+    res@fitted_index <- res@residuals_index
+
+
     return(res)
   }
 )
@@ -82,14 +90,14 @@ sp <- function()
 	upper=rep(1e9, 2))
 
 	# awkward
-	model  <- index ~ indexhat(catch,index,r,k)
+	model  <- index ~ ihat(catch,index,r,k)
 
 	return(list(logl=logl, model=model, initial=initial))
 }
 
 #*******************************************************************************
 # Accessor things
-indexhat <- function(catch, index, r, k)
+ihat <- function(catch, index, r, k)
 {
 	res <- .Call("flspCpp",catch,index[[1]],r,1,k)
 	ihat <- FLQuant(res[["qhat"]]*res[["B"]])
@@ -99,6 +107,113 @@ indexhat <- function(catch, index, r, k)
 	indexhat_flqs[[1]] <- ihat
   return(indexhat_flqs)
 }
+
+#*******************************************************************************
+# Methods
+if (!isGeneric("evalC"))
+    setGeneric("evalC", function(object, ...)
+    standardGeneric("evalC"))
+
+setMethod('evalC', signature(object='FLsp'),
+  function(object) {
+      # Only works on first iter
+	object <- iter(object,1)
+	tape <- .Call("flspCpp",object@catch,object@index[[1]],object@params['r'],1,object@params['k'])
+	return(tape)
+})
+
+
+if (!isGeneric("biomass"))
+    setGeneric("biomass", function(object, ...)
+    standardGeneric("biomass"))
+
+setMethod('biomass', signature(object='FLsp'),
+  function(object) {
+      # Make an FLQuant with right number of iterations
+      iters <- dims(object)$iter
+      dimnames <- dimnames(object@catch)
+      dimnames$iter <- iters
+      biomass <- FLQuant(NA,dimnames=dimnames)
+      for (i in 1:iters)
+	  iter(biomass,i)[] <- evalC(iter(object,i))[["B"]]
+      return(biomass)
+})
+
+
+if (!isGeneric("qhat"))
+    setGeneric("qhat", function(object, ...)
+    standardGeneric("qhat"))
+
+setMethod('qhat', signature(object='FLsp'),
+  function(object) {
+      # Make an FLQuant with right number of iterations
+      iters <- dims(object)$iter
+      #dimnames <- dimnames(object@catch)
+      #dimnames$iter <- iters
+      qhat <- FLQuant(NA,dimnames=list(iter=iters))
+      for (i in 1:iters)
+	  iter(qhat,i)[] <- evalC(iter(object,i))[["qhat"]]
+      return(qhat)
+})
+
+if (!isGeneric("sigma2"))
+    setGeneric("sigma2", function(object, ...)
+    standardGeneric("sigma2"))
+
+setMethod('sigma2', signature(object='FLsp'),
+  function(object) {
+      # Make an FLQuant with right number of iterations
+      iters <- dims(object)$iter
+      #dimnames <- dimnames(object@catch)
+      #dimnames$iter <- iters
+      sigma2 <- FLQuant(NA,dimnames=list(iter=iters))
+      for (i in 1:iters)
+	  iter(sigma2,i)[] <- evalC(iter(object,i))[["sigma2"]]
+      return(sigma2)
+})
+
+
+if (!isGeneric("ll"))
+    setGeneric("ll", function(object, ...)
+    standardGeneric("ll"))
+
+setMethod('ll', signature(object='FLsp'),
+  function(object) {
+      # Make an FLQuant with right number of iterations
+      iters <- dims(object)$iter
+      #dimnames <- dimnames(object@catch)
+      #dimnames$iter <- iters
+      ll <- FLQuant(NA,dimnames=list(iter=iters))
+      for (i in 1:iters)
+	  iter(ll,i)[] <- evalC(iter(object,i))[["ll"]]
+      return(ll)
+})
+
+
+if (!isGeneric("indexhat"))
+    setGeneric("indexhat", function(object, ...)
+    standardGeneric("indexhat"))
+
+setMethod('indexhat', signature(object='FLsp'),
+  function(object) {
+      # Make an FLQuant with right number of iterations
+      nindex <- length(object@index)
+      iters <- dims(object)$iter
+      dimnames <- dimnames(object@catch)
+      dimnames$iter <- iters
+      flq <- FLQuant(NA,dimnames=dimnames)
+      indexhat <- FLQuants()
+      for (i in 1:iters)
+      {
+	  ihat <- evalC(iter(object,i))[["Ihat"]]
+	  for (j in 1:nindex)
+	  {
+	      iter(flq,i)[] <- ihat
+	      indexhat[[j]] <- flq
+	  }
+      }
+      return(indexhat)
+})
 
 
 
