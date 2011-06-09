@@ -5,6 +5,8 @@
 # rewrite dims method
 # tests
 
+# qhat should be FLQuants - for multiple indices
+
 # Surplus production model class
 # class FLsp
 validFLsp <- function(object)
@@ -25,7 +27,7 @@ validFLsp <- function(object)
 setClass('FLsp', representation(
   'FLModel',
   catch='FLQuant',
-  biomass='FLQuant',
+  #biomass='FLQuant',
   index='FLQuants',
   fitted_index='FLQuants',
   residuals_index='FLQuants'
@@ -50,7 +52,17 @@ setMethod('FLsp', signature(model='missing'),
   function(...)
   {
     #browser()
-    res <- FLModel(..., class='FLsp')
+
+    args <- list(...)
+    catch <- args$catch
+    index <- args$index
+    if (class(index)=="FLQuant")
+	index <- FLQuants(index=index)
+    res <- FLModel(catch=catch,index=index, class='FLsp')
+
+
+
+    #res <- FLModel(..., class='FLsp')
     model(res) <- sp
     # set up fitted_index and residuals index
     # Have to be the same dims as index slot - but empty
