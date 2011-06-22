@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-1.40.10 (TeX Live 2009/Debian) (format=pdflatex 2011.4.6)  8 JUN 2011 17:30
+This is pdfTeX, Version 3.1415926-1.40.10 (TeX Live 2009/Debian) (format=pdflatex 2011.4.6)  9 JUN 2011 17:26
 entering extended mode
  %&-line parsing enabled.
 **flsp_man.tex
@@ -365,7 +365,11 @@ LaTeX Font Info:    Try loading font information for T1+aer on input line 100.
 
 (/usr/share/texmf-texlive/tex/latex/ae/t1aer.fd
 File: t1aer.fd 1997/11/16 Font definitions for T1/aer.
-)))) (./flsp_man.aux)
+)))) (./flsp_man.aux
+
+LaTeX Warning: Label `fig:residuals_nzrl' multiply defined.
+
+)
 \openout1 = `flsp_man.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 24.
@@ -384,8 +388,7 @@ LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 24.
 LaTeX Font Info:    ... okay on input line 24.
 LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 24.
 LaTeX Font Info:    Try loading font information for TS1+cmr on input line 24.
-
-(/usr/share/texmf-texlive/tex/latex/base/ts1cmr.fd
+ (/usr/share/texmf-texlive/tex/latex/base/ts1cmr.fd
 File: ts1cmr.fd 1999/05/25 v2.5h Standard LaTeX font definitions
 )
 LaTeX Font Info:    ... okay on input line 24.
@@ -473,37 +476,7 @@ File: t1aett.fd 1997/11/16 Font definitions for T1/aett.
 Overfull \vbox (73.64777pt too high) has occurred while \output is active []
 
 
-[4] <flsp_man-nzrlfittedindexplot.pdf, id=68, 433.62pt x 433.62pt>
-File: flsp_man-nzrlfittedindexplot.pdf Graphic file (type pdf)
-
-<use flsp_man-nzrlfittedindexplot.pdf>
-<flsp_man-nzrlresidplot.pdf, id=70, 433.62pt x 433.62pt>
-File: flsp_man-nzrlresidplot.pdf Graphic file (type pdf)
-
-<use flsp_man-nzrlresidplot.pdf> [5] [6 <./flsp_man-nzrlfittedindexplot.pdf>]
-[7 <./flsp_man-nzrlresidplot.pdf>] (./flsp_man.aux) ) 
-Here is how much of TeX's memory you used:
- 6437 strings out of 495061
- 91483 string characters out of 1182622
- 166009 words of memory out of 3000000
- 9460 multiletter control sequences out of 15000+50000
- 21915 words of font info for 54 fonts, out of 3000000 for 9000
- 28 hyphenation exceptions out of 8191
- 38i,9n,36p,294b,352s stack positions out of 5000i,500n,10000p,200000b,50000s
-</usr/share/texmf-texlive/
-fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texmf-texlive/fonts/type1
-/public/amsfonts/cm/cmex10.pfb></usr/share/texmf-texlive/fonts/type1/public/ams
-fonts/cm/cmmi10.pfb></usr/share/texmf-texlive/fonts/type1/public/amsfonts/cm/cm
-mi12.pfb></usr/share/texmf-texlive/fonts/type1/public/amsfonts/cm/cmmi7.pfb></u
-sr/share/texmf-texlive/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/tex
-mf-texlive/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texmf-texlive/f
-onts/type1/public/amsfonts/cm/cmr17.pfb></usr/share/texmf-texlive/fonts/type1/p
-ublic/amsfonts/cm/cmr7.pfb></usr/share/texmf-texlive/fonts/type1/public/amsfont
-s/cm/cmsltt10.pfb></usr/share/texmf-texlive/fonts/type1/public/amsfonts/cm/cmsy
-10.pfb></usr/share/texmf-texlive/fonts/type1/public/amsfonts/cm/cmtt10.pfb>
-Output written on flsp_man.pdf (7 pages, 207030 bytes).
-PDF statistics:
- 143 PDF objects out of 1000 (max. 8388607)
- 24 named destinations out of 1000 (max. 500000)
- 67 words of extra memory for PDF output out of 10000 (max. 10000000)
-
+[4]
+!pdfTeX error: pdflatex (file ./flsp_man-nzrlfittedindexplot.pdf): PDF inclusio
+n: required page does not exist <0>
+ ==> Fatal error occurred, no output PDF file produced!
