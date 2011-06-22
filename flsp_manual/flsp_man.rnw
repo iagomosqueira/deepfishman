@@ -166,26 +166,30 @@ It can be seen that there is good agreement between the published results and th
 
 \section{Testing FLsp against the other data sets}
 
-There are two other data sets available: South Atlantic albacore ($saa$) and Northern Namibian hake ($nnh$). The above process can be repeated and the results checked against the published results.
+%There are two other data sets available: South Atlantic albacore ($saa$) and Northern Namibian hake ($nnh$). The above process can be repeated and the results checked against the published results (see Table~\ref{tab:compare3datasets}).
 
 % HIDDEN!
-%\begin{center}
-%\begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
-<<eval=TRUE, quiet=TRUE,echo=FALSE,results=hide,keep.source=FALSE>>=
+%<<label=fitNAAandSAA,include=FALSE>>=
+<<label=fitNAAandSAA,eval=TRUE, quiet=TRUE,echo=FALSE,results=hide,keep.source=FALSE>>=
 data(saa)
-saa <- FLsp(catch=FLQuant(saa$catch),index=FLQuant(saa$cpue))
+saa <- FLsp(catch=FLQuant(saa$catch,dimnames=list(year=saa$year)),index=FLQuant(saa$cpue,dimnames=list(year=saa$year)))
 saa <- fitsp(saa)
 data(nnh)
-nnh <- FLsp(catch=FLQuant(nnh$catch),index=FLQuant(nnh$cpue))
+nnh <- FLsp(catch=FLQuant(nnh$catch,dimnames=list(year=nnh$year)),index=FLQuant(nnh$cpue,dimnames=list(year=nnh$year)))
 nnh <- fitsp(nnh)
+r <- signif(c(nzrl@params['r'],saa@params['r'],nnh@params['r']),3)
+k <- signif(c(nzrl@params['k']/1000,saa@params['k'],nnh@params['k']),3)
+#qhat <- signif(c(qhat(nzrl),qhat(saa),qhat(nnh)),3)*10^4
+qhat <- signif(c(qhat(nzrl),qhat(saa),qhat(nnh)),3)
+sigma <- signif(sqrt(c(sigma2(nzrl),sigma2(saa),sigma2(nnh))),3)
+bc <- signif(c(c(biomass(nzrl)[,"1990"]),c(biomass(saa)[,"1989"]),c(biomass(nnh)[,"1988"])),3)
+#msy <- 
 @
-%\end{shaded}%
-%\end{minipage}
-%\end{center}
 
-TABLE OF RESULTS
-
+%TABLE OF RESULTS
+\begin{table}
+%% Tabular is not a floating environment so cannot caption it.
+%% so put inside table, which is a floating environment
 \begin{tabular}{|c|c|c|c|c|c|c|}
 \hline
 & \multicolumn{2}{|c|}{New Zealand Rock Lobster}
@@ -194,12 +198,19 @@ TABLE OF RESULTS
 \hline
 Measure & FLsp & Published & FLsp & Published & FLsp & Published \\
 \hline
-r          & \Sexpr{round(c(nzrl@params['r']),4)} & 0.0659 &  \Sexpr{round(c(saa@params['r']),4)} &  0.328 & \Sexpr{round(c(nnh@params['r']),4)} & 0.379\\
-K ('000 t) & \Sexpr{round(c(nzrl@params['k']),4)/1000}& 129.0  &  \Sexpr{round(c(saa@params['k']),4)} & 239.6  & \Sexpr{round(c(nnh@params['k']),4)} & 2772.6\\
-$\sigma$   & \Sexpr{round(sqrt(c(sigma2(nzrl))),3)} & 0.207  &  \Sexpr{round(sqrt(c(sigma2(saa))),3)} & 0.111 & \Sexpr{round(sqrt(c(sigma2(nnh))),3)}& 0.124\\
-$\hat{q}$ (x$10^4$)  &\Sexpr{round(c(qhat(nzrl)),3)} & 24.61&  \Sexpr{round(c(qhat(saa)),3)} & 26.71 &\Sexpr{round(c(qhat(nnh)),3)}& 4.360 \\
+r          & \Sexpr{r[1]}     & 0.0659    &  \Sexpr{r[2]}     & 0.328 & \Sexpr{r[3]}     & 0.379     \\
+K ('000 t) & \Sexpr{k[1]}     & 129.0     &  \Sexpr{k[2]}     & 239.6  & \Sexpr{k[3]}     & 2772.6    \\
+$\sigma$   & \Sexpr{sigma[1]} & 0.207     &  \Sexpr{sigma[2]} & 0.111  & \Sexpr{sigma[3]} & 0.124     \\
+$\hat{q}$  & \Sexpr{qhat[1]}  & 2.461e-05 &  \Sexpr{qhat[2]}  & 0.2671 & \Sexpr{qhat[3]}  & 4.360e-04 \\
+$B_{current}$  & \Sexpr{bc[1]/1000}  & 21.15 &  \Sexpr{bc[2]}  & 75.51 & \Sexpr{bc[3]}  & 1646.3 \\
+MSY        &  \Sexpr{0} & 2133.74 &  \Sexpr{0}  & 19.65 & \Sexpr{0}  & 263.2 \\
 \hline
 \end{tabular}
+\caption{Comparing the published results with those from $FLsp$ for three data sets.}
+\label{tab:compare3datasets}
+\end{table}
+
+The results fitted with $FLsp$ are in good agreement with the published results.
 
 \section{Plotting results}
 There is no generic plot for FLsp at the moment. However, it is possible to look at the fitted index and residuals using relatively simple code. For example, to plot the indices with the fitted indices you can use (see Figure~\ref{fig:fitted_index_nzrl}):
@@ -208,6 +219,8 @@ There is no generic plot for FLsp at the moment. However, it is possible to look
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 %<<fig=FALSE,eval=FALSE, quiet=TRUE,echo=TRUE,results=verbatim,keep.source=TRUE>>=
+% Why doesn't this line work here? Works further down
+%<<label=nzrlfitedindexplotcode,include=FALSE>>= 
 <<label=nzrlfittedindexplotcode,echo=TRUE, fig=FALSE, keep.source=TRUE,results=hide,eval=FALSE>>=
 fitted <- cbind(as.data.frame(nzrl@fitted_index),type="fitted")
 index <- cbind(as.data.frame(nzrl@index),type="index")
@@ -260,12 +273,53 @@ print(xyplot(data ~ year | qname, data=residuals,panel=function(x,y)
 
 \section{Profiling the fit}
 
+You can explore how good the fit is by looking at the likelihood profile. This is easily done by using the $profile()$ method.
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<label=profilecode,include=FALSE>>=
+profile(nzrl,maxsteps=50)
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+\begin{figure}
+\begin{center}
+%<<echo=FALSE, fig=TRUE, echo=FALSE>>=
+<<label=profileplot,fig=TRUE,echo=FALSE>>=
+<<profilecode>>
+@
+\end{center}
+\caption{Profile plot for New Zealand rock lobster}
+\label{fig:profile_nzrl}
+\end{figure}
+
+It is also work looking at the gradient of the likelihood to see if we are at 0 at the estimated solution.
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<label=profilegradcode,include=FALSE>>=
+r <- 0.5
+k <- 0.5
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+\section{Uncertainty}
+
+
+
 % TO DO
 % Produce table of results for all three data sets
 % Plotting the results
 % Something on profiling including the gradients
 % MSY - plot with data
 % Uncertainty and boostrapping
+% Return MSY
+% dFmsy/dr etc for SE
 
 %\begin{center}
 %\begin{minipage}[H]{0.95\textwidth}%

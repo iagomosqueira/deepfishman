@@ -203,10 +203,10 @@ An object of class "FLQuant"
 
      year
 quant 1945   1946   1947   1948   1949   1950   1951   1952   1953   1954  
-  all 142356 141547 140733 139893 138653 136959 134544 132075 129222 125651
+  all 142357 141548 140733 139894 138653 136959 134544 132075 129222 125651
      year
 quant 1955   1956   1957   1958   1959   1960   1961   1962   1963   1964  
-  all 120838 116732 111223 107376 104232 101593  99269  96711  93660  90689
+  all 120839 116732 111223 107376 104232 101593  99269  96711  93660  90689
      year
 quant 1965   1966   1967   1968   1969   1970   1971   1972   1973   1974  
   all  87718  84398  80800  77744  74513  71481  68540  65818  64072  62028
@@ -215,7 +215,7 @@ quant 1975   1976   1977   1978   1979   1980   1981   1982   1983   1984
   all  60115  58843  57238  55692  53949  51554  48989  46518  43734  40846
      year
 quant 1985   1986   1987   1988   1989   1990  
-  all  37374  33880  30498  27182  25141  22846
+  all  37374  33880  30499  27182  25141  22846
 
 units:  NA 
 \end{Soutput}
@@ -228,18 +228,15 @@ It can be seen that there is good agreement between the published results and th
 
 \section{Testing FLsp against the other data sets}
 
-There are two other data sets available: South Atlantic albacore ($saa$) and Northern Namibian hake ($nnh$). The above process can be repeated and the results checked against the published results.
+%There are two other data sets available: South Atlantic albacore ($saa$) and Northern Namibian hake ($nnh$). The above process can be repeated and the results checked against the published results (see Table~\ref{tab:compare3datasets}).
 
 % HIDDEN!
-%\begin{center}
-%\begin{minipage}[H]{0.95\textwidth}%
-%\begin{shaded}%
-%\end{shaded}%
-%\end{minipage}
-%\end{center}
+%<<label=fitNAAandSAA,include=FALSE>>=
 
-TABLE OF RESULTS
-
+%TABLE OF RESULTS
+\begin{table}
+%% Tabular is not a floating environment so cannot caption it.
+%% so put inside table, which is a floating environment
 \begin{tabular}{|c|c|c|c|c|c|c|}
 \hline
 & \multicolumn{2}{|c|}{New Zealand Rock Lobster}
@@ -248,12 +245,19 @@ TABLE OF RESULTS
 \hline
 Measure & FLsp & Published & FLsp & Published & FLsp & Published \\
 \hline
-r          & 0.0494 & 0.0659 &  0.3197 &  0.328 & 0.3701 & 0.379\\
-K ('000 t) & 142.3564741& 129.0  &  243.3652 & 239.6  & 2823.0843 & 2772.6\\
-$\sigma$   & 0.207 & 0.207  &  0.11 & 0.111 & 0.125& 0.124\\
-$\hat{q}$ (x$10^4$)  &0 & 24.61&  0.264 & 26.71 &0& 4.360 \\
+r          & 0.0494     & 0.0659    &  0.32     & 0.328 & 0.37     & 0.379     \\
+K ('000 t) & 142     & 129.0     &  243     & 239.6  & 2820     & 2772.6    \\
+$\sigma$   & 0.207 & 0.207     &  0.11 & 0.111  & 0.125 & 0.124     \\
+$\hat{q}$  & 2.21e-05  & 2.461e-05 &  0.264  & 0.2671 & 0.000427  & 4.360e-04 \\
+$B_{current}$  & 22.8  & 21.15 &  75  & 75.51 & 1660  & 1646.3 \\
+MSY        &  0 & 2133.74 &  0  & 19.65 & 0  & 263.2 \\
 \hline
 \end{tabular}
+\caption{Comparing the published results with those from $FLsp$ for three data sets.}
+\label{tab:compare3datasets}
+\end{table}
+
+The results fitted with $FLsp$ are in good agreement with the published results.
 
 \section{Plotting results}
 There is no generic plot for FLsp at the moment. However, it is possible to look at the fitted index and residuals using relatively simple code. For example, to plot the indices with the fitted indices you can use (see Figure~\ref{fig:fitted_index_nzrl}):
@@ -262,12 +266,15 @@ There is no generic plot for FLsp at the moment. However, it is possible to look
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 %<<fig=FALSE,eval=FALSE, quiet=TRUE,echo=TRUE,results=verbatim,keep.source=TRUE>>=
+%<<label=nzrlfittedindexplotcode,echo=TRUE, fig=FALSE, keep.source=TRUE,results=hide,eval=FALSE>>=
+% Why doesn't this line work here? Works further down
 \begin{Schunk}
 \begin{Sinput}
-> fitted <- cbind(as.data.frame(nzrl@fitted_index),type="fitted")
-> index <- cbind(as.data.frame(nzrl@index),type="index")
-> index <- rbind(index,fitted)
-> print(xyplot(data ~ year | qname, group=type, data=index, type="b",auto.key=TRUE))
+> fitted <- cbind(as.data.frame(nzrl@fitted_index), type = "fitted")
+> index <- cbind(as.data.frame(nzrl@index), type = "index")
+> index <- rbind(index, fitted)
+> print(xyplot(data ~ year | qname, group = type, data = index, 
++     type = "b", auto.key = TRUE))
 \end{Sinput}
 \end{Schunk}
 \end{shaded}%
@@ -316,12 +323,41 @@ To look at the residuals and put a loess function through them use (see Figure~\
 
 \section{Profiling the fit}
 
+You can explore how good the fit is by looking at the likelihood profile. This is easily done by using the $profile()$ method.
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+\begin{Schunk}
+\begin{Sinput}
+> profile(nzrl, maxsteps = 50)
+\end{Sinput}
+\end{Schunk}
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+\begin{figure}
+\begin{center}
+%<<echo=FALSE, fig=TRUE, echo=FALSE>>=
+\includegraphics{flsp_man-profileplot}
+\end{center}
+\caption{Profile plot for New Zealand rock lobster}
+\label{fig:profile_nzrl}
+\end{figure}
+
+\section{Uncertainty}
+
+
+
 % TO DO
 % Produce table of results for all three data sets
 % Plotting the results
 % Something on profiling including the gradients
 % MSY - plot with data
 % Uncertainty and boostrapping
+% Return MSY
+% dFmsy/dr etc for SE
 
 %\begin{center}
 %\begin{minipage}[H]{0.95\textwidth}%
