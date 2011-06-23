@@ -273,13 +273,16 @@ print(xyplot(data ~ year | qname, data=residuals,panel=function(x,y)
 
 \section{Profiling the fit}
 
-You can explore how good the fit is by looking at the likelihood profile. This is easily done by using the $profile()$ method.
+You can explore how good the fit is by looking at the likelihood profile. This is easily done by using the $profile()$ method (see Figure~\ref{fig:profile_nzrl}).
+
+Notice that the profile plot has a banana shaped flat section which contains the optimum solution. This is because the parameters $r$ and $K$ are correlated, making them difficult to estimate unless there is sufficient information in the data.
+The profile plot also includes the gradient of the log likelihood as $r$ and $K$ change (keeping $K$ and $r$ fixed at the estimated value found by the optimiser respectively). The dashed line is at a gradient of 0. If the fitting has worked, the gradient should be 0 at the estimated parameter values. It is just another simple way to check that the results of from the fitting process are sensible.
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 <<label=profilecode,include=FALSE>>=
-profile(nzrl,maxsteps=50)
+profile(nzrl,maxsteps=31,range=0.25)
 @
 \end{shaded}%
 \end{minipage}
@@ -295,18 +298,6 @@ profile(nzrl,maxsteps=50)
 \caption{Profile plot for New Zealand rock lobster}
 \label{fig:profile_nzrl}
 \end{figure}
-
-It is also work looking at the gradient of the likelihood to see if we are at 0 at the estimated solution.
-\begin{center}
-\begin{minipage}[H]{0.95\textwidth}%
-\begin{shaded}%
-<<label=profilegradcode,include=FALSE>>=
-r <- 0.5
-k <- 0.5
-@
-\end{shaded}%
-\end{minipage}
-\end{center}
 
 \section{Uncertainty}
 
