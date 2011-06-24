@@ -301,7 +301,114 @@ profile(nzrl,maxsteps=31,range=0.25)
 
 \section{Uncertainty}
 
+%The standard error of the parameters $r$ and $K$ are estimates of the standard deviation of their sampling distributions associated with the estimation method.
+%It measures how confident we are that the estimated values of the parameters are good.
+%The standard error may also be estimated by taking the square root of the estimated error variance of the quantity.
+%It is therefore possible to calculate the standard error of the parameters by taking the square root of the diagonal elements of the
+%variance-covariance matrix.
+%SE <- sqrt(diag(vcov.matrix))
 
+We are trying to generate a range of simulated values of $r$ and $K$ that have the same statistical properties as
+the esimated values. i.e. the mean and the variance-covariance matrix of the simulated values should be the same
+as for the estimated values.
+
+The Cholesky decomposition is commonly used in the Monte Carlo method for
+simulating systems with multiple correlated variables.
+The Cholesky decompostion of a matrix is analagous to finding the square root of a scalar number.
+It decomposes the matrix into the product of a lower triangular matrix and its conjugate transpose.
+A = LL* (* is the conjugate transpose)
+The Cholesky decomposition is useful in the Monte Carlo method because it allows
+the transformation of a set of independent normally distributed random
+variables into a correlated set.
+
+In the Monte Carlo method the correlation matrix is
+decomposed, to give the lower-triangular matrix L. Applying this to a vector of
+uncorrelated samples, u, produces a sample vector Lu with the covariance
+properties of the system being modeled. These samples are then rescaled by the estimated parameter values
+to give the correct means and variances.
+
+This procedure may sound complicated but it is easy to carry out in R!
+
+First we want to the get the variance-covariance matrix of the estimated parameters.
+It is possible to estimate the variance-covariance matrix from the matrix of second-order (partial) derivatives, called the Hessian matrix,
+which is returned in the fitted $FLsp$ object.
+If we assume the parameter distribution has (multivariate) normality, it is a standard statistical result that $ \mathbf{V} = (-\mathbf{A})^{-1}$ (REF)
+i.e. the variance-covariance matrix is the inverse of the negative hessian matrix.
+
+This relationship makes sense if you think about the change of slope of the likelihood function at the estimated parameter values.
+If the change is very sharp (i.e. if you look at the likelihood profile there is a clearly defined minimum),
+then the second-order derivative will be relatively large. This means that there will be lot of confidence in the parameter estimate because
+it is clearly identifiable and hence the standard error will be small.
+On the other hand, if the second-order derivative is low, then the change in the slope around the function minimum is low (the likelihood profile will look flat).
+This means that the parameter value can vary in any direction without greatly affecting the value of the likelihood function.
+This implies that the standard error of the parameter will be large.
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
+vcov.matrix <- solve(-1 * nzrl@hessian[,,1])
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+Now we need to get the correlation matrix. The correlation matrix is the variance-covariance
+matrix, scaled by the product of the standard deviations of the estimated parameter values.
+The standard deviations of the
+estimated parameter values is simply the square root of the diagonal of the variance-covariance matrix.
+% correlation matrix is 0 - 1, which is what we need
+
+R CODE ON GETTING THE CORR MATRIX
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+
+We are ready to use Cholesky decomposition on the correlation matrix
+
+R CODE ON CHOLESKY
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+Now we create a vector of uncorrelated values. We use values pulled from a normal
+distributution with a mean of 0 and a standard deviation of 1.
+
+R CODE ON RNORM
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+Finally we multiply the decomposed Cholesky matrix by the pairs of uncorrelated
+values. We also have to rescale them to give appropriate mean and variance.
+
+R CODE
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+We can then check the statistical properties of the simulated parameter values.
 
 % TO DO
 % Produce table of results for all three data sets
