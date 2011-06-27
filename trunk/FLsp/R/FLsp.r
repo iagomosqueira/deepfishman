@@ -231,6 +231,16 @@ setMethod('indexhat', signature(object='FLsp'),
       return(indexhat)
 })
 
+if (!isGeneric("msy"))
+    setGeneric("msy", function(object, ...)
+    standardGeneric("msy"))
+
+setMethod('msy', signature(object='FLsp'),
+  function(object) {
+      out <- t(params(object)['r',] * params(object)['k',] / 4)
+      return(out)
+})
+
 # Need to overload this so that FLQuants slots are included
 setMethod("dims", signature(obj="FLsp"),
     # Returns a list with different parameters

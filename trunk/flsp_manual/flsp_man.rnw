@@ -308,31 +308,75 @@ profile(nzrl,maxsteps=31,range=0.25)
 %variance-covariance matrix.
 %SE <- sqrt(diag(vcov.matrix))
 
+
+%The Cholesky decomposition is commonly used in the Monte Carlo method for
+%simulating systems with multiple correlated variables.
+%The Cholesky decompostion of a matrix is analagous to finding the square root of a scalar number.
+%It decomposes the matrix into the product of a lower triangular matrix and its conjugate transpose.
+%A = LL* (* is the conjugate transpose)
+%The Cholesky decomposition is useful in the Monte Carlo method because it allows
+%the transformation of a set of independent normally distributed random
+%variables into a correlated set.
+%
+%In the Monte Carlo method the correlation matrix is
+%decomposed, to give the lower-triangular matrix L. Applying this to a vector of
+%uncorrelated samples, u, produces a sample vector Lu with the covariance
+%properties of the system being modeled. These samples are then rescaled by the estimated parameter values
+%to give the correct means and variances.
+
+% See page 50 of Elements of Computational Statistics, Gentle, J. E.
+% Common way of generating multivariate random variates are by use of
+% iid (independet, identically distributed) univariates followed by a
+% transformation or else a sequence of conditional univariates.
+% Y1 to Yd is seqeunce of iid with a variance = 1. Assume mean = 0
+% (i.e. normal, mean 0, sd = 1)
+% Random vector X, which is what we want (the transformed random variable)
+% X = AY for nonsingular A
+% The variance-covariance matrix of the transformed random variable is
+% AA^T
+% We want to determine a transformation of iid random variables with unit
+% variances that yields a random variable with variance-covariance matrix E
+% Y is the vector of iid variables
+% AA^T = E
+% then X = AY is the transformation
+% Matrix A is the Cholesky factor (or square root) of E
+% This transformation is a very good way of generating multivariate
+% normal random variables. For other multivariate distributions its
+% usefulness is more limited. WHY?
+
 We are trying to generate a range of simulated values of $r$ and $K$ that have the same statistical properties as
-the esimated values. i.e. the mean and the variance-covariance matrix of the simulated values should be the same
-as for the estimated values.
+the esimated values. i.e. the mean and the variance-covariance matrix of the simulated values should be the same as for the estimated values.
 
-The Cholesky decomposition is commonly used in the Monte Carlo method for
-simulating systems with multiple correlated variables.
-The Cholesky decompostion of a matrix is analagous to finding the square root of a scalar number.
-It decomposes the matrix into the product of a lower triangular matrix and its conjugate transpose.
-A = LL* (* is the conjugate transpose)
-The Cholesky decomposition is useful in the Monte Carlo method because it allows
-the transformation of a set of independent normally distributed random
-variables into a correlated set.
+This will be done here by following the method described in Gentle (Elements of Computationsl Statistics REF). 
+The method involves generating a vector of values that are independent and identically distributed (i.i.d.) and transforming them to simulated values of $r$ and $K$.
+The vector of i.i.d. values, $Y$, has a variance equal to 1 and a mean equal to 0.  
+We want to generate a transformed variable $X$ (pairs of values of $r$ and $K$). The transformation uses $A$, a non-singular matrix, that gives the transformation:
 
-In the Monte Carlo method the correlation matrix is
-decomposed, to give the lower-triangular matrix L. Applying this to a vector of
-uncorrelated samples, u, produces a sample vector Lu with the covariance
-properties of the system being modeled. These samples are then rescaled by the estimated parameter values
-to give the correct means and variances.
+\begin{equation}
+X = A Y
+%B_{y+1} = B_y + g(B_y) - C_y
+%R = A_{y-1} / (\alpha + \beta A_{y-1})
+\end{equation}
 
-This procedure may sound complicated but it is easy to carry out in R!
+The variance-covariance matrix of the transformed random variable $X$ is $\Sigma$.
+As $Y$ is i.i.d. with a variance of 1, $\Sigma$ is:
+
+\begin{equation}
+\Sigma = A A^T
+\end{equation}
+
+The matrix $A$ can be found using the Cholesky decomposition of $\Sigma$ (analagous to the square root). As $Y$ has a mean equal to 0 (to ensure generality of the approach) the mean of the simulated values is also 0. This is straightforward to correct.
+
+This procedure may sound complicated but it is easy to carry out in R.
+The approach is demonstrated below.
 
 First we want to the get the variance-covariance matrix of the estimated parameters.
 It is possible to estimate the variance-covariance matrix from the matrix of second-order (partial) derivatives, called the Hessian matrix,
 which is returned in the fitted $FLsp$ object.
-If we assume the parameter distribution has (multivariate) normality, it is a standard statistical result that $ \mathbf{V} = (-\mathbf{A})^{-1}$ (REF)
+If we assume the parameter distribution has multivariate normality, it is a standard statistical result that:
+\begin{equation}
+\Sigma = (-H)^{-1}
+\end{equation}
 i.e. the variance-covariance matrix is the inverse of the negative hessian matrix.
 
 This relationship makes sense if you think about the change of slope of the likelihood function at the estimated parameter values.
@@ -353,67 +397,146 @@ vcov.matrix <- solve(-1 * nzrl@hessian[,,1])
 \end{minipage}
 \end{center}
 
-Now we need to get the correlation matrix. The correlation matrix is the variance-covariance
-matrix, scaled by the product of the standard deviations of the estimated parameter values.
-The standard deviations of the
-estimated parameter values is simply the square root of the diagonal of the variance-covariance matrix.
-% correlation matrix is 0 - 1, which is what we need
-
-R CODE ON GETTING THE CORR MATRIX
+We are ready to get the Cholesky factor of the variance-covariance matrix
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 <<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
+A <- t(chol(vcov.matrix))
 @
 \end{shaded}%
 \end{minipage}
 \end{center}
 
+Now we create a vector of i.i.d. values. We use values pulled from a normal distributution with a mean of 0 and a standard deviation of 1. This means that we are making the assumption that $r$ and $K$ are multivariate normal random variables.
+IS THIS SAFE? WE DO IT ABOVE TO GET THE VCOV  
 
-We are ready to use Cholesky decomposition on the correlation matrix
-
-R CODE ON CHOLESKY
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 <<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
-@
-\end{shaded}%
-\end{minipage}
-\end{center}
-
-Now we create a vector of uncorrelated values. We use values pulled from a normal
-distributution with a mean of 0 and a standard deviation of 1.
-
-R CODE ON RNORM
-\begin{center}
-\begin{minipage}[H]{0.95\textwidth}%
-\begin{shaded}%
-<<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
+nsam <- 1000
+Y <- matrix(nrow=nsam,ncol=2)
+Y[,1] <- rnorm(nsam)
+Y[,2] <- rnorm(nsam)
 @
 \end{shaded}%
 \end{minipage}
 \end{center}
 
 Finally we multiply the decomposed Cholesky matrix by the pairs of uncorrelated
-values. We also have to rescale them to give appropriate mean and variance.
+i.i.d. values. We also have to correct the mean.
 
-R CODE
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 <<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
+X <- t(apply(Y,1,function(x,A){x <- A%*%x},A))
+colnames(X) <- c("r","k")
+X <- sweep(X,2,params(nzrl),"+")
 @
 \end{shaded}%
 \end{minipage}
 \end{center}
 
 We can then check the statistical properties of the simulated parameter values.
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<eval=TRUE, quiet=TRUE,echo=TRUE,results=verbatim,keep.source=TRUE>>=
+cov(X)
+vcov.matrix
+apply(X,2,mean)
+c(params(nzrl))
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+We can see that the variance-covariance matrix and the mean of the simulated values of $r$ and $K$ are the same as for the estimated values.
+
+We can plot histograms of the simulated parameter values (see Figure~\ref{fig:hist_rK_plot}).
+%We will use the package $ggplot2$ for extra snazziness:
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<label=hist_rK,include=FALSE>>=
+par(mfrow=c(2,1))
+hist(X[,1], xlab="r", main="")
+hist(X[,2], xlab="K", main="")
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+\begin{figure}
+\begin{center}
+%<<echo=FALSE, fig=TRUE, echo=FALSE>>=
+<<label=hist_rK_plot,fig=TRUE,echo=FALSE>>=
+<<hist_rK>>
+@
+\end{center}
+\caption{Profile plot for New Zealand rock lobster}
+\label{fig:hist_rK_plot}
+\end{figure}
+
+You can see that some of the simulated variables are negative. Although this is consistent with the statistical properties of the estimated values of $r$ and $K$ clearly these values do not make sense for a surplus production model. Consequently rows that contain negative values will be removed for the remaining analysis. The simulated parameter values are copied into a copy of the $nzrl$ object.
+
+
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
+X <- X[-X[,1] <= 0,]
+X <- X[-X[,2] <= 0,]
+nzrl_sim <- nzrl
+params(nzrl_sim) <- propagate(params(nzrl_sim), nrow(X))
+params(nzrl_sim)['r',] <- X[,1]
+params(nzrl_sim)['k',] <- X[,2]
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+We can now calculate the equivalent value for MSY at each of the simulated parameter values:
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
+nzrl_msy <- msy(nzrl_sim)
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+Do same for BMSY
+
+And plot the distribution of MSY and BMSY (see Figure~\ref{fig:hist_msy_plot}).
+\begin{center}
+\begin{minipage}[H]{0.95\textwidth}%
+\begin{shaded}%
+<<label=hist_msy,include=FALSE>>=
+par(mfrow=c(2,1))
+hist(nzrl_msy, xlab="MSY", main="")
+#hist(X[,2], xlab="K", main="")
+@
+\end{shaded}%
+\end{minipage}
+\end{center}
+
+\begin{figure}
+\begin{center}
+%<<echo=FALSE, fig=TRUE, echo=FALSE>>=
+<<label=hist_msy_plot,fig=TRUE,echo=FALSE>>=
+<<hist_msy>>
+@
+\end{center}
+\caption{Histogram of MSY and $B_{MSY}$}
+\label{fig:hist_msy_plot}
+\end{figure}
 
 % TO DO
-% Produce table of results for all three data sets
-% Plotting the results
-% Something on profiling including the gradients
 % MSY - plot with data
 % Uncertainty and boostrapping
 % Return MSY

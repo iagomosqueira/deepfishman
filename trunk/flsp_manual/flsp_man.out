@@ -1,8 +1,8 @@
-\BOOKMARK [1][-]{section.1}{Introduction}{}% 1
-\BOOKMARK [1][-]{section.2}{The Model}{}% 2
-\BOOKMARK [1][-]{section.3}{The FLsp class}{}% 3
-\BOOKMARK [1][-]{section.4}{Creating and fitting FLsp objects}{}% 4
-\BOOKMARK [1][-]{section.5}{Testing FLsp against the other data sets}{}% 5
-\BOOKMARK [1][-]{section.6}{Plotting results}{}% 6
-\BOOKMARK [1][-]{section.7}{Profiling the fit}{}% 7
-\BOOKMARK [1][-]{section.8}{Uncertainty}{}% 8
+\BOOKMARK [1][-]{section.1}{Introduction}{}
+\BOOKMARK [1][-]{section.2}{The Model}{}
+\BOOKMARK [1][-]{section.3}{The FLsp class}{}
+\BOOKMARK [1][-]{section.4}{Creating and fitting FLsp objects}{}
+\BOOKMARK [1][-]{section.5}{Testing FLsp against the other data sets}{}
+\BOOKMARK [1][-]{section.6}{Plotting results}{}
+\BOOKMARK [1][-]{section.7}{Profiling the fit}{}
+\BOOKMARK [1][-]{section.8}{Uncertainty}{}
