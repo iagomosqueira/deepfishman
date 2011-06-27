@@ -11,8 +11,8 @@ save(nnh, file="../FLsp/data/nnh.RData")
 # Load the library
 library(FLsp)
 # Load the New Zealand Rock Lobster data set
-#data(nzrl)
-nzrl <- read.csv("../FLsp/data/NZRL.csv")
+data(nzrl)
+#nzrl <- read.csv("../FLsp/data/NZRL.csv")
 # This is a dataframe with year, catch and cpue
 # Make FLQuant objects of the catch and cpue series
 catch <- FLQuant(nzrl$catch, dimnames=list(year=nzrl$year))
@@ -88,11 +88,41 @@ ch <- t(chol(vcov.matrix))
 # uncorrelated samples
 nsam <- 1000
 ## set up theta matrix of samples
-theta <- matrix(nrow=nsam,ncol=2)
-theta[,1] <- rnorm(nsam)
-theta[,2] <- rnorm(nsam)
-theta <- t(apply(theta,1,function(x,ch){x <- ch%*%x},ch))
-theta[,1] <- nzrl@params['r',]+theta[,1]
-theta[,2] <- nzrl@params['k',]+theta[,2]
-apply(theta,2,mean)
+Y <- matrix(nrow=nsam,ncol=2)
+Y[,1] <- rnorm(nsam)
+Y[,2] <- rnorm(nsam)
+X <- t(apply(Y,1,function(x,ch){x <- ch%*%x},ch))
+cov(X)
+vcov.matrix
+# cov looks OK
+apply(X,2,mean)
+c(params(nzrl))
+# but mean is 0 (or thereabouts)
+hist(X[,2])
+X <- sweep(X,2,params(nzrl),"+")
+
+library(ggplot2)
+# put the data into a dataframe using reshape
+Xdf <- melt(X,varnames=c("obs","param"))
+qplot(value, data=Xdf, facets= param ~ .,geom="histogram")
+# But the scales are not helpful
+
+par(mfrow=c(2,1))
+hist(X[,1], xlab="r", main="")
+hist(X[,2], xlab="K", main="")
+
+X < 0
+apply(X,2,function(x) x<0)
+X[,1] <= 0
+XX <- X
+XX[XX[,1] <= 0,] <- NA
+
+# Copy the parameters back
+params(nzrl) <- propagate(params(nzrl), nsam)
+params(nzrl)['r',] <- X[,1]
+params(nzrl)['k',] <- X[,2]
+
+
+
+
 

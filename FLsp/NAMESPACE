@@ -12,7 +12,8 @@ exportMethods(
     "qhat",
     "sigma2",
     "indexhat",
-    "ll")
+    "ll",
+    "msy")
 export(
 	"sp",
 	"ihat")
