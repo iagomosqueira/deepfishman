@@ -1,8 +1,5 @@
 // FLsp
 
-//#define ADOLC_TAPELESS // Going to use the tapeless method
-//#include "adouble.h" // only this is needed for tapeless
-//typedef adtl::adouble adouble; // necessary for tapeless - see manual
 
 #include <adolc.h>
 #include <stdlib.h>
@@ -68,7 +65,7 @@ RcppExport SEXP flspCpp_tape(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp,
     //rk[0] <<= as<double>(r_sexp);
     //rk[1] <<= as<double>(k_sexp);
 
-  // initialise B0 - should be part of the solving loop?
+  // initialise B0 and other stuff
   B_ad[0] = k_ad;
   *q = 0;
   *sigma2 = 0;
@@ -154,11 +151,13 @@ void q_obs_mult_log(adouble* B, adouble* q, NumericVector I)
   for (yr = 0; yr<I.size(); yr++)
   {
     // check if index has a value
-    //if (!__isnan(I(yr)))
-    //{
+    // We don't like conditionals when using tape ADOLC
+    // But here we only evaluate tape once before it is written over so should be OK
+    if (!__isnan(I(yr)))
+    {
       n++;
       *q = *q + log(I(yr) / B[yr]);
-    //}
+    }
   }
   *q = exp(*q / n);
 }
@@ -185,12 +184,12 @@ void ll_obs(adouble* B, NumericVector C, NumericVector I, adouble* q, adouble* I
   for (yr = 0; yr<C.size(); yr++)
   {
     // check if index has a value
-    //if (!__isnan(I(yr)))
-    //{
+    if (!__isnan(I(yr)))
+    {
       n++;
       vhat_ad[yr] = log(I(yr) / Ihat[yr]);
       *sigma2 = *sigma2 + pow(vhat_ad[yr],2);
-    //}
+    }
   }
   *sigma2 = *sigma2 / n;
 
@@ -199,11 +198,11 @@ void ll_obs(adouble* B, NumericVector C, NumericVector I, adouble* q, adouble* I
   for (yr = 0; yr<C.size(); yr++)
   {
     // check if index has a value
-    //if (!__isnan(I(yr)))
-    //{
+    if (!__isnan(I(yr)))
+    {
       n++;
       *ll = *ll - pow(vhat_ad[yr],2) / (2 * *sigma2);
-    //}
+    }
   }
     *ll = *ll - n * log (sqrt(2*pi* *sigma2));
 }

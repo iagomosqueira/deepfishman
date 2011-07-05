@@ -372,7 +372,7 @@ The approach is demonstrated below.
 
 First we want to the get the variance-covariance matrix of the estimated parameters.
 It is possible to estimate the variance-covariance matrix from the matrix of second-order (partial) derivatives, called the Hessian matrix,
-which is returned in the fitted $FLsp$ object.
+which is returned in the fitted $FLsp$ object. As $FLsp$ uses automatic differentiation this estimate of the Hessian matrix is very accurate.
 If we assume the parameter distribution has multivariate normality, it is a standard statistical result that:
 \begin{equation}
 \Sigma = (-H)^{-1}
@@ -387,22 +387,23 @@ On the other hand, if the second-order derivative is low, then the change in the
 This means that the parameter value can vary in any direction without greatly affecting the value of the likelihood function.
 This implies that the standard error of the parameter will be large.
 
+After fitting the model, $fitsp$ attempts to estimate the variance-covariance matrix from the Hessian matrix using the above relationship. The results are stored in the $vcov$ slot. If estimating the variance-covariance matrix has failed, $NA$ is returned. Here we see that the estimation has been successful.
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
-<<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
-vcov.matrix <- solve(-1 * nzrl@hessian[,,1])
+<<eval=TRUE, quiet=TRUE,echo=TRUE,results=verbatim,keep.source=TRUE>>=
+vcov(nzrl)
 @
 \end{shaded}%
 \end{minipage}
 \end{center}
 
-We are ready to get the Cholesky factor of the variance-covariance matrix
+We are ready to get the Cholesky factor of the variance-covariance matrix. We need to specify which iteration of the variance-covariance matrix we want to use (even when there is only one iter).
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 <<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
-A <- t(chol(vcov.matrix))
+A <- t(chol(vcov(nzrl)[,,1]))
 @
 \end{shaded}%
 \end{minipage}
@@ -445,7 +446,7 @@ We can then check the statistical properties of the simulated parameter values.
 \begin{shaded}%
 <<eval=TRUE, quiet=TRUE,echo=TRUE,results=verbatim,keep.source=TRUE>>=
 cov(X)
-vcov.matrix
+vcov(nzrl)
 apply(X,2,mean)
 c(params(nzrl))
 @
@@ -499,12 +500,14 @@ params(nzrl_sim)['k',] <- X[,2]
 \end{minipage}
 \end{center}
 
-We can now calculate the equivalent value for MSY at each of the simulated parameter values:
+We can now calculate the equivalent value for MSY, $B_{MSY}$ and $B_{current}$ at each of the simulated parameter values:
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 <<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
 nzrl_msy <- msy(nzrl_sim)
+nzrl_bmsy <- bmsy(nzrl_sim)
+nzrl_bcurrent <- bcurrent(nzrl_sim)
 @
 \end{shaded}%
 \end{minipage}
@@ -517,9 +520,10 @@ And plot the distribution of MSY and BMSY (see Figure~\ref{fig:hist_msy_plot}).
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 <<label=hist_msy,include=FALSE>>=
-par(mfrow=c(2,1))
+par(mfrow=c(3,1))
 hist(nzrl_msy, xlab="MSY", main="")
-#hist(X[,2], xlab="K", main="")
+hist(nzrl_bmsy, xlab="BMSY", main="")
+hist(nzrl_bcurrent, xlab="Bcurrent", main="")
 @
 \end{shaded}%
 \end{minipage}
@@ -532,7 +536,7 @@ hist(nzrl_msy, xlab="MSY", main="")
 <<hist_msy>>
 @
 \end{center}
-\caption{Histogram of MSY and $B_{MSY}$}
+\caption{Histogram of MSY, $B_{MSY}$ and $B_{current}}
 \label{fig:hist_msy_plot}
 \end{figure}
 

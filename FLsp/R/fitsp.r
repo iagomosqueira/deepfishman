@@ -125,6 +125,7 @@ setMethod('fitsp',
     #  iter=1:iter))
     #object@hessian <- object@vcov
     object@hessian <- array(NA,dim=c(2,2,iter),dimnames=list(c("r","k"),c("r","k"),iter=1:iter))
+    object@vcov <- object@hessian
 
 
     #browser()
@@ -222,6 +223,14 @@ for (index.count in 1:length(object@index))
 	object@hessian[,,it] <- tape_res$hessian
 
 	#browser()
+	# Sort out variance-covariance matrix
+	tempvcov <- try(solve(-1 * object@hessian[,,it]),silent=TRUE)
+	if (class(tempvcov) == 'try-error')
+	    object@vcov[,,it] <- NA
+	else
+	    object@vcov[,,it] <- tempvcov
+
+
     }
     # force dimnames[1:5] in 'fitted' and 'residuals' to match
     #dimnames(fitted(object))[1:5] <- dimnames(do.call(as.character(
