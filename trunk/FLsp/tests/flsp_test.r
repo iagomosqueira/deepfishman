@@ -1,10 +1,8 @@
 # FLsp test
 
-setwd("m:/Projects/Deepfishman/deepfishman")
-
 library(FLsp)
-dyn.load("C:/R/library/FLsp/libs/i386/FLsp.dll")
 
+# Testing the C code
 catch <- c(100,200,300)
 r <- 1
 p <- 1

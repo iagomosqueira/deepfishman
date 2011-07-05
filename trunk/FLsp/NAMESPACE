@@ -13,7 +13,9 @@ exportMethods(
     "sigma2",
     "indexhat",
     "ll",
-    "msy")
+    "msy",
+    "bmsy",
+    "bcurrent")
 export(
 	"sp",
 	"ihat")

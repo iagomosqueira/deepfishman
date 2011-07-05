@@ -2,7 +2,6 @@
 # Multiple indices
 # a plot
 # iter check
-# rewrite dims method
 # tests
 
 # qhat should be FLQuants - for multiple indices
@@ -138,21 +137,35 @@ setMethod('evalC', signature(object='FLsp'),
 	return(tape)
 })
 
-
+#******** biomass *************
 if (!isGeneric("biomass"))
     setGeneric("biomass", function(object, ...)
     standardGeneric("biomass"))
 
 setMethod('biomass', signature(object='FLsp'),
   function(object) {
+      #browser()
       # Make an FLQuant with right number of iterations
       iters <- dims(object)$iter
       dimnames <- dimnames(object@catch)
-      dimnames$iter <- iters
+      dimnames$iter <- 1:iters
       biomass <- FLQuant(NA,dimnames=dimnames)
       for (i in 1:iters)
 	  iter(biomass,i)[] <- evalC(iter(object,i))[["B"]]
       return(biomass)
+})
+
+
+#******** Bcurrent *************
+
+if (!isGeneric("bcurrent"))
+    setGeneric("bcurrent", function(object, ...)
+    standardGeneric("bcurrent"))
+
+setMethod('bcurrent', signature(object='FLsp'),
+  function(object) {
+      #biomass <- biomass(object)
+      return(biomass(object)[,dim(object@catch)[2]])
 })
 
 
@@ -166,7 +179,7 @@ setMethod('qhat', signature(object='FLsp'),
       iters <- dims(object)$iter
       #dimnames <- dimnames(object@catch)
       #dimnames$iter <- iters
-      qhat <- FLQuant(NA,dimnames=list(iter=iters))
+      qhat <- FLQuant(NA,iter=iters)
       for (i in 1:iters)
 	  iter(qhat,i)[] <- evalC(iter(object,i))[["qhat"]]
       return(qhat)
@@ -182,7 +195,7 @@ setMethod('sigma2', signature(object='FLsp'),
       iters <- dims(object)$iter
       #dimnames <- dimnames(object@catch)
       #dimnames$iter <- iters
-      sigma2 <- FLQuant(NA,dimnames=list(iter=iters))
+      sigma2 <- FLQuant(NA,iter=iters)
       for (i in 1:iters)
 	  iter(sigma2,i)[] <- evalC(iter(object,i))[["sigma2"]]
       return(sigma2)
@@ -199,7 +212,7 @@ setMethod('ll', signature(object='FLsp'),
       iters <- dims(object)$iter
       #dimnames <- dimnames(object@catch)
       #dimnames$iter <- iters
-      ll <- FLQuant(NA,dimnames=list(iter=iters))
+      ll <- FLQuant(NA,iter=iters)
       for (i in 1:iters)
 	  iter(ll,i)[] <- evalC(iter(object,i))[["ll"]]
       return(ll)
@@ -216,8 +229,8 @@ setMethod('indexhat', signature(object='FLsp'),
       nindex <- length(object@index)
       iters <- dims(object)$iter
       dimnames <- dimnames(object@catch)
-      dimnames$iter <- iters
-      flq <- FLQuant(NA,dimnames=dimnames)
+      #dimnames$iter <- iters
+      flq <- FLQuant(NA,dimnames=dimnames,iter=iters)
       indexhat <- FLQuants()
       for (i in 1:iters)
       {
@@ -237,18 +250,35 @@ if (!isGeneric("msy"))
 
 setMethod('msy', signature(object='FLsp'),
   function(object) {
-      out <- t(params(object)['r',] * params(object)['k',] / 4)
+      out <- c(t(params(object)['r',] * params(object)['k',] / 4))
       return(out)
 })
 
+
+#**** BMSY *****
+if (!isGeneric("bmsy"))
+    setGeneric("bmsy", function(object, ...)
+    standardGeneric("bmsy"))
+
+setMethod('bmsy', signature(object='FLsp'),
+  function(object) {
+      out <- c(params(object)['k',] / 2)
+      return(out)
+})
+
+#**** Dims *****
 # Need to overload this so that FLQuants slots are included
+# And iters in params slot - pretty hacky...
+# Why doesn't this get loaded?
 setMethod("dims", signature(obj="FLsp"),
     # Returns a list with different parameters
     function(obj, ...)
 	{
+	    #browser()
     res <- callNextMethod()
     iters_in_index_slot <- max(unlist(lapply(obj@index,function(x)dim(x)[6])))
-    res$iter <- max(res$iter,iters_in_index_slot)
+    iters_in_params_slot <- dim(obj@params)[2]
+    res$iter <- max(res$iter,iters_in_index_slot, iters_in_params_slot)
     return(res)
 	})
 
