@@ -15,7 +15,11 @@ exportMethods(
     "ll",
     "msy",
     "bmsy",
-    "bcurrent")
+    "bcurrent",
+		"dims",
+		"profile",
+		"predict",
+		"iter")
 export(
 	"sp",
 	"ihat")

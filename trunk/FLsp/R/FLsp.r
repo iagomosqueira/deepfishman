@@ -283,6 +283,36 @@ setMethod("dims", signature(obj="FLsp"),
 	})
 
 
+setMethod("iter", signature(object="FLsp"),
+	  function(object, it) {
+			res <- callNextMethod(object,it)
+			# sort out indices
+			res@index <- lapply(res@index,function(x) iter(x,it))
+			return(res)
+
+    # FLArray
+#    object <- qapply(object, FUN=iter, it)
+#    # params
+#    params(object) <- iter(params(object), it)
+#    # vcov
+#    if(length(dim(vcov)) > 2)
+#      if(dim(vcov)[3] > 1)
+#        vcov(object) <- vcov(object)[,,it]
+#      else
+#        vcov(object) <- vcov(object)[,,1]
+#    # logLik
+#    logLik(object) <- iter(object@logLik, it)
+#		# indices
+#		object@index <- lapply(object@index,function(x) iter(x,it))
+#		return(object)
+
+			
+			
+			
+			
+})
+
+
 # New profile plot - includes gradients
 setMethod("profile", signature(fitted="FLsp"),
   function(fitted, which, maxsteps=11, range=0.5, ci=c(0.25, 0.5, 0.75, 0.95),

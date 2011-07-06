@@ -142,9 +142,11 @@ for (index.count in 1:length(object@index))
     object@residuals_index[[index.count]] <- propagate(FLQuant(NA,dimnames=index_dmns),iter)
 }
 
-
+#browser()
     for (it in 1:iter)
     {
+
+#if (it == 4) browser()
 
     cat("iter: ", it, "\n")
 
@@ -184,6 +186,8 @@ for (index.count in 1:length(object@index))
 
     #browser()
 
+			#if (it ==4) browser()
+
 	    out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
 
 	    #if (it ==2) browser()
@@ -216,19 +220,20 @@ for (index.count in 1:length(object@index))
 	}
 
 	# Load up the hessian slots
+	# leave out for the moment
 	#browser()
-	tape_res <- .Call("flspCpp_tape",iter(object@catch,it),iter(object@index[[1]],it),iter(object@params["r"],it),1,iter(object@params["k"],it))
+#	tape_res <- .Call("flspCpp_tape",iter(object@catch,it),iter(object@index[[1]],it),iter(object@params["r"],it),1,iter(object@params["k"],it))
 	# fix the upper right part of hessian
-	tape_res$hessian[1,2] <- tape_res$hessian[2,1]
-	object@hessian[,,it] <- tape_res$hessian
+#	tape_res$hessian[1,2] <- tape_res$hessian[2,1]
+#	object@hessian[,,it] <- tape_res$hessian
 
 	#browser()
 	# Sort out variance-covariance matrix
-	tempvcov <- try(solve(-1 * object@hessian[,,it]),silent=TRUE)
-	if (class(tempvcov) == 'try-error')
-	    object@vcov[,,it] <- NA
-	else
-	    object@vcov[,,it] <- tempvcov
+#	tempvcov <- try(solve(-1 * object@hessian[,,it]),silent=TRUE)
+#	if (class(tempvcov) == 'try-error')
+#	    object@vcov[,,it] <- NA
+#	else
+#	    object@vcov[,,it] <- tempvcov
 
 
     }
@@ -482,13 +487,13 @@ setMethod('predict', signature(object='FLsp'),
 # original dims in FLComp does not count FLQuants
 # We need to here because index slot is FLQuants and can be multi iter
 
-setMethod("dims", signature(obj="FLsp"),
-    # Returns a list with different parameters
-    function(obj, ...)
-	{
-    res <- callNextMethod()
-    iters_in_index_slot <- max(unlist(lapply(obj@index,function(x)dim(x)[6])))
-    res$iter <- max(res$iter,iters_in_index_slot)
-    return(res)
-	})
+#setMethod("dims", signature(obj="FLsp"),
+#    # Returns a list with different parameters
+#    function(obj, ...)
+#	{
+#    res <- callNextMethod()
+#    iters_in_index_slot <- max(unlist(lapply(obj@index,function(x)dim(x)[6])))
+#    res$iter <- max(res$iter,iters_in_index_slot)
+#    return(res)
+#	})
 
