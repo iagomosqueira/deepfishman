@@ -162,7 +162,7 @@ These can be compared to our results by interrogating the $FLsp$ object.
 An object of class "FLPar"
 params
          r          k 
-4.9429e-02 1.4233e+05 
+4.2725e-02 1.4901e+05 
 units:  NA 
 \end{Soutput}
 \begin{Sinput}
@@ -175,7 +175,7 @@ An object of class "FLQuant"
 
      year
 quant 1         
-  all 2.2129e-05
+  all 2.1051e-05
 
 units:  NA 
 \end{Soutput}
@@ -189,7 +189,7 @@ An object of class "FLQuant"
 
      year
 quant 1      
-  all 0.20695
+  all 0.20701
 
 units:  NA 
 \end{Soutput}
@@ -202,20 +202,14 @@ An object of class "FLQuant"
 , , unit = unique, season = all, area = unique
 
      year
-quant 1945   1946   1947   1948   1949   1950   1951   1952   1953   1954  
-  all 142335 141526 140712 139872 138632 136938 134522 132053 129201 125630
+quant 1945   1946   1947   1948   1949   1950   1951   1952   1953   1954   1955   1956   1957   1958   1959   1960   1961  
+  all 149006 148197 147378 146527 145272 143555 141108 138593 135683 132041 127143 122931 117303 113320 110033 107244 104767
      year
-quant 1955   1956   1957   1958   1959   1960   1961   1962   1963   1964  
-  all 120818 116712 111203 107357 104214 101575  99251  96694  93644  90673
+quant 1962   1963   1964   1965   1966   1967   1968   1969   1970   1971   1972   1973   1974   1975   1976   1977   1978  
+  all 102053  98844  95712  92578  89092  85327  82103  78703  75504  72396  69508  67598  65392  63316  61885  60120  58415
      year
-quant 1965   1966   1967   1968   1969   1970   1971   1972   1973   1974  
-  all  87703  84383  80786  77731  74500  71469  68528  65807  64061  62018
-     year
-quant 1975   1976   1977   1978   1979   1980   1981   1982   1983   1984  
-  all  60105  58834  57229  55684  53941  51547  48982  46512  43729  40842
-     year
-quant 1985   1986   1987   1988   1989   1990  
-  all  37370  33876  30495  27180  25139  22844
+quant 1979   1980   1981   1982   1983   1984   1985   1986   1987   1988   1989   1990  
+  all  56515  53964  51244  48623  45691  42660  39050  35425  31921  28493  26350  23958
 
 units:  NA 
 \end{Soutput}
@@ -245,12 +239,12 @@ It can be seen that there is good agreement between the published results and th
 \hline
 Measure & FLsp & Published & FLsp & Published & FLsp & Published \\
 \hline
-r          & 0.0494     & 0.0659    &  0.32     & 0.328 & 0.37     & 0.379     \\
-K ('000 t) & 142     & 129.0     &  243     & 239.6  & 2820     & 2772.6    \\
-$\sigma$   & 0.207 & 0.207     &  0.11 & 0.111  & 0.125 & 0.124     \\
-$\hat{q}$  & 2.21e-05  & 2.461e-05 &  0.264  & 0.2671 & 0.000427  & 4.360e-04 \\
-$B_{current}$  & 22.8  & 21.15 &  75  & 75.51 & 1660  & 1646.3 \\
-MSY        &  0 & 2133.74 &  0  & 19.65 & 0  & 263.2 \\
+r          & \Sexpr{r[1]}     & 0.0659    &  \Sexpr{r[2]}     & 0.328 & \Sexpr{r[3]}     & 0.379     \\
+K ('000 t) & \Sexpr{k[1]}     & 129.0     &  \Sexpr{k[2]}     & 239.6  & \Sexpr{k[3]}     & 2772.6    \\
+$\sigma$   & \Sexpr{sigma[1]} & 0.207     &  \Sexpr{sigma[2]} & 0.111  & \Sexpr{sigma[3]} & 0.124     \\
+$\hat{q}$  & \Sexpr{qhat[1]}  & 2.461e-05 &  \Sexpr{qhat[2]}  & 0.2671 & \Sexpr{qhat[3]}  & 4.360e-04 \\
+$B_{current}$  & \Sexpr{bc[1]/1000}  & 21.15 &  \Sexpr{bc[2]}  & 75.51 & \Sexpr{bc[3]}  & 1646.3 \\
+MSY        &  \Sexpr{0} & 2133.74 &  \Sexpr{0}  & 19.65 & \Sexpr{0}  & 263.2 \\
 \hline
 \end{tabular}
 \caption{Comparing the published results with those from $FLsp$ for three data sets.}
@@ -299,8 +293,7 @@ To look at the residuals and put a loess function through them use (see Figure~\
 \begin{Schunk}
 \begin{Sinput}
 > residuals <- as.data.frame(nzrl@residuals_index)
-> print(xyplot(data ~ year | qname, data = residuals, panel = function(x, 
-+     y) {
+> print(xyplot(data ~ year | qname, data = residuals, panel = function(x, y) {
 +     panel.xyplot(x, y)
 +     panel.loess(x, y, span = 1)
 + }))
@@ -449,8 +442,8 @@ After fitting the model, $fitsp$ attempts to estimate the variance-covariance ma
 
    
                 r             k
-  r  1.889633e-03 -1.818686e+03
-  k -1.818686e+03  1.754115e+09
+  r  1.329093e-03 -1.389215e+03
+  k -1.389215e+03  1.456696e+09
 \end{Soutput}
 \end{Schunk}
 \end{shaded}%
@@ -515,8 +508,8 @@ We can then check the statistical properties of the simulated parameter values.
 \end{Sinput}
 \begin{Soutput}
               r             k
-r  1.888649e-03 -1.821158e+03
-k -1.821158e+03  1.759895e+09
+r  1.309872e-03 -1.366057e+03
+k -1.366057e+03  1.429485e+09
 \end{Soutput}
 \begin{Sinput}
 > vcov(nzrl)
@@ -526,21 +519,21 @@ k -1.821158e+03  1.759895e+09
 
    
                 r             k
-  r  1.889633e-03 -1.818686e+03
-  k -1.818686e+03  1.754115e+09
+  r  1.329093e-03 -1.389215e+03
+  k -1.389215e+03  1.456696e+09
 \end{Soutput}
 \begin{Sinput}
 > apply(X,2,mean)
 \end{Sinput}
 \begin{Soutput}
            r            k 
-4.636808e-02 1.451950e+05 
+4.183654e-02 1.498782e+05 
 \end{Soutput}
 \begin{Sinput}
 > c(params(nzrl))
 \end{Sinput}
 \begin{Soutput}
-[1] 4.942920e-02 1.423348e+05
+[1] 4.272527e-02 1.490063e+05
 \end{Soutput}
 \end{Schunk}
 \end{shaded}%
