@@ -48,6 +48,18 @@ setMethod('fitsp',
     if(is.null(upper))
         upper <- upper(object)[match(parnm, names(fixed), nomatch=0)==0]
 
+		# gr function
+		if(!is.null(body(object@gr)))
+    {
+      gr <- function(par)
+      {
+        pars <- as.list(par)
+        names(pars) <- names(start)
+        pars[fixnm] <- lapply(fixed, iter, it)
+        return(-1*(do.call(object@gr, args=c(pars, data))))
+      }
+    }
+    else
 		gr <- NULL
 		
 	  loglfoo <- function(par) {
@@ -156,6 +168,8 @@ for (index.count in 1:length(object@index))
       else
         data <- alldata
 
+#print(data)
+
 	# We don't have start values but we need to set some because they are used by loglfoo
       # start values
 #      if(missing(start)) {
@@ -184,20 +198,25 @@ for (index.count in 1:length(object@index))
 #      out <- do.call('optim', c(list(par=unlist(start), fn=loglfoo, method=method,
 #        hessian=TRUE, control=control, lower=lower, upper=upper, gr=gr)))
 
-    #browser()
-
-			#if (it ==4) browser()
-
-	    out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
-
-	    #if (it ==2) browser()
+    browser()
 
 
-	    names(out$optim$bestmem) <- names(start)
-      # output
-      # place out$par in right iter dim
-      iter(object@params[names(out$optim$bestmem),], it) <- exp(out$optim$bestmem)
-      # fixed
+
+	    #out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
+	    #names(out$optim$bestmem) <- names(start)
+      #iter(object@params[names(out$optim$bestmem),], it) <- exp(out$optim$bestmem)
+      #object@logLik[it] <- -out$optim$bestval
+
+			out <- do.call('genoud', c(list(fn=loglfoo, nvars= (2-length(fixed)), control=control, gr=gr)))
+	    names(out$par) <- names(start)
+      iter(object@params[names(out$par),], it) <- exp(out$par)
+      object@logLik[it] <- -out$value
+
+
+
+
+
+			# fixed
       if(length(fixed) > 0)
         iter(object@params, it)[fixnm,] <- unlist(lapply(fixed, iter, it))
       # TODO make details list of lists if iter > 1?
@@ -205,11 +224,10 @@ for (index.count in 1:length(object@index))
       #  convergence=out$convergence, message=out$message)
 
       # logLik
-      object@logLik[it] <- -out$optim$bestval
       attr(object@logLik, 'nobs') <- length(data[[1]])
 
 
-      #browser()
+
 
     # fitted & residuals
     # No iter <- methods for FLQuants so a bit hacky
@@ -222,18 +240,18 @@ for (index.count in 1:length(object@index))
 	# Load up the hessian slots
 	# leave out for the moment
 	#browser()
-#	tape_res <- .Call("flspCpp_tape",iter(object@catch,it),iter(object@index[[1]],it),iter(object@params["r"],it),1,iter(object@params["k"],it))
+	tape_res <- .Call("flspCpp_tape",iter(object@catch,it),iter(object@index[[1]],it),iter(object@params["r"],it),1,iter(object@params["k"],it))
 	# fix the upper right part of hessian
-#	tape_res$hessian[1,2] <- tape_res$hessian[2,1]
-#	object@hessian[,,it] <- tape_res$hessian
+	tape_res$hessian[1,2] <- tape_res$hessian[2,1]
+	object@hessian[,,it] <- tape_res$hessian
 
 	#browser()
 	# Sort out variance-covariance matrix
-#	tempvcov <- try(solve(-1 * object@hessian[,,it]),silent=TRUE)
-#	if (class(tempvcov) == 'try-error')
-#	    object@vcov[,,it] <- NA
-#	else
-#	    object@vcov[,,it] <- tempvcov
+	tempvcov <- try(solve(-1 * object@hessian[,,it]),silent=TRUE)
+	if (class(tempvcov) == 'try-error')
+	    object@vcov[,,it] <- NA
+	else
+	    object@vcov[,,it] <- tempvcov
 
 
     }
