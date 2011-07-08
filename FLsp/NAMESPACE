@@ -13,13 +13,14 @@ exportMethods(
     "sigma2",
     "indexhat",
     "ll",
-    "msy",
-    "bmsy",
+    "Msy",
+    "Bmsy",
     "bcurrent",
 		"dims",
 		"profile",
 		"predict",
-		"iter")
+		"iter",
+		"plot")
 export(
 	"sp",
 	"ihat")
