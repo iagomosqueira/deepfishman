@@ -109,7 +109,7 @@ RcppExport SEXP flspCpp_tape(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp,
  
 //return List::create(Named("I",I));
 
-return List::create(Named("B",B),
+List output = List::create(Named("B",B),
                     Named("Ihat",Ihat),
                     Named("qhat",(*q).value()),
                     Named("sigma2",(*sigma2).value()),
@@ -119,6 +119,21 @@ return List::create(Named("B",B),
 		    Named("hessian",Hout),
 		    Named("res",res)
                     );
+
+// clean up
+delete[] B_ad;
+delete[] Ihat_ad;
+delete[] q;
+delete[] sigma2;
+delete[] ll;
+delete[] rk;
+delete[] indeps;
+delete[] grads;
+for (i=0;i<2;i++)
+	delete[] H[i];
+delete[] H;
+                    
+return output;
 
 }
 
@@ -205,5 +220,7 @@ void ll_obs(adouble* B, NumericVector C, NumericVector I, adouble* q, adouble* I
     }
   }
     *ll = *ll - n * log (sqrt(2*pi* *sigma2));
+    
+    delete[] vhat_ad;
 }
 
