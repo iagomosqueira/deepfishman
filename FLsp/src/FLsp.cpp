@@ -107,7 +107,11 @@ RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP
     res(i) = I(i) - Ihat(i);
   }
 
-return List::create(Named("B",B),
+
+
+//return List::create(Named("B",B),
+//List output.create(Named("B",B),
+List output = List::create(Named("B",B),
                     Named("Ihat",Ihat),
                     Named("qhat",(*q).getValue()),
                     Named("sigma2",(*sigma2).getValue()),
@@ -118,6 +122,15 @@ return List::create(Named("B",B),
 		    Named("res_grad_r",res_grad_r),
 		    Named("res_grad_k",res_grad_k)
                     );
+
+// clean up
+delete[] B_ad;
+delete[] Ihat_ad;
+delete[] q;
+delete[] sigma2;
+delete[] ll;
+                    
+return output;
 }
 
 void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k)
@@ -196,5 +209,7 @@ void ll_obs(adouble* B, NumericVector C, NumericVector I, adouble* q, adouble* I
       *ll = *ll - pow(vhat_ad[yr],2) / (2 * *sigma2);
     }
     *ll = *ll - n * log (sqrt(2*pi* *sigma2));
+    
+    delete[] vhat_ad;
 }
 
