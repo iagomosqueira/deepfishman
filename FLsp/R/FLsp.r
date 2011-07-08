@@ -90,6 +90,14 @@ sp <- function()
   	return(res)
 	}
 
+	gr <- function(r, k, catch, index)
+  {
+		res <- .Call("flspCpp",catch,index[[1]],r,1,k)
+		#if (is.nan(res)) res <- Inf # Fix for DEoptim
+  	#if (is.na(res)) res <- Inf
+  	return(c(res[["ll_grad_r"]],res[["ll_grad_k"]]))
+	}
+
   initial <- structure(function(catch)
 	{
 		# The function to provide initial values
@@ -104,7 +112,7 @@ sp <- function()
 	# awkward
 	model  <- index ~ ihat(catch,index,r,k)
 
-	return(list(logl=logl, model=model, initial=initial))
+	return(list(logl=logl,  gr=gr, model=model, initial=initial))
 }
 
 #*******************************************************************************
@@ -244,11 +252,11 @@ setMethod('indexhat', signature(object='FLsp'),
       return(indexhat)
 })
 
-if (!isGeneric("msy"))
-    setGeneric("msy", function(object, ...)
-    standardGeneric("msy"))
+if (!isGeneric("Msy"))
+    setGeneric("Msy", function(object, ...)
+    standardGeneric("Msy"))
 
-setMethod('msy', signature(object='FLsp'),
+setMethod('Msy', signature(object='FLsp'),
   function(object) {
       out <- c(t(params(object)['r',] * params(object)['k',] / 4))
       return(out)
@@ -256,11 +264,11 @@ setMethod('msy', signature(object='FLsp'),
 
 
 #**** BMSY *****
-if (!isGeneric("bmsy"))
-    setGeneric("bmsy", function(object, ...)
-    standardGeneric("bmsy"))
+if (!isGeneric("Bmsy"))
+    setGeneric("Bmsy", function(object, ...)
+    standardGeneric("Bmsy"))
 
-setMethod('bmsy', signature(object='FLsp'),
+setMethod('Bmsy', signature(object='FLsp'),
   function(object) {
       out <- c(params(object)['k',] / 2)
       return(out)
@@ -318,6 +326,7 @@ setMethod("profile", signature(fitted="FLsp"),
   function(fitted, which, maxsteps=11, range=0.5, ci=c(0.25, 0.5, 0.75, 0.95),
       plot=TRUE, fixed=list(), print=FALSE, control=list(trace=0), ...)
   {
+
     # vars
     foo <- logl(fitted)
     params <- params(fitted)
@@ -459,7 +468,7 @@ setMethod("profile", signature(fitted="FLsp"),
     lines(y=c(-1e9,1e9),x=c(0,0),lty=2)
     par(mar=c(5.1,5.1,1,1))
 
-
+#browser()
         do.call('image', c(list(x=profiled[[1]], y=profiled[[2]], z=surface,
           xlab=which[1], ylab=which[2]), dots[!names(dots) %in% names(formals(optim))]))
 
@@ -484,7 +493,36 @@ setMethod("profile", signature(fitted="FLsp"),
 ) # }}}
 
 
+#*******************************************************************************
+# Basic plot
+# Single iter
+setMethod("plot", signature(x="FLsp", y="missing"),
+	function(x, ...)
+  {
+	#browser()
 
+  x <- iter(x,1)
+  yrs <- as.numeric(dimnames(x@catch)$year)
+  if (all(is.na(x@residuals_index[[1]])))
+  #if (dim(x@residuals_index[[1]])[2] == length(yrs))
+		par(mfrow=c(2,1))
+  else
+		(par(mfrow=c(3,1)))
+
+
+  plot(x=yrs, y=c(x@catch), type="l", xlab="year", ylab="catch")
+  plot(x=yrs, y=c(x@index[[1]]), type="l", xlab="year", ylab="index")
+  if (!all(is.na(x@residuals_index[[1]])))
+  	lines(x=yrs, y=c(x@fitted_index[[1]]), lty=2)
+	legend("topright",legend=(c("index","fitted index")),lty=c(1,2))
+
+	if (!all(is.na(x@residuals_index[[1]])))
+	{
+		plot(x=yrs, y=c(x@residuals_index[[1]]), xlab="year", ylab="residuals")
+		lines(x=c(-1e6,1e6),y=c(0,0),lty=2)
+	}
+
+  })
 
 
 
