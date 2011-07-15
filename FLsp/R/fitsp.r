@@ -198,19 +198,19 @@ for (index.count in 1:length(object@index))
 #      out <- do.call('optim', c(list(par=unlist(start), fn=loglfoo, method=method,
 #        hessian=TRUE, control=control, lower=lower, upper=upper, gr=gr)))
 
-    browser()
+    #browser()
 
 
 
-	    #out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
-	    #names(out$optim$bestmem) <- names(start)
-      #iter(object@params[names(out$optim$bestmem),], it) <- exp(out$optim$bestmem)
-      #object@logLik[it] <- -out$optim$bestval
+	    out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
+	    names(out$optim$bestmem) <- names(start)
+      iter(object@params[names(out$optim$bestmem),], it) <- exp(out$optim$bestmem)
+      object@logLik[it] <- -out$optim$bestval
 
-			out <- do.call('genoud', c(list(fn=loglfoo, nvars= (2-length(fixed)), control=control, gr=gr)))
-	    names(out$par) <- names(start)
-      iter(object@params[names(out$par),], it) <- exp(out$par)
-      object@logLik[it] <- -out$value
+			#out <- do.call('genoud', c(list(fn=loglfoo, nvars= (2-length(fixed)), control=control, gr=gr)))
+	    #names(out$par) <- names(start)
+      #iter(object@params[names(out$par),], it) <- exp(out$par)
+      #object@logLik[it] <- -out$value
 
 
 
