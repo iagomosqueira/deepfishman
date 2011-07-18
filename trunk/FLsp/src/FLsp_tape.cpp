@@ -121,18 +121,23 @@ List output = List::create(Named("B",B),
                     );
 
 // clean up
+
+// Clean pointers to adouble
 delete[] B_ad;
 delete[] Ihat_ad;
-delete[] q;
-delete[] sigma2;
-delete[] ll;
 delete[] rk;
+
+delete q;
+delete sigma2;
+delete ll_ad;
+
+// Clean pointers to double
 delete[] indeps;
 delete[] grads;
 for (i=0;i<2;i++)
 	delete[] H[i];
 delete[] H;
-                    
+
 return output;
 
 }

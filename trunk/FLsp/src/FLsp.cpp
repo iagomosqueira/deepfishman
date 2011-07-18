@@ -126,9 +126,9 @@ List output = List::create(Named("B",B),
 // clean up
 delete[] B_ad;
 delete[] Ihat_ad;
-delete[] q;
-delete[] sigma2;
-delete[] ll;
+delete q;
+delete sigma2;
+delete ll;
                     
 return output;
 }
