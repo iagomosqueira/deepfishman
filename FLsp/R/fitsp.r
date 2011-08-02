@@ -9,8 +9,10 @@ setGeneric('fitsp', function(object, ...)
 setMethod('fitsp',
 	signature(object="FLsp"),
 	function(object, fixed=list(),
-    control = DEoptim.control(trace=50), lower=NULL,
-    upper=NULL, seq.iter=TRUE, ...)
+    #control = DEoptim.control(trace=50),
+    control = list(trace=0),
+		lower=NULL,
+		upper=NULL, start=missing, seq.iter=TRUE, ...)
 	{
 	    #browser()
 
@@ -53,10 +55,16 @@ setMethod('fitsp',
     {
       gr <- function(par)
       {
+      #browser()
         pars <- as.list(par)
         names(pars) <- names(start)
+    	# We are estimating log(params) so we need to pass in exp(params) to log function
+	    	pars <- lapply(pars,exp)
         pars[fixnm] <- lapply(fixed, iter, it)
-        return(-1*(do.call(object@gr, args=c(pars, data))))
+				#cat("Calling gradient function\n")
+				grs <- -1*(do.call(object@gr, args=c(pars, data)))
+				#cat("Gradients ", grs, "\n")
+        return(grs)
       }
     }
     else
@@ -66,6 +74,7 @@ setMethod('fitsp',
 	      #browser()
     	pars <- as.list(par)
     	names(pars) <- names(start)
+    	# We are estimating log(params) so we need to pass in exp(params) to log function
     	pars <- lapply(pars,exp)
     	pars[fixnm] <- lapply(fixed, iter, it)
     	return(-1*(do.call(logl, args=c(pars, data))))
@@ -172,17 +181,18 @@ for (index.count in 1:length(object@index))
 
 	# We don't have start values but we need to set some because they are used by loglfoo
       # start values
-#      if(missing(start)) {
+      if(missing(start)) {
 #        # add call to @initial
-#        if(is.function(object@initial))
-#         start <- as(do.call(object@initial, args=data[names(formals(object@initial))]),
-#           'list')
-#        else
+        if(is.function(object@initial))
+         start <- as(do.call(object@initial, args=data[names(formals(object@initial))]),
+           'list')
+        else
           start <- formals(logl)[names(formals(logl))%in%parnm]
-#      }
-#      else
+      }
+      else
 #        # HACK! clean up fixed list if elements are named vectors
-#        start <- lapply(start, function(x){ names(x) <- NULL; x})
+        start <- lapply(start, function(x){ names(x) <- NULL; x})
+
      if(!is.null(fixnm))
         start[fixnm] <- NULL
       if(any(!names(start) %in% parnm))
@@ -201,19 +211,38 @@ for (index.count in 1:length(object@index))
     #browser()
 
 
+			control <- DEoptim.control(NP=50,trace=50,itermax=500)
+			lower <- log(c(1e-6,1))
+			upper <- log(c(10,1e6))
 
 	    out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
 	    names(out$optim$bestmem) <- names(start)
       iter(object@params[names(out$optim$bestmem),], it) <- exp(out$optim$bestmem)
       object@logLik[it] <- -out$optim$bestval
 
+<<<<<<< .mine
+			# Use Rgenoud
+			#browser()
+#			out <- do.call('genoud', c(list(fn=loglfoo, nvars= (2-length(fixed)),
+#											control=control, gr=gr,
+#											print.level=1,
+#											max.generations=200,
+#											#hard.generation.limit=FALSE,
+#											starting.values = log(unlist(start)),
+#											#starting.values = c(-1.23,6.3),
+#											Domains = matrix(c(log(1e-9), log(10), log(1e-9), log(5000)),nrow=2,byrow=TRUE)))
+#											)
+#	    names(out$par) <- names(start)
+#      iter(object@params[names(out$par),], it) <- exp(out$par)
+#      object@logLik[it] <- -out$value
+#			#browser()
+#
+=======
 			#out <- do.call('genoud', c(list(fn=loglfoo, nvars= (2-length(fixed)), control=control, gr=gr)))
 	    #names(out$par) <- names(start)
       #iter(object@params[names(out$par),], it) <- exp(out$par)
       #object@logLik[it] <- -out$value
-
-
-
+>>>>>>> .r100
 
 
 			# fixed
