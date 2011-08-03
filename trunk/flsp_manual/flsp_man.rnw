@@ -1,7 +1,13 @@
+% setwd("c:/Projects/Deepfishman/deepfishman/trunk/flsp_manual")
 % Sweave("flsp_man.rnw")
 % pdflatex flsp_man.tex
 % Manual for FLsp
 % Front Guff
+
+% Fix 3 compares results table
+% Add a line of loglikelhoods - show that although I get different parameters
+# my logL is lower
+
 \documentclass[a4paper]{article}
 \usepackage{geometry}
 \usepackage{color}
@@ -23,7 +29,7 @@
 \begin{document}
 \SweaveOpts{engine=R}
 \title{FLsp - a Surplus Production model in FLR}
-\author{ Finlay Scott <finlay.scott@cefas.co.uk\\
+\author{Finlay Scott <finlay.scott@cefas.co.uk\\
 Cefas, Lowestoft, UK}
 \date{June 2011}
 \maketitle
@@ -33,18 +39,21 @@ Cefas, Lowestoft, UK}
 
 This package implements the surplus production described in Polacheck REF.
 At the moment only the model including observation error is implemented.
-The Pella Tomlinson shape is used (which defaults to Schaeffer)
-Tested against the three data sets in the paper.
+The Pella-Tomlinson shape is used (which defaults to Schaeffer by setting the $p$ shape parameter to 1)
+The model implementatin is tested against the three data sets in the paper.
 Accurate gradients and hessian are returned using automatic differentiation (implemented using ADOLC REF)
 
 % Details of the model being implemented
 \section{The Model}
-Following the Polacheck paper
+Following the Polacheck paper REF.
+
 Assumptions:
-Observation error
-Only r and k are estimated
-sigma and q are approximated as described in the paper
-The inital biomass is k
+\begin{itemize}
+\item Observation error.
+\item Only $r$ and $K$ are estimated.
+\item $\sigma$ and $q$ are approximated as described in the paper.
+\item The inital biomass is fixed at $k$.
+\end{itemize}
 
 The general equation for the biomass through time is:
 \begin{equation}
@@ -67,7 +76,7 @@ The biomass is related to an index of abundance:
 I_y = q B_y
 \end{equation}
 
-Where I is an index of relative abundance in year $y$ and $q$ is the catchability coefficient.
+Where $I$ is an index of relative abundance in year $y$ and $q$ is the catchability coefficient.
 
 Here we assume that errors are introduced through observation. The population dynamics are assumed to be deterministic and all of the error occurs in the relationship between stock biomass and the index of abundance.
 It is assumed that the error is multiplicative and log-normal with a constant coefficient of variation. The estimates of the model parameters are ($B_0$, $r$, $K$ and $q$) are obtained by maximising the likeilhood function:
@@ -91,7 +100,7 @@ The value of $q$ which maximises the likelihood is given by:
 \hat{q} = exp\left(\frac{1}{n} \sum_{y} log(I_y/\hat{B_y})\right)
 \end{equation}
 
-Following Polacheck et al $B_0$ is set to $K$. This means that only two parameters need to be estimated: $r$ and $K$.
+Following Polacheck et al REF, $B_0$ is set to $K$. This means that only two parameters need to be estimated: $r$ and $K$.
 In $FLsp$ the estimation is performed using the $DEoptim$ package REF.
 
 \section{The FLsp class}
@@ -126,7 +135,11 @@ nzrl <- FLsp(catch=catch,index=index)
 \end{minipage}
 \end{center}
 
-After creating our object we are ready to fit the parameters.
+After creating our object we are ready to fit the parameters. This is done by calling
+the $fitsp()$ function and passing the $FLsp$ object.
+We will use the default optimising parameters. It is also possible to pass an
+object of class $DEoptim.control$ to set the the optimising parameters. See
+the help page for $DEoptim.control$ for more details.
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
@@ -157,16 +170,28 @@ qhat(nzrl)
 sqrt(sigma2(nzrl))
 # returns the full biomass timeseries
 biomass(nzrl)
+# The likelihood at the current parameter values
+ll(nzrl)
 @
 \end{shaded}%
 \end{minipage}
 \end{center}
 
 It can be seen that there is good agreement between the published results and those generated with $FLsp$. The differences are likely caused by the precision of the printed data set in the Polcheck paper (REF) and the fitting method used.
+If the parameters are set to the published values the log likelihood is 6.896.
+Even though the parameters estimated here are different to the published values,
+the maximum log likelihood for the the estimated parameter values is higher.
+WHY? HOPE MODEL IS OK...!
+
+%nzrl2 <- nzrl
+%params(nzrl2)[,] <- c(0.0659,129000)
+%ll(nzrl2)
+%
+
 
 \section{Testing FLsp against the other data sets}
 
-%There are two other data sets available: South Atlantic albacore ($saa$) and Northern Namibian hake ($nnh$). The above process can be repeated and the results checked against the published results (see Table~\ref{tab:compare3datasets}).
+There are two other data sets available: South Atlantic albacore ($saa$) and Northern Namibian hake ($nnh$). The above process can be repeated and the results checked against the published results (see Table~\ref{tab:compare3datasets}).
 
 % HIDDEN!
 %<<label=fitNAAandSAA,include=FALSE>>=
@@ -213,19 +238,15 @@ MSY        &  \Sexpr{0} & 2133.74 &  \Sexpr{0}  & 19.65 & \Sexpr{0}  & 263.2 \\
 The results fitted with $FLsp$ are in good agreement with the published results.
 
 \section{Plotting results}
-There is no generic plot for FLsp at the moment. However, it is possible to look at the fitted index and residuals using relatively simple code. For example, to plot the indices with the fitted indices you can use (see Figure~\ref{fig:fitted_index_nzrl}):
-
+There is a generic plot for FLsp that plots the catch time series, compares the observed and fitted index,
+and plots the index residuals (see Figure~\ref{fig:fitted_index_nzrl}):.
+STICK A LOESS THROUGH RESIDUALS?
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
-%<<fig=FALSE,eval=FALSE, quiet=TRUE,echo=TRUE,results=verbatim,keep.source=TRUE>>=
-% Why doesn't this line work here? Works further down
-%<<label=nzrlfitedindexplotcode,include=FALSE>>= 
+%<<label=nzrlfitedindexplotcode,include=FALSE>>=
 <<label=nzrlfittedindexplotcode,echo=TRUE, fig=FALSE, keep.source=TRUE,results=hide,eval=FALSE>>=
-fitted <- cbind(as.data.frame(nzrl@fitted_index),type="fitted")
-index <- cbind(as.data.frame(nzrl@index),type="index")
-index <- rbind(index,fitted)
-print(xyplot(data ~ year | qname, group=type, data=index, type="b",auto.key=TRUE))
+plot(nzrl)
 @
 \end{shaded}%
 \end{minipage}
@@ -240,49 +261,27 @@ print(xyplot(data ~ year | qname, group=type, data=index, type="b",auto.key=TRUE
 <<nzrlfittedindexplotcode>>
 @
 \end{center}
-\caption{Indices and fitted indices for New Zealand rock lobster}
+\caption{Generic plot for New Zealand rock lobster}
 \label{fig:fitted_index_nzrl}
 \end{figure}
 
-To look at the residuals and put a loess function through them use (see Figure~\ref{fig:residuals_nzrl}):
-\begin{center}
-\begin{minipage}[H]{0.95\textwidth}%
-\begin{shaded}%
-%<<echo=TRUE, fig=FALSE, keep.source=TRUE,results=hide,eval=FALSE>>=
-<<label=nzrlresidplotcode,include=FALSE>>=
-residuals <- as.data.frame(nzrl@residuals_index)
-print(xyplot(data ~ year | qname, data=residuals,panel=function(x,y)
-	{panel.xyplot(x,y)
-	panel.loess(x,y,span=1)}))
-@
-\end{shaded}%
-\end{minipage}
-\end{center}
-
-% Actually plot it
-\begin{figure}
-\begin{center}
-%<<echo=FALSE, fig=TRUE, echo=FALSE>>=
-<<label=nzrlresidplot,fig=TRUE,echo=FALSE>>=
-<<nzrlresidplotcode>>
-@
-\end{center}
-\caption{Residuals for New Zealand rock lobster}
-\label{fig:residuals_nzrl}
-\end{figure}
 
 \section{Profiling the fit}
 
 You can explore how good the fit is by looking at the likelihood profile. This is easily done by using the $profile()$ method (see Figure~\ref{fig:profile_nzrl}).
 
 Notice that the profile plot has a banana shaped flat section which contains the optimum solution. This is because the parameters $r$ and $K$ are correlated, making them difficult to estimate unless there is sufficient information in the data.
-The profile plot also includes the gradient of the log likelihood as $r$ and $K$ change (keeping $K$ and $r$ fixed at the estimated value found by the optimiser respectively). The dashed line is at a gradient of 0. If the fitting has worked, the gradient should be 0 at the estimated parameter values. It is just another simple way to check that the results of from the fitting process are sensible.
+The profile plot also includes the gradient of the log likelihood as $r$ and $K$ change
+(keeping $K$ and $r$ fixed at the estimated value found by the optimiser respectively).
+The dashed line horizontal is at a gradient of 0. If the fitting has worked,
+the gradient should be 0 at the estimated parameter values.
+It is just another simple way to check that the results of from the fitting process are sensible.
 
 \begin{center}
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 <<label=profilecode,include=FALSE>>=
-profile(nzrl,maxsteps=31,range=0.25)
+profile(nzrl,maxsteps=51,range=0.25)
 @
 \end{shaded}%
 \end{minipage}
@@ -482,7 +481,12 @@ hist(X[,2], xlab="K", main="")
 \label{fig:hist_rK_plot}
 \end{figure}
 
-You can see that some of the simulated variables are negative. Although this is consistent with the statistical properties of the estimated values of $r$ and $K$ clearly these values do not make sense for a surplus production model. Consequently rows that contain negative values will be removed for the remaining analysis. The simulated parameter values are copied into a copy of the $nzrl$ object.
+You can see that some of the simulated variables are negative.
+Although this is consistent with the statistical properties of the estimated
+values of $r$ and $K$ clearly these values do not make sense for a surplus
+production model. Consequently rows that contain negative values will be removed
+for the remaining analysis. The simulated parameter values are copied into a
+copy of the $nzrl$ object.
 
 
 \begin{center}
@@ -505,8 +509,8 @@ We can now calculate the equivalent value for MSY, $B_{MSY}$ and $B_{current}$ a
 \begin{minipage}[H]{0.95\textwidth}%
 \begin{shaded}%
 <<eval=TRUE, quiet=TRUE,echo=TRUE,results=hide,keep.source=TRUE>>=
-nzrl_msy <- msy(nzrl_sim)
-nzrl_bmsy <- bmsy(nzrl_sim)
+nzrl_msy <- Msy(nzrl_sim)
+nzrl_bmsy <- Bmsy(nzrl_sim)
 nzrl_bcurrent <- bcurrent(nzrl_sim)
 @
 \end{shaded}%
@@ -536,9 +540,11 @@ hist(nzrl_bcurrent, xlab="Bcurrent", main="")
 <<hist_msy>>
 @
 \end{center}
-\caption{Histogram of MSY, $B_{MSY}$ and $B_{current}}
+\caption{Histogram of MSY, $B_{MSY}$ and $B_{current}$}
 \label{fig:hist_msy_plot}
 \end{figure}
+
+The above analysis has been compiled into a function: $forgotthename()$
 
 % TO DO
 % MSY - plot with data
