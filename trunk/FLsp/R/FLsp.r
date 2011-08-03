@@ -102,7 +102,8 @@ sp <- function()
 	{
 		# The function to provide initial values
 		# DEoptim does not use start values
-    return(FLPar(r=NA, k=NA))
+		# It could do, but doesn't at the moment
+    return(FLPar(r=0.5, k=mean(catch[,,,,,1])))
 	},
 
   # lower and upper limits for optim()
@@ -138,10 +139,14 @@ if (!isGeneric("evalC"))
     standardGeneric("evalC"))
 
 setMethod('evalC', signature(object='FLsp'),
-  function(object) {
-      # Only works on first iter
-	object <- iter(object,1)
-	tape <- .Call("flspCpp",object@catch,object@index[[1]],object@params['r'],1,object@params['k'])
+  function(object, iter=1) {
+	#object <- iter(object,1)
+	#tape <- .Call("flspCpp",object@catch,object@index[[1]],object@params['r'],1,object@params['k'])
+	tape <- .Call("flspCpp",iter(object@catch,iter),
+													iter(object@index[[1]],iter),
+													iter(object@params['r'],iter),
+													1,
+													iter(object@params['k'],iter))
 	return(tape)
 })
 
@@ -159,7 +164,7 @@ setMethod('biomass', signature(object='FLsp'),
       dimnames$iter <- 1:iters
       biomass <- FLQuant(NA,dimnames=dimnames)
       for (i in 1:iters)
-	  iter(biomass,i)[] <- evalC(iter(object,i))[["B"]]
+	  		iter(biomass,i)[] <- evalC(object,iter=i)[["B"]]
       return(biomass)
 })
 
@@ -189,7 +194,7 @@ setMethod('qhat', signature(object='FLsp'),
       #dimnames$iter <- iters
       qhat <- FLQuant(NA,iter=iters)
       for (i in 1:iters)
-	  iter(qhat,i)[] <- evalC(iter(object,i))[["qhat"]]
+	  iter(qhat,i)[] <- evalC(object,iter=i)[["qhat"]]
       return(qhat)
 })
 
@@ -205,7 +210,7 @@ setMethod('sigma2', signature(object='FLsp'),
       #dimnames$iter <- iters
       sigma2 <- FLQuant(NA,iter=iters)
       for (i in 1:iters)
-	  iter(sigma2,i)[] <- evalC(iter(object,i))[["sigma2"]]
+	  iter(sigma2,i)[] <- evalC(object,iter=i)[["sigma2"]]
       return(sigma2)
 })
 
@@ -222,7 +227,7 @@ setMethod('ll', signature(object='FLsp'),
       #dimnames$iter <- iters
       ll <- FLQuant(NA,iter=iters)
       for (i in 1:iters)
-	  iter(ll,i)[] <- evalC(iter(object,i))[["ll"]]
+	  iter(ll,i)[] <- evalC(object,iter=i)[["ll"]]
       return(ll)
 })
 
@@ -242,7 +247,7 @@ setMethod('indexhat', signature(object='FLsp'),
       indexhat <- FLQuants()
       for (i in 1:iters)
       {
-	  ihat <- evalC(iter(object,i))[["Ihat"]]
+	  ihat <- evalC(object,iter=i)[["Ihat"]]
 	  for (j in 1:nindex)
 	  {
 	      iter(flq,i)[] <- ihat
@@ -291,34 +296,30 @@ setMethod("dims", signature(obj="FLsp"),
 	})
 
 
+# Really slow
 setMethod("iter", signature(object="FLsp"),
 	  function(object, it) {
-			res <- callNextMethod(object,it)
-			# sort out indices
-			res@index <- lapply(res@index,function(x) iter(x,it))
-			return(res)
+#browser()
+#			res <- callNextMethod(object,it)
+#			res@index <- lapply(res@index,function(x) iter(x,it))
+# return(res)
 
     # FLArray
-#    object <- qapply(object, FUN=iter, it)
-#    # params
-#    params(object) <- iter(params(object), it)
-#    # vcov
-#    if(length(dim(vcov)) > 2)
-#      if(dim(vcov)[3] > 1)
-#        vcov(object) <- vcov(object)[,,it]
-#      else
-#        vcov(object) <- vcov(object)[,,1]
-#    # logLik
-#    logLik(object) <- iter(object@logLik, it)
-#		# indices
-#		object@index <- lapply(object@index,function(x) iter(x,it))
-#		return(object)
-
-			
-			
-			
-			
-})
+    object <- qapply(object, FUN=iter, it)
+    # params
+    params(object) <- iter(params(object), it)
+    # vcov
+    if(length(dim(vcov)) > 2)
+      if(dim(vcov)[3] > 1)
+        vcov(object) <- vcov(object)[,,it]
+      else
+        vcov(object) <- vcov(object)[,,1]
+    # logLik
+    logLik(object) <- iter(object@logLik, it)
+			# sort out indices
+			object@index <- lapply(object@index,function(x) iter(x,it))
+			return(object)
+		})
 
 
 # New profile plot - includes gradients
@@ -441,14 +442,14 @@ setMethod("profile", signature(fitted="FLsp"),
     for (i in 1:length(profiled[["ll_grad_k"]]))
     {
 	dummy@params["r",] <- profiled[["r"]][i]
-	profiled[["ll_grad_r"]][i] <- evalC(iter(dummy,1))[["ll_grad_r"]]
+	profiled[["ll_grad_r"]][i] <- evalC(dummy,iter=1)[["ll_grad_r"]]
     }
     dummy@params <- params
     # get dll/dk
     for (i in 1:length(profiled[["ll_grad_k"]]))
     {
 	dummy@params["k",] <- profiled[["k"]][i]
-	profiled[["ll_grad_k"]][i] <- evalC(iter(dummy,1))[["ll_grad_k"]]
+	profiled[["ll_grad_k"]][i] <- evalC(dummy,iter=1)[["ll_grad_k"]]
     }
     #browser()
     # Need y and x lims for the plots
