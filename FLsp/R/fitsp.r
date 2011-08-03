@@ -10,7 +10,7 @@ setMethod('fitsp',
 	signature(object="FLsp"),
 	function(object, fixed=list(),
     #control = DEoptim.control(trace=50),
-    control = list(trace=0),
+    control = DEoptim.control(NP=50,trace=50,itermax=500),
 		lower=NULL,
 		upper=NULL, start=missing, seq.iter=TRUE, ...)
 	{
@@ -211,16 +211,16 @@ for (index.count in 1:length(object@index))
     #browser()
 
 
-			control <- DEoptim.control(NP=50,trace=50,itermax=500)
-			lower <- log(c(1e-6,1))
-			upper <- log(c(10,1e6))
+			#control <- DEoptim.control(NP=50,trace=50,itermax=500)
+#			lower <- log(c(1e-6,1))
+#			upper <- log(c(10,1e6))
 
 	    out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
 	    names(out$optim$bestmem) <- names(start)
       iter(object@params[names(out$optim$bestmem),], it) <- exp(out$optim$bestmem)
       object@logLik[it] <- -out$optim$bestval
 
-<<<<<<< .mine
+
 			# Use Rgenoud
 			#browser()
 #			out <- do.call('genoud', c(list(fn=loglfoo, nvars= (2-length(fixed)),
@@ -237,12 +237,12 @@ for (index.count in 1:length(object@index))
 #      object@logLik[it] <- -out$value
 #			#browser()
 #
-=======
+
 			#out <- do.call('genoud', c(list(fn=loglfoo, nvars= (2-length(fixed)), control=control, gr=gr)))
 	    #names(out$par) <- names(start)
       #iter(object@params[names(out$par),], it) <- exp(out$par)
       #object@logLik[it] <- -out$value
->>>>>>> .r100
+
 
 
 			# fixed
