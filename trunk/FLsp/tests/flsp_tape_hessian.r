@@ -3,16 +3,18 @@
 # FLsp test
 
 #setwd("~/Work/deepfishman/trunk")
-setwd("m:/Projects/Deepfishman/deepfishman")
+#setwd("m:/Projects/Deepfishman/deepfishman")
+#setwd("c:/Projects/Deepfishman/deepfishman/trunk/FLsp")
 
 library(FLsp)
 #dyn.load("C:/R/library/FLsp/libs/i386/FLsp.dll")
 
 # Try SAA
 
-data <- read.csv("FLsp/data/NZRL.csv")
+#data <- read.csv("FLsp/data/NZRL.csv")
 #data <- read.csv("FLsp/data/NNH.csv")
 #data <- read.csv("FLsp/data/SAAL.csv")
+data(nzrl)
 
 p <- 1
 # Polacheck's results
@@ -22,8 +24,8 @@ k <- 129000
 q <- 2.461e-5
 sigma <- 0.207
 # what do we get?
-sp <- .Call("flspCpp",data$catch,data$cpue,r,p,k)
-tape <- .Call("flspCpp_tape",data$catch,data$cpue,r,p,k)
+sp <- .Call("flspCpp",nzrl$catch,nzrl$cpue,r,p,k)
+tape <- .Call("flspCpp_tape",nzrl$catch,nzrl$cpue,r,p,k)
 
 sp[["B"]]
 tape[["B"]]
@@ -508,5 +510,17 @@ l <- prod(exp(-(vhat^2)/(2*sigma2)) / sqrt(2*pi*sigma2))
 ll <- log(l)
 sp[["ll"]]
 # ll is spot on
+
+
+#*******************************************************************************
+# crashes with iters
+
+for (i in 1:1000)
+	sp <- .Call("flspCpp",nzrl$catch,nzrl$cpue,r,p,k)
+
+for (i in 1:1000)
+	tape <- .Call("flspCpp_tape",nzrl$catch,nzrl$cpue,r,p,k)
+
+
 
 
