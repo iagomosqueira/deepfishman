@@ -6,7 +6,7 @@
 
 % Fix 3 compares results table
 % Add a line of loglikelhoods - show that although I get different parameters
-# my logL is lower
+% my logL is lower
 
 \documentclass[a4paper]{article}
 \usepackage{geometry}
