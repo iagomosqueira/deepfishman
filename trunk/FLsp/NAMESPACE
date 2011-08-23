@@ -23,5 +23,7 @@ exportMethods(
 		"plot")
 export(
 	"sp",
-	"ihat")
+	"ihat",
+	"speedy_bcurrent",
+	"conf_sp")
 
