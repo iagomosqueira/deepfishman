@@ -182,6 +182,27 @@ setMethod('bcurrent', signature(object='FLsp'),
 })
 
 
+# Terrible hacking function because methods calling methods is too slow
+# Assumes 1 iteration in catch and index and multiple iterations
+# in params
+# Assumes you know what you are doing...
+speedy_bcurrent <- function(object)
+{
+	niters <- dim(object@params)[2]
+	bc <- rep(NA,niters)
+	bcref <- dim(object@catch)[2]
+	for (i in 1:niters)
+	{
+		b <- .Call("flspCpp",object@catch,
+													object@index[[1]],
+													object@params['r',i],
+													1,
+													object@params['k',i])[["B"]]
+		bc[i] <- b[bcref]
+	}
+	return(bc)
+}
+
 if (!isGeneric("qhat"))
     setGeneric("qhat", function(object, ...)
     standardGeneric("qhat"))
