@@ -1,5 +1,5 @@
 % setwd("c:/Projects/Deepfishman/deepfishman/trunk/flsp_manual")
-% Sweave("flsp_man.rnw")
+% Sweave("flsp_man.rnw", syntax="SweaveSyntaxNoweb")
 % pdflatex flsp_man.tex
 % Manual for FLsp
 % Front Guff
@@ -181,12 +181,6 @@ It can be seen that there is good agreement between the published results and th
 If the parameters are set to the published values the log likelihood is 6.896.
 Even though the parameters estimated here are different to the published values,
 the maximum log likelihood for the the estimated parameter values is higher.
-WHY? HOPE MODEL IS OK...!
-
-%nzrl2 <- nzrl
-%params(nzrl2)[,] <- c(0.0659,129000)
-%ll(nzrl2)
-%
 
 
 \section{Testing FLsp against the other data sets}
@@ -208,7 +202,7 @@ k <- signif(c(nzrl@params['k']/1000,saa@params['k'],nnh@params['k']),3)
 qhat <- signif(c(qhat(nzrl),qhat(saa),qhat(nnh)),3)
 sigma <- signif(sqrt(c(sigma2(nzrl),sigma2(saa),sigma2(nnh))),3)
 bc <- signif(c(c(biomass(nzrl)[,"1990"]),c(biomass(saa)[,"1989"]),c(biomass(nnh)[,"1988"])),3)
-#msy <- 
+msy <- signif(c(Msy(nzrl),Msy(saa),Msy(nnh)),3)
 @
 
 %TABLE OF RESULTS
@@ -223,15 +217,15 @@ bc <- signif(c(c(biomass(nzrl)[,"1990"]),c(biomass(saa)[,"1989"]),c(biomass(nnh)
 \hline
 Measure & FLsp & Published & FLsp & Published & FLsp & Published \\
 \hline
-r          & \Sexpr{r[1]}     & 0.0659    &  \Sexpr{r[2]}     & 0.328 & \Sexpr{r[3]}     & 0.379     \\
-K ('000 t) & \Sexpr{k[1]}     & 129.0     &  \Sexpr{k[2]}     & 239.6  & \Sexpr{k[3]}     & 2772.6    \\
+$r$          & \Sexpr{r[1]}     & 0.0659    &  \Sexpr{r[2]}     & 0.328 & \Sexpr{r[3]}     & 0.379     \\
+$K$ ('000 t) & \Sexpr{k[1]}     & 129.0     &  \Sexpr{k[2]}     & 239.6  & \Sexpr{k[3]}     & 2772.6    \\
 $\sigma$   & \Sexpr{sigma[1]} & 0.207     &  \Sexpr{sigma[2]} & 0.111  & \Sexpr{sigma[3]} & 0.124     \\
 $\hat{q}$  & \Sexpr{qhat[1]}  & 2.461e-05 &  \Sexpr{qhat[2]}  & 0.2671 & \Sexpr{qhat[3]}  & 4.360e-04 \\
 $B_{current}$  & \Sexpr{bc[1]/1000}  & 21.15 &  \Sexpr{bc[2]}  & 75.51 & \Sexpr{bc[3]}  & 1646.3 \\
-MSY        &  \Sexpr{0} & 2133.74 &  \Sexpr{0}  & 19.65 & \Sexpr{0}  & 263.2 \\
+$MSY$        &  \Sexpr{msy[1]} & 2133.74 &  \Sexpr{msy[2]}  & 19.65 & \Sexpr{msy[3]}  & 263.2 \\
 \hline
 \end{tabular}
-\caption{Comparing the published results with those from $FLsp$ for three data sets.}
+\caption{Comparing the published results with those estimated using $FLsp$ for three data sets.}
 \label{tab:compare3datasets}
 \end{table}
 

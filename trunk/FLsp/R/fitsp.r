@@ -10,7 +10,7 @@ setMethod('fitsp',
 	signature(object="FLsp"),
 	function(object, fixed=list(),
     #control = DEoptim.control(trace=50),
-    control = DEoptim.control(NP=50,trace=50,itermax=500),
+    control = DEoptim.control(NP=50,trace=50,itermax=1000),
 		lower=NULL,
 		upper=NULL, start=missing, seq.iter=TRUE, ...)
 	{
