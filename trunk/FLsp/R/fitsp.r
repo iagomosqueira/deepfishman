@@ -10,7 +10,7 @@ setMethod('fitsp',
 	signature(object="FLsp"),
 	function(object, fixed=list(),
     #control = DEoptim.control(trace=50),
-    control = DEoptim.control(NP=50,trace=50,itermax=1000),
+    control = DEoptim.control(NP=50,trace=200,itermax=2000),
 		lower=NULL,
 		upper=NULL, start=missing, seq.iter=TRUE, ...)
 	{
@@ -71,7 +71,7 @@ setMethod('fitsp',
 		gr <- NULL
 		
 	  loglfoo <- function(par) {
-	      #browser()
+	    #browser()
     	pars <- as.list(par)
     	names(pars) <- names(start)
     	# We are estimating log(params) so we need to pass in exp(params) to log function
@@ -209,16 +209,28 @@ for (index.count in 1:length(object@index))
 #        hessian=TRUE, control=control, lower=lower, upper=upper, gr=gr)))
 
     #browser()
-
-
-			#control <- DEoptim.control(NP=50,trace=50,itermax=500)
-#			lower <- log(c(1e-6,1))
-#			upper <- log(c(10,1e6))
-
+			# Using DEoptim
 	    out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
 	    names(out$optim$bestmem) <- names(start)
       iter(object@params[names(out$optim$bestmem),], it) <- exp(out$optim$bestmem)
       object@logLik[it] <- -out$optim$bestval
+
+			cat("DEoptim best: ", exp(out$optim$bestmem), "\n")
+
+			# Finish off with optim? - Doesn't like infs
+#			cat("Trying with optim\n")
+#      out <- do.call('optim', c(list(par=exp(out$optim$bestmem), fn=loglfoo, method="BFGS",
+#        hessian=TRUE, gr=gr)))
+
+
+# Use ucminf to finish off
+#browser()
+#cat("Trying ucminf\n")
+#require(ucminf)
+#out <- do.call('ucminf', c(list(par=out$optim$bestmem, fn=loglfoo, gr=gr)))
+#cat("ucminf out\n")
+#print(exp(out$par))
+#print(out$value)
 
 
 			# Use Rgenoud

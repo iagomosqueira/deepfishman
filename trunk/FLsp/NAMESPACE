@@ -1,6 +1,7 @@
 useDynLib("FLsp")
 import("FLCore",
 	"Rcpp")
+exportPattern("^[[:alpha:]]+")
 exportClasses(
 	"FLsp")
 exportMethods(

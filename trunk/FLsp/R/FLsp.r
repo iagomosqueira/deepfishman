@@ -84,18 +84,23 @@ sp <- function()
 {
   logl <- function(r, k, catch, index)
   {
-		res <- .Call("flspCpp",catch,index[[1]],r,1,k)[["ll"]]
-		if (is.nan(res)) res <- Inf # Fix for DEoptim
-  	if (is.na(res)) res <- Inf
+		#res <- .Call("flspCpp",catch,index[[1]],r,1,k)[["ll"]]
+		# Use the exposed C logl function
+		res <- get_logl(params=c(r,k),C=catch,I=index[[1]],p=1,extinct_val=1e-9)
+		if (is.nan(res)) res <- -Inf # Fix for DEoptim
+  	if (is.na(res)) res <- -Inf
+		#cat("logl: ", res, "\n")
   	return(res)
 	}
 
 	gr <- function(r, k, catch, index)
   {
-		res <- .Call("flspCpp",catch,index[[1]],r,1,k)
+		#res <- .Call("flspCpp",catch,index[[1]],r,1,k)
+		res <- get_loglgrads(params=c(r,k), C=catch, I=index[[1]],p=1,extinct_val=1e-9)
 		#if (is.nan(res)) res <- Inf # Fix for DEoptim
   	#if (is.na(res)) res <- Inf
-  	return(c(res[["ll_grad_r"]],res[["ll_grad_k"]]))
+		return(res)
+  	#return(c(res[["ll_grad_r"]],res[["ll_grad_k"]]))
 	}
 
   initial <- structure(function(catch)
@@ -120,7 +125,9 @@ sp <- function()
 # Accessor things
 ihat <- function(catch, index, r, k)
 {
-	res <- .Call("flspCpp",catch,index[[1]],r,1,k)
+	#res <- .Call("flspCpp",catch,index[[1]],r,1,k)
+	# Use exposed function
+	res <- eval_FLsp(C=catch, I=index[[1]], r=r, k=k,p=1,extinct_val=1e-9)
 	ihat <- FLQuant(res[["qhat"]]*res[["B"]])
   indexhat_flqs <- FLQuants()
 #  for (i in 1:length(index))
@@ -142,12 +149,18 @@ setMethod('evalC', signature(object='FLsp'),
   function(object, iter=1) {
 	#object <- iter(object,1)
 	#tape <- .Call("flspCpp",object@catch,object@index[[1]],object@params['r'],1,object@params['k'])
-	tape <- .Call("flspCpp",iter(object@catch,iter),
-													iter(object@index[[1]],iter),
-													iter(object@params['r'],iter),
-													1,
-													iter(object@params['k'],iter))
-	return(tape)
+#	tape <- .Call("flspCpp",iter(object@catch,iter),
+#													iter(object@index[[1]],iter),
+#													iter(object@params['r'],iter),
+#													1,
+#													iter(object@params['k'],iter))
+
+	# use exposed function
+	res <- eval_FLsp(C=iter(object@catch,iter), I=iter(object@index[[1]],iter),
+										r=iter(object@params['r'],iter), k=iter(object@params['k'],iter),p=1,
+										extinct_val=1e-9)
+
+	return(res)
 })
 
 #******** biomass *************
@@ -193,11 +206,13 @@ speedy_bcurrent <- function(object)
 	bcref <- dim(object@catch)[2]
 	for (i in 1:niters)
 	{
-		b <- .Call("flspCpp",object@catch,
-													object@index[[1]],
-													object@params['r',i],
-													1,
-													object@params['k',i])[["B"]]
+#		b <- .Call("flspCpp",object@catch,
+#													object@index[[1]],
+#													object@params['r',i],
+#													1,
+#													object@params['k',i])[["B"]]
+# Use exposed function
+		b <- project_biomass(C=object@catch, r=object@params['r',i],k=object@params['k',i],p=1,extinct_val=1e-9)
 		bc[i] <- b[bcref]
 	}
 	return(bc)
@@ -348,7 +363,7 @@ setMethod("profile", signature(fitted="FLsp"),
   function(fitted, which, maxsteps=11, range=0.5, ci=c(0.25, 0.5, 0.75, 0.95),
       plot=TRUE, fixed=list(), print=FALSE, control=list(trace=0), ...)
   {
-
+#browser()
     # vars
     foo <- logl(fitted)
     params <- params(fitted)
@@ -463,14 +478,14 @@ setMethod("profile", signature(fitted="FLsp"),
     for (i in 1:length(profiled[["ll_grad_k"]]))
     {
 	dummy@params["r",] <- profiled[["r"]][i]
-	profiled[["ll_grad_r"]][i] <- evalC(dummy,iter=1)[["ll_grad_r"]]
+	profiled[["ll_grad_r"]][i] <- evalC(dummy,iter=1)[["ll_grads"]][1]
     }
     dummy@params <- params
     # get dll/dk
     for (i in 1:length(profiled[["ll_grad_k"]]))
     {
 	dummy@params["k",] <- profiled[["k"]][i]
-	profiled[["ll_grad_k"]][i] <- evalC(dummy,iter=1)[["ll_grad_k"]]
+	profiled[["ll_grad_k"]][i] <- evalC(dummy,iter=1)[["ll_grads"]][2]
     }
     #browser()
     # Need y and x lims for the plots
@@ -533,7 +548,7 @@ setMethod("plot", signature(x="FLsp", y="missing"),
 
 
   plot(x=yrs, y=c(x@catch), type="l", xlab="year", ylab="catch")
-  plot(x=yrs, y=c(x@index[[1]]), type="l", xlab="year", ylab="index")
+  plot(x=yrs, y=c(x@index[[1]]), xlab="year", ylab="index")
   if (!all(is.na(x@residuals_index[[1]])))
   	lines(x=yrs, y=c(x@fitted_index[[1]]), lty=2)
 	legend("topright",legend=(c("index","fitted index")),lty=c(1,2))

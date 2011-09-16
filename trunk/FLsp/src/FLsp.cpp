@@ -1,26 +1,30 @@
 // FLsp
 
-#define ADOLC_TAPELESS // Going to use the tapeless method
-#include "adouble.h" // only this is needed for tapeless
-typedef adtl::adouble adouble; // necessary for tapeless - see manual
-#include <stdlib.h>
+// Moved headers and all the top gumpf to FLsp.h
+
+//#define ADOLC_TAPELESS // Going to use the tapeless method
+//#include "adouble.h" // only this is needed for tapeless
+//typedef adtl::adouble adouble; // necessary for tapeless - see manual
+//#include <stdlib.h>
 
 // use Rcpp
-#include <Rcpp.h>
-#include <math.h>
+//#include <Rcpp.h>
+//#include <math.h>
+
+#include "FLsp.h"
 
 #define pi 3.1415926535897932384626433832795
 
 using namespace Rcpp;
 
 // Function headers
-void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k);
+//void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k);
 // assume error in I = q B is multiplicative and lognormal with a constant coefficient of variation
-void q_obs_mult_log(adouble* B, adouble* q, NumericVector I);
+//void q_obs_mult_log(adouble* B, adouble* q, NumericVector I);
 // other ways of estimating q (see Polacheck et al 1993)
 // additive and normal with constant standard deviation
 // additive and normal with constant coefficient of variation
-void ll_obs(adouble* B, NumericVector C, NumericVector I, adouble* q, adouble* Ihat, adouble* sigma2, adouble* ll);
+//void ll_obs(adouble* B, NumericVector C, NumericVector I, adouble* q, adouble* Ihat, adouble* sigma2, adouble* ll);
 
 
 RcppExport SEXP testflspCpp(SEXP C_sexp)
@@ -31,6 +35,9 @@ RcppExport SEXP testflspCpp(SEXP C_sexp)
   return wrap(C);
 }
 
+// This is the old function that is called from R using .Call
+// Left in for old times sake
+// Can also use the exposed functions in FLsp_exposed.cpp
 RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP k_sexp)
 {
   //Rprintf("In flspCpp\n");
@@ -72,6 +79,8 @@ RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP
     double ll_grad_r;
     double ll_grad_k;
 
+	double extinct_val = 1e-9;
+
 // Tapeless evaluation
 // Might be quicker to do this taped rather than repeating the code
 // Evaluate with r
@@ -79,7 +88,7 @@ RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP
   k_ad.setADValue(0);
   // initialise B0 - should be part of the solving loop?
   B_ad[0] = k_ad;
-  project_biomass(B_ad, C, p, r_ad, k_ad);
+  project_biomass(B_ad, C, p, r_ad, k_ad, extinct_val);
   q_obs_mult_log(B_ad, q, I);
   ll_obs(B_ad, C, I, q, Ihat_ad, sigma2, ll);
   ll_grad_r = (*ll).getADValue();
@@ -91,7 +100,7 @@ RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP
   k_ad.setADValue(1);
   // initialise B0 - should be part of the solving loop?
   B_ad[0] = k_ad;
-  project_biomass(B_ad, C, p, r_ad, k_ad);
+  project_biomass(B_ad, C, p, r_ad, k_ad, extinct_val);
   q_obs_mult_log(B_ad, q, I);
   ll_obs(B_ad, C, I, q, Ihat_ad, sigma2, ll);
   ll_grad_k = (*ll).getADValue();
@@ -133,7 +142,7 @@ delete ll;
 return output;
 }
 
-void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k)
+void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k, double extinct_val)
 {
   // some stuff
   //Rprintf("In project biomass\n");
@@ -142,7 +151,8 @@ void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k
   {
     B[yr] = B[yr-1] + (r / p) * B[yr-1] * (1 - pow((B[yr-1] / k),p)) - C(yr-1);
     //if (B[yr] <= 0) B[yr] = 1e-9;
-    B[yr] = fmax(B[yr],1e-9);
+    // Could make this 0 instead of 1e-9?
+    B[yr] = fmax(B[yr],extinct_val);
   }
   //Rprintf("Leaving project biomass\n");
 }
