@@ -26,5 +26,6 @@ export(
 	"sp",
 	"ihat",
 	"speedy_bcurrent",
+	"speedy_ll",
 	"conf_sp")
 
