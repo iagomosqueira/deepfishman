@@ -86,7 +86,7 @@ sp <- function()
   {
 		#res <- .Call("flspCpp",catch,index[[1]],r,1,k)[["ll"]]
 		# Use the exposed C logl function
-		res <- get_logl(params=c(r,k),C=catch,I=index[[1]],p=1,extinct_val=1e-9)
+		res <- get_logl(params=c(r,k),C=catch,I=index[[1]],p=1,extinct_val=0)
 		if (is.nan(res)) res <- -Inf # Fix for DEoptim
   	if (is.na(res)) res <- -Inf
 		#cat("logl: ", res, "\n")
@@ -96,7 +96,7 @@ sp <- function()
 	gr <- function(r, k, catch, index)
   {
 		#res <- .Call("flspCpp",catch,index[[1]],r,1,k)
-		res <- get_loglgrads(params=c(r,k), C=catch, I=index[[1]],p=1,extinct_val=1e-9)
+		res <- get_loglgrads(params=c(r,k), C=catch, I=index[[1]],p=1,extinct_val=0)
 		#if (is.nan(res)) res <- Inf # Fix for DEoptim
   	#if (is.na(res)) res <- Inf
 		return(res)
@@ -127,8 +127,10 @@ ihat <- function(catch, index, r, k)
 {
 	#res <- .Call("flspCpp",catch,index[[1]],r,1,k)
 	# Use exposed function
-	res <- eval_FLsp(C=catch, I=index[[1]], r=r, k=k,p=1,extinct_val=1e-9)
-	ihat <- FLQuant(res[["qhat"]]*res[["B"]])
+	res <- eval_FLsp(C=catch, I=index[[1]], r=r, k=k,p=1,extinct_val=0)
+	Bhat <- res[["B"]]
+	Bhat <- Bhat[1:length(catch)] # trim off the final year - we have one extra year in B
+	ihat <- FLQuant(res[["qhat"]]*Bhat)
   indexhat_flqs <- FLQuants()
 #  for (i in 1:length(index))
 #    indexhat_flqs[[i]] <- FLQuant(indexhat_array[i,],dimnames=dimnames(catch))
@@ -158,7 +160,7 @@ setMethod('evalC', signature(object='FLsp'),
 	# use exposed function
 	res <- eval_FLsp(C=iter(object@catch,iter), I=iter(object@index[[1]],iter),
 										r=iter(object@params['r'],iter), k=iter(object@params['k'],iter),p=1,
-										extinct_val=1e-9)
+										extinct_val=0)
 
 	return(res)
 })
@@ -196,25 +198,20 @@ setMethod('bcurrent', signature(object='FLsp'),
 
 
 # Terrible hacking function because methods calling methods is too slow
-# Assumes 1 iteration in catch and index and multiple iterations
-# in params
+# Assumes 1 iteration in catch and index and multiple iterations in params
 # Assumes you know what you are doing...
 speedy_bcurrent <- function(object)
 {
 	niters <- dim(object@params)[2]
 	bc <- rep(NA,niters)
 	bcref <- dim(object@catch)[2]
-	for (i in 1:niters)
-	{
-#		b <- .Call("flspCpp",object@catch,
-#													object@index[[1]],
-#													object@params['r',i],
-#													1,
-#													object@params['k',i])[["B"]]
-# Use exposed function
-		b <- project_biomass(C=object@catch, r=object@params['r',i],k=object@params['k',i],p=1,extinct_val=1e-9)
-		bc[i] <- b[bcref]
-	}
+	#for (i in 1:niters)
+	#{
+	#	# Use exposed function
+	#	b <- project_biomass(C=object@catch, r=object@params['r',i],k=object@params['k',i],p=1,extinct_val=0)
+	#	bc[i] <- b[bcref]
+	#}
+	bc <- bcurrent_iters(C=object@catch, r=c(object@params['r',]),k=c(object@params['k',]),p=1,extinct_val=0)
 	return(bc)
 }
 
@@ -263,9 +260,22 @@ setMethod('ll', signature(object='FLsp'),
       #dimnames$iter <- iters
       ll <- FLQuant(NA,iter=iters)
       for (i in 1:iters)
-	  iter(ll,i)[] <- evalC(object,iter=i)[["ll"]]
+	  		iter(ll,i)[] <- evalC(object,iter=i)[["ll"]]
       return(ll)
 })
+
+speedy_ll <- function(object)
+{
+	niters <- dim(object@params)[2]
+	ll <- rep(NA,niters)
+	#for (i in 1:niters)
+	#{
+	#	ll[i] <- get_logl(params=c(object@params['r',i],object@params['k',i]), C=object@catch, I=object@index[[1]],p=1,extinct_val=0)
+	#}
+	ll <- get_logl_iters(r=c(object@params['r',]),k=c(object@params['k',]), C=object@catch, I=object@index[[1]],p=1,extinct_val=0)
+	return(ll)
+}
+
 
 
 if (!isGeneric("indexhat"))
