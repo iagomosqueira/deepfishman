@@ -29,22 +29,46 @@ NumericVector project_biomassC(NumericVector C, double r, double k, double p, do
 {
   int nyrs = C.size();
   int i;
-  // Make a vector for Biomass, same size as the Catch
-  NumericVector B(nyrs);
-  adouble* B_ad = new adouble[nyrs];
+  // Make a vector for Biomass, one year longer than Catch
+  NumericVector B(nyrs+1);
+  adouble* B_ad = new adouble[nyrs+1];
 	adouble r_ad, k_ad;
     // initialise
   r_ad = r;
   k_ad = k;
   B_ad[0] = k_ad;
   project_biomass(B_ad, C, p, r_ad, k_ad, extinct_val);
-  for (i=0; i<nyrs; i++)
+  for (i=0; i<B.size(); i++)
 		B(i) = B_ad[i].getValue();
 
 	delete[] B_ad;
 
 	return B;
 }
+
+NumericVector bcurrent_iters(NumericVector C, NumericVector r, NumericVector k, double p, double extinct_val)
+{
+  int nyrs = C.size();
+  int i, j;
+  int iters = r.size();
+  // Make a vector for Biomass, same size as the Catch
+  NumericVector Bc(iters);
+  adouble* B_ad = new adouble[nyrs+1];
+	adouble r_ad, k_ad;
+
+	for (j=0; j < iters; j++)
+	{
+    // initialise
+  	r_ad = r(j);
+  	k_ad = k(j);
+  	B_ad[0] = k_ad;
+  	project_biomass(B_ad, C, p, r_ad, k_ad, extinct_val);
+		Bc(j) = B_ad[nyrs].getValue();
+	}
+		delete[] B_ad;
+	return Bc;
+}
+
 
 // A function that gets all the bits together
 // This can then be called by other C functions to just return the bits we want?
@@ -57,8 +81,8 @@ List eval_FLsp(NumericVector C, NumericVector I, double r, double k, double p, d
 
   // Make a vector for Biomass, same size as the Catch
   //NumericVector B(clone(C));
-  NumericVector B(nyrs);
-  adouble* B_ad = new adouble[nyrs];
+  NumericVector B(nyrs+1);
+  adouble* B_ad = new adouble[nyrs+1];
   NumericVector Ihat(nyrs);
   NumericVector res(nyrs);
   adouble* Ihat_ad = new adouble[nyrs];
@@ -102,10 +126,13 @@ List eval_FLsp(NumericVector C, NumericVector I, double r, double k, double p, d
 
   for (i=0; i<C.size(); i++)
   {
-    B(i) = B_ad[i].getValue();
+    //B(i) = B_ad[i].getValue();
     Ihat(i) = Ihat_ad[i].getValue();
     res(i) = I(i) - Ihat(i);
   }
+
+	for (i=0; i<B.size(); i++)
+		B(i) = B_ad[i].getValue();
 
 	NumericVector ll_grads(2);
 	ll_grads(0) = ll_grad_r;
@@ -152,13 +179,28 @@ double get_logl(NumericVector params, NumericVector C, NumericVector I, double p
 	return ll;
 }
 
-
 NumericVector get_loglgrads(NumericVector params, NumericVector C, NumericVector I, double p, double extinct_val)
 {
 	List all = eval_FLsp(C, I, params(0), params(1), p, extinct_val);
 	return all["ll_grads"];
 }
 
+NumericVector get_logl_iters(NumericVector r, NumericVector k,NumericVector C, NumericVector I, double p, double extinct_val)
+{
+	int iters = r.size();
+	NumericVector ll(iters);
+	List all;
+	int i;
+	double rd, kd;
+	for (i=0; i<iters; i++)
+	{
+		rd = r(i);
+		kd = k(i);
+		all = eval_FLsp(C, I, rd, kd, p, extinct_val);
+		ll(i) = as<double>(all["ll"]);
+	}
+	return ll;
+}
 
 
 RCPP_MODULE(yada){
@@ -167,10 +209,12 @@ RCPP_MODULE(yada){
 	function( "expose_vector2", &expose_vector2);
 	//function( "project_biomass", &project_biomassC);
 	function( "project_biomass", &project_biomassC, List::create( _["C"], _["r"], _["k"], _["p"]=1.0, _["extinct_val"]=0));
+	function( "bcurrent_iters", &bcurrent_iters, List::create( _["C"], _["r"], _["k"], _["p"]=1.0, _["extinct_val"]=0));
 	function( "eval_FLsp", &eval_FLsp, List::create( _["C"], _["I"], _["r"], _["k"],_["p"]=1.0, _["extinct_val"]=0));
 //	function( "get_logl", &get_logl, List::create( _["C"], _["I"], _["p"]=1.0, _["r"], _["k"]));
 	function( "get_logl", &get_logl, List::create(_["params"], _["C"], _["I"], _["p"]=1.0,_["extinct_val"]=0));
 	function( "get_loglgrads", &get_loglgrads, List::create( _["params"], _["C"], _["I"], _["p"]=1.0, _["extinct_val"]=0));
+	function( "get_logl_iters", &get_logl_iters, List::create(_["r"],_["k"], _["C"], _["I"], _["p"]=1.0,_["extinct_val"]=0));
 }
 
 

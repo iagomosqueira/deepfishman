@@ -142,6 +142,7 @@ return output;
 
 }
 
+
 void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k)
 {
   // some stuff
@@ -150,7 +151,8 @@ void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k
   for (yr = 1; yr<C.size(); yr++)
   {
     B[yr] = B[yr-1] + (r / p) * B[yr-1] * (1 - pow((B[yr-1] / k),p)) - C(yr-1);
-    B[yr] = fmax(B[yr],1e-9);
+    //B[yr] = fmax(B[yr],1e-9);
+    B[yr] = fmax(B[yr],0);
   }
   //Rprintf("Leaving project biomass\n");
 }
@@ -228,4 +230,139 @@ void ll_obs(adouble* B, NumericVector C, NumericVector I, adouble* q, adouble* I
     
     delete[] vhat_ad;
 }
+
+
+//******************************************************************************
+// Hessian of log r and log k
+RcppExport SEXP flspCpp_tape_log(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP k_sexp)
+{
+  //Rprintf("In flspCpp\n");
+  int i, j;
+
+  NumericVector C(C_sexp);
+  NumericVector I(I_sexp);
+  double r = as<double>(r_sexp);
+  double p = as<double>(p_sexp);
+  double k = as<double>(k_sexp);
+
+  double log_r = log(r);
+  double log_k = log(k);
+
+  int nyrs = C.size();
+  NumericVector B(nyrs);
+  NumericVector Ihat(nyrs);
+  NumericVector res(nyrs);
+  NumericVector res_grad_r(nyrs);
+  NumericVector res_grad_k(nyrs);
+    double ll_grad_r;
+    double ll_grad_k;
+    double ll;
+    int tag=1;
+
+  // Active variables
+  adouble* B_ad = new adouble[nyrs];
+  adouble* Ihat_ad = new adouble[nyrs];
+  adouble r_ad, k_ad;
+  adouble log_r_ad, log_k_ad;
+  adouble* q = new adouble;
+  adouble* sigma2 = new adouble;
+  adouble* ll_ad = new adouble;
+
+  
+  // Start the tape
+    trace_on(tag);
+    
+  // initialise
+  //  r_ad <<= as<double>(r_sexp);
+  //  k_ad <<= as<double>(k_sexp);
+
+    log_r_ad <<= log_r;
+    log_k_ad <<= log_k;
+
+    r_ad = exp(log_r_ad);
+    k_ad = exp(log_k_ad);
+  
+  // initialise B0 and other stuff
+  B_ad[0] = k_ad;
+  *q = 0;
+  *sigma2 = 0;
+  *ll_ad = 0;
+    project_biomass(B_ad, C, p, r_ad, k_ad);
+    //project_biomass(B_ad, C, p, rk[0], rk[1]);
+
+  q_obs_mult_log(B_ad, q, I);
+  ll_obs(B_ad, C, I, q, Ihat_ad, sigma2, ll_ad);
+  *ll_ad >>= ll;
+  
+  trace_off();
+
+  // interrogate tape
+  // get gradients (d ll / d r and d ll / dk)
+
+  double* indeps = new double[2];
+  indeps[0] = log_r;//as<double>(r_sexp);
+  indeps[1] = log_k;//as<double>(k_sexp);
+  double* grads = new double[2];
+
+  gradient(tag,2,indeps,grads);
+
+  //Rprintf("indeps[0] %f\n", indeps[0]);
+  //Rprintf("indeps[1] %f\n", indeps[1]);
+  //Rprintf("grads[0] %f\n", grads[0]);
+  //Rprintf("grads[1] %f\n", grads[1]);
+
+  // get hessian
+  double** H = new double*[2];
+  for (i=0; i<2; i++)
+     H[i] = new double[2]; 
+
+	hessian(tag,2,indeps,H);
+  NumericMatrix Hout(2,2);
+  for (i=0;i<2;i++)
+      for(j=0;j<2;j++)
+	  Hout(i,j) = H[i][j];
+
+  for (i=0; i<C.size(); i++)
+  {
+    B(i) = B_ad[i].value();
+    Ihat(i) = Ihat_ad[i].value();
+    res(i) = I(i) - Ihat(i);
+  }
+ 
+//return List::create(Named("I",I));
+
+List output = List::create(Named("B",B),
+                    Named("Ihat",Ihat),
+                    Named("qhat",(*q).value()),
+                    Named("sigma2",(*sigma2).value()),
+                    Named("ll",ll),
+                    Named("ll_grad_r",grads[0]),
+                    Named("ll_grad_k",grads[1]),
+		    Named("hessian",Hout),
+		    Named("res",res)
+                    );
+
+// clean up
+
+// Clean pointers to adouble
+delete[] B_ad;
+delete[] Ihat_ad;
+
+delete q;
+delete sigma2;
+delete ll_ad;
+
+// Clean pointers to double
+delete[] indeps;
+delete[] grads;
+for (i=0;i<2;i++)
+	delete[] H[i];
+delete[] H;
+
+return output;
+
+}
+
+
+
 

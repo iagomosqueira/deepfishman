@@ -272,6 +272,7 @@ for (index.count in 1:length(object@index))
 
     # fitted & residuals
     # No iter <- methods for FLQuants so a bit hacky
+#browser()
 	for (i in 1:length(object@index))
 	{
 	    object@fitted_index[[i]][,,,,,it] <- predict(iter(object, it))[[i]]

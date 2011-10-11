@@ -1,4 +1,8 @@
 // FLsp
+// Catch and index years can be different
+// You can always get one more biomass year than catch year
+// Index is compared to biomass to calculate the likelihood
+// So you can have one more year in index than in catch - probably won't have but it's possible
 
 // Moved headers and all the top gumpf to FLsp.h
 
@@ -40,7 +44,6 @@ RcppExport SEXP testflspCpp(SEXP C_sexp)
 // Can also use the exposed functions in FLsp_exposed.cpp
 RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP k_sexp)
 {
-  //Rprintf("In flspCpp\n");
   int i;
 
   NumericVector C(C_sexp);
@@ -51,9 +54,12 @@ RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP
 
   int nyrs = C.size();
   // Make a vector for Biomass, same size as the Catch
+  // Actually has one more year than catch
   //NumericVector B(clone(C));
-  NumericVector B(nyrs);
-  adouble* B_ad = new adouble[nyrs];
+  NumericVector B(nyrs+1);
+  adouble* B_ad = new adouble[nyrs+1];
+  // Index should have as many years as it wants - could be one more than catch
+  // For the moment leave as same as same size - most likely
   NumericVector Ihat(nyrs);
   NumericVector res(nyrs);
   NumericVector res_grad_r(nyrs);
@@ -71,7 +77,6 @@ RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP
   adouble* ll = new adouble;
   *ll = 0;
 
-
   // initialise
   r_ad = as<double>(r_sexp);
   k_ad = as<double>(k_sexp);
@@ -79,7 +84,7 @@ RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP
     double ll_grad_r;
     double ll_grad_k;
 
-	double extinct_val = 1e-9;
+	double extinct_val = 0;
 
 // Tapeless evaluation
 // Might be quicker to do this taped rather than repeating the code
@@ -107,17 +112,16 @@ RcppExport SEXP flspCpp(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_sexp, SEXP
   for (i=0; i<C.size(); i++)
     res_grad_k(i) = (I(i) - Ihat_ad[i]).getADValue();
 
-
-
   for (i=0; i<C.size(); i++)
   {
-    B(i) = B_ad[i].getValue();
+    //B(i) = B_ad[i].getValue();
     Ihat(i) = Ihat_ad[i].getValue();
     res(i) = I(i) - Ihat(i);
   }
 
-
-
+	for (i=0; i<B.size(); i++)
+		B(i) = B_ad[i].getValue();
+		
 //return List::create(Named("B",B),
 //List output.create(Named("B",B),
 List output = List::create(Named("B",B),
@@ -142,19 +146,30 @@ delete ll;
 return output;
 }
 
+// c 10 long, 0 - 9
+// b can be 11 long
+
 void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k, double extinct_val)
 {
-  // some stuff
-  //Rprintf("In project biomass\n");
   int yr;
+	// Timing is wrong - biomass has one more year than catch
+	/*
   for (yr = 1; yr<C.size(); yr++)
   {
     B[yr] = B[yr-1] + (r / p) * B[yr-1] * (1 - pow((B[yr-1] / k),p)) - C(yr-1);
-    //if (B[yr] <= 0) B[yr] = 1e-9;
-    // Could make this 0 instead of 1e-9?
+		// check if population has collapsed
     B[yr] = fmax(B[yr],extinct_val);
   }
-  //Rprintf("Leaving project biomass\n");
+  */
+  for (yr = 0; yr<C.size(); yr++)
+  {
+//		Rprintf("yr %i\n", yr);
+//		Rprintf("C[yr] %f\n", C(yr));
+//		Rprintf("B[yr] %f\n", B[yr].getValue());
+    B[yr+1] = B[yr] + (r / p) * B[yr] * (1 - pow((B[yr] / k),p)) - C(yr);
+		// check if population has collapsed
+    B[yr+1] = fmax(B[yr+1],extinct_val);
+  }
 }
 
 // Calculate qhat assuming observation error
