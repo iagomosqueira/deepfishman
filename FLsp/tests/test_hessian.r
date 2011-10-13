@@ -35,60 +35,141 @@ tape_all[["ll_grad_r"]]
 dlldk
 tape_all[["ll_grad_k"]]
 
-# Check log gradients
-ll_r_log <- .Call("flspCpp_tape",data$catch,data$cpue,exp(log(r)+tiny),p,k)[["ll"]]
-ll_k_log <- .Call("flspCpp_tape",data$catch,data$cpue,r,p,exp(log(k)+tiny))[["ll"]]
-dlldr_log <- (ll_r_log - ll_orig) / tiny
-dlldk_log <- (ll_k_log - ll_orig) / tiny
 
-dlldr_log
+# Put this into a function
+# If dll / d log(r) look at small change in log r, not r
+grad_approx <- function(r,k,logrk=FALSE)
+{
+  tiny <- 1+1e-12
+  ll_orig <- .Call("flspCpp_tape",data$catch,data$cpue,r,p,k)[["ll"]]
+  ll_r <- .Call("flspCpp_tape",data$catch,data$cpue,r*tiny,p,k)[["ll"]]
+  if (!logrk)
+    dlldr <- (ll_r - ll_orig) / (r * tiny - r)
+  if (logrk)
+    dlldr <- (ll_r - ll_orig) / (log(r * tiny) - log(r))    
+
+  ll_k <- .Call("flspCpp_tape",data$catch,data$cpue,r,p,k*tiny)[["ll"]]
+  if (!logrk)
+    dlldk <- (ll_k - ll_orig) / (k * tiny - k)
+  if (logrk)
+    dlldk <- (ll_k - ll_orig) / (log(k * tiny) - log(k))
+  return(list(dlldr=dlldr,dlldk=dlldk))
+}
+
+grad_approx(r,k)
+tape_all[["ll_grad_r"]]
+tape_all[["ll_grad_k"]]
+
+grad_approx(r,k,logrk=TRUE)
 tape_all_log[["ll_grad_r"]]
-
-dlldk_log
 tape_all_log[["ll_grad_k"]]
 
-
-# Approximate hessian of non logged
-# returns the gradients
-simple_diff <- function(r,k)
+# Can we use this to get approximate hessian
+# Change in gradient to change in r
+tiny <- 1+1e-12
+dll_orig <- grad_approx(r,k)
+dll_r <- grad_approx(r*tiny,k)
+dll_k <- grad_approx(r,k*tiny)
+h11 <- (dll_r[[1]] - dll_orig[[1]]) / (r*tiny - r)
+h22 <- (dll_k[[2]] - dll_orig[[2]]) / (k*tiny - k)
+tape_all[["hessian"]]
+# It's too approximate - just wrong... also method is just wrong see below
+# So do it using true gradient
+true_grad <- function(r,k)
 {
 	llorig <- .Call("flspCpp_tape",data$catch,data$cpue,r,p,k)
 	return(c(llorig[["ll_grad_r"]],llorig[["ll_grad_k"]]))
 }
 
-dorig <- simple_diff(r,k) # original gradients
-drtiny <- simple_diff(r+tiny,k)
-dktiny <- simple_diff(r,k+tiny)
-dll2dr2 <- (drtiny[1]-dorig[1])/tiny # change in grad_ll with change in r
-dll2dk2 <- (dktiny[2]-dorig[2])/tiny
-dll2drk <-(dktiny[1]-dorig[1])/tiny
-dll2dkr <-(drtiny[2]-dorig[2])/tiny
+tiny <- 1+1e-9
+dll_orig <- true_grad(r,k)
+dll_r <- true_grad(r*tiny,k)
+dll_k <- true_grad(r,k*tiny)
 
-# Put all together
-hesshat <- matrix(c(dll2dr2,dll2drk,dll2dkr,dll2dk2),nrow=2)
+h11 <- (dll_r[1] - dll_orig[1]) / (r*tiny - r)
+h12 <- (dll_k[1] - dll_orig[1]) / (k*tiny - k)
+h21 <- (dll_r[2] - dll_orig[2]) / (r*tiny - r)
+h22 <- (dll_k[2] - dll_orig[2]) / (k*tiny - k)
+tape_all[["hessian"]]
 
-tape_all$hessian
-hesshat
-
-# Hessian of logged
-# We have checked that the tape_log function returns dll / d log(r)
-simple_diff_log <- function(r,k)
+# log hessian
+h11_log <- (dll_r[1] - dll_orig[1]) / (log(r*tiny) - log(r))
+tape_all_log[["hessian"]]
+# Not right
+# Hessian in log case is how much the log_gradient changes with log r,
+# not how much the gradient changes with log r
+true_grad_log <- function(r,k)
 {
 	llorig <- .Call("flspCpp_tape_log",data$catch,data$cpue,r,p,k)
 	return(c(llorig[["ll_grad_r"]],llorig[["ll_grad_k"]]))
 }
+tiny <- 1+1e-9
+dll_orig_log <- true_grad_log(r,k)
+dll_r_log <- true_grad_log(r*tiny,k)
+dll_k_log <- true_grad_log(r,k*tiny)
 
-tiny <- 1e-9
-dorig <- simple_diff_log(r,k) # original gradients
-drtiny <- simple_diff_log(exp(log(r)+tiny),k)
-dktiny <- simple_diff_log(r,exp(log(k)+tiny))
-dll2dr2 <- (drtiny[1]-dorig[1])/tiny
-dll2dk2 <- (dktiny[2]-dorig[2])/tiny
-dll2drk <-(dktiny[1]-dorig[1])/tiny
-dll2dkr <-(drtiny[2]-dorig[2])/tiny
-hesshat <- matrix(c(dll2dr2,dll2drk,dll2dkr,dll2dk2),nrow=2)
+h11_log <- (dll_r_log[1] - dll_orig_log[1]) / (log(r*tiny) - log(r))
+h12_log <- (dll_k_log[1] - dll_orig_log[1]) / (log(k*tiny) - log(k))
+h21_log <- (dll_r_log[2] - dll_orig_log[2]) / (log(r*tiny) - log(r))
+h22_log <- (dll_k_log[2] - dll_orig_log[2]) / (log(k*tiny) - log(k))
+tape_all_log[["hessian"]]
 
-tape_all_log$hessian
-hesshat
+#*******************************************************************************
+# Question is, are we actually getting the right Hessian?
 
-# looks fine
+# We want the hessian from fitting log(r) and log(k)
+# So if log(r) changes, how does ll change?
+# The gradient is right
+library(FLsp)
+library(numDeriv)
+data(nzrl)
+data <- nzrl
+
+p <- 1
+# Polacheck's results
+# NZRL
+r <- 0.0659
+k <- 129000
+q <- 2.461e-5
+sigma <- 0.207
+
+k <- k / 1000
+data$catch <- data$catch / 1000
+#data$cpue <- data$cpue / 1000
+
+
+ll <- function(x, catch, cpue, p)
+{
+  r <- x[1]
+  k <- x[2]
+  ll <- .Call("flspCpp_tape",catch,cpue,r,p,k)[["ll"]]
+  if (is.nan(ll)) ll <- -1e10 # weight against NaNs
+  return(ll)
+}
+
+ll(c(r/10,k), catch=data$catch, cpue=data$cpue, p=p)
+numDeriv::hessian(func = ll, x =c(r,k), method.args=list(r=6),catch=data$catch, cpue=data$cpue, p=p)
+tape_all <- Call("flspCpp_tape",data$catch,data$cpue,r,p,k)
+tape_all[["hessian"]]
+# Yup!
+
+logll <- function(x, catch, cpue, p)
+{
+  
+  r <- exp(x[1])
+  k <- exp(x[2])
+  ll <- .Call("flspCpp_tape",catch,cpue,r,p,k)[["ll"]]
+  if (is.nan(ll)) ll <- -1e10 # weight against NaNs
+  return(ll)
+}
+
+logll(log(c(r/10,k)), catch=data$catch, cpue=data$cpue, p=p)
+
+numDeriv::hessian(func = logll, x =log(c(r,k)), method.args=list(r=6), catch=data$catch, cpue=data$cpue, p=p)
+tape_all_log <- .Call("flspCpp_tape_log",data$catch,data$cpue,r,p,k)
+tape_all_log[["hessian"]]
+#Yup
+
+# Our hessian is the hessian from fitting log(r) and log(k)
+
+

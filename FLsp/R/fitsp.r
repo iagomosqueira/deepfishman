@@ -148,6 +148,9 @@ setMethod('fitsp',
     object@hessian <- array(NA,dim=c(2,2,iter),dimnames=list(c("r","k"),c("r","k"),iter=1:iter))
     object@vcov <- object@hessian
 
+    object@hessian_log <- array(NA,dim=c(2,2,iter),dimnames=list(c("r","k"),c("r","k"),iter=1:iter))
+    object@vcov_log <- object@hessian_log
+
 
     #browser()
     # We're solving on the log scale so upper and lower need to be logged
@@ -287,13 +290,23 @@ for (index.count in 1:length(object@index))
 	tape_res$hessian[1,2] <- tape_res$hessian[2,1]
 	object@hessian[,,it] <- tape_res$hessian
 
-	#browser()
+ 	tape_res_log <- .Call("flspCpp_tape_log",iter(object@catch,it),iter(object@index[[1]],it),iter(object@params["r"],it),1,iter(object@params["k"],it))
+ 	# fix the upper right part of hessian
+	tape_res_log$hessian[1,2] <- tape_res_log$hessian[2,1]
+	object@hessian_log[,,it] <- tape_res_log$hessian
+
 	# Sort out variance-covariance matrix
 	tempvcov <- try(solve(-1 * object@hessian[,,it]),silent=TRUE)
 	if (class(tempvcov) == 'try-error')
 	    object@vcov[,,it] <- NA
 	else
 	    object@vcov[,,it] <- tempvcov
+
+	tempvcov_log <- try(solve(-1 * object@hessian_log[,,it]),silent=TRUE)
+	if (class(tempvcov_log) == 'try-error')
+	    object@vcov_log[,,it] <- NA
+	else
+	    object@vcov_log[,,it] <- tempvcov_log
 
 
     }

@@ -29,7 +29,9 @@ setClass('FLsp', representation(
   #biomass='FLQuant',
   index='FLQuants',
   fitted_index='FLQuants',
-  residuals_index='FLQuants'
+  residuals_index='FLQuants',
+  vcov_log='array',
+  hessian_log='array'
 ),
 	validity=validFLsp
 )

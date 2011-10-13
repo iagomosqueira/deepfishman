@@ -306,11 +306,6 @@ RcppExport SEXP flspCpp_tape_log(SEXP C_sexp, SEXP I_sexp, SEXP r_sexp, SEXP p_s
 
   gradient(tag,2,indeps,grads);
 
-  //Rprintf("indeps[0] %f\n", indeps[0]);
-  //Rprintf("indeps[1] %f\n", indeps[1]);
-  //Rprintf("grads[0] %f\n", grads[0]);
-  //Rprintf("grads[1] %f\n", grads[1]);
-
   // get hessian
   double** H = new double*[2];
   for (i=0; i<2; i++)
