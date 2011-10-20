@@ -174,11 +174,13 @@ if (!isGeneric("biomass"))
 
 setMethod('biomass', signature(object='FLsp'),
   function(object) {
-      #browser()
+      # browser()
       # Make an FLQuant with right number of iterations
       iters <- dims(object)$iter
       dimnames <- dimnames(object@catch)
       dimnames$iter <- 1:iters
+      # Add on extra year of biomass
+      dimnames$year <- c(dimnames$year,as.character(max(as.numeric(dimnames$year))+1))
       biomass <- FLQuant(NA,dimnames=dimnames)
       for (i in 1:iters)
 	  		iter(biomass,i)[] <- evalC(object,iter=i)[["B"]]
@@ -216,6 +218,29 @@ speedy_bcurrent <- function(object)
 	bc <- bcurrent_iters(C=object@catch, r=c(object@params['r',]),k=c(object@params['k',]),p=1,extinct_val=0)
 	return(bc)
 }
+
+# Another hacking function because methods calling methods is too slow
+# Assumes 1 iteration in catch and index and multiple iterations in params
+# Assumes you know what you are doing...
+speedy_b <- function(object)
+{
+	niters <- dim(object@params)[2]
+	dn <- dimnames(object@catch)
+	b <- FLQuant(NA,dimnames=list(year=c(as.numeric(dn$year),as.numeric(dn$year)[length(dn$year)]+1),iter=as.character(1:niters)))
+	#bcref <- dim(object@catch)[2]
+	#for (i in 1:niters)
+	#{
+	#	# Use exposed function
+	#	b <- project_biomass(C=object@catch, r=object@params['r',i],k=object@params['k',i],p=1,extinct_val=0)
+	#	bc[i] <- b[bcref]
+	#}
+	bt <- b_iters(C=object@catch, r=c(object@params['r',]),k=c(object@params['k',]),p=1,extinct_val=0)
+	# bt[] <- rnorm(10)
+	#b[] <- t(bt)
+	return(bc)
+}
+
+
 
 if (!isGeneric("qhat"))
     setGeneric("qhat", function(object, ...)

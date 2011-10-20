@@ -69,6 +69,33 @@ NumericVector bcurrent_iters(NumericVector C, NumericVector r, NumericVector k, 
 	return Bc;
 }
 
+// As bcurrent_iters but returns whole biomass vector
+NumericMatrix b_iters(NumericVector C, NumericVector r, NumericVector k, double p, double extinct_val)
+{
+  int nyrs = C.size();
+  int i, j;
+  int iters = r.size();
+  
+  //NumericVector Bc(iters);
+  NumericMatrix B(iters,nyrs+1);
+  adouble* B_ad = new adouble[nyrs+1];
+	adouble r_ad, k_ad;
+
+	for (j=0; j < iters; j++)
+	{
+    // initialise
+  	r_ad = r(j);
+  	k_ad = k(j);
+  	B_ad[0] = k_ad;
+  	project_biomass(B_ad, C, p, r_ad, k_ad, extinct_val);
+  	for (i=0; i < (nyrs+1); i++)
+		  B(j,i) = B_ad[i].getValue();
+	}
+		delete[] B_ad;
+	return B;
+}
+
+
 
 // A function that gets all the bits together
 // This can then be called by other C functions to just return the bits we want?
@@ -210,6 +237,7 @@ RCPP_MODULE(yada){
 	//function( "project_biomass", &project_biomassC);
 	function( "project_biomass", &project_biomassC, List::create( _["C"], _["r"], _["k"], _["p"]=1.0, _["extinct_val"]=0));
 	function( "bcurrent_iters", &bcurrent_iters, List::create( _["C"], _["r"], _["k"], _["p"]=1.0, _["extinct_val"]=0));
+	function( "b_iters", &b_iters, List::create( _["C"], _["r"], _["k"], _["p"]=1.0, _["extinct_val"]=0));	
 	function( "eval_FLsp", &eval_FLsp, List::create( _["C"], _["I"], _["r"], _["k"],_["p"]=1.0, _["extinct_val"]=0));
 //	function( "get_logl", &get_logl, List::create( _["C"], _["I"], _["p"]=1.0, _["r"], _["k"]));
 	function( "get_logl", &get_logl, List::create(_["params"], _["C"], _["I"], _["p"]=1.0,_["extinct_val"]=0));
