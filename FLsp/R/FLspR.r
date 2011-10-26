@@ -12,15 +12,28 @@
 # qhat = exp ((1/n) sum (log (Iy / Bhaty)) )
 
 # index and catch same length
+#projectB <- function(r,k,catch,p=1)
+#{
+#	B <- rep(NA,length(catch)+1)
+#	B[1] <- k
+#	for (i in 2:(length(catch)+1))
+#		B[i] <- B[i-1] + (r/p) * B[i-1] * (1 - (B[i-1] / k)^p) - catch[i-1]
+#	B[B<0] <- 0
+#	return(B)
+#}
+#
 projectB <- function(r,k,catch,p=1)
 {
-	B <- rep(NA,length(catch)+1)
-	B[1] <- k
+  niters <- length(r)
+	B <- array(NA,dim=c(niters,length(catch)+1))
+	B[,1] <- k
 	for (i in 2:(length(catch)+1))
-		B[i] <- B[i-1] + (r/p) * B[i-1] * (1 - (B[i-1] / k)^p) - catch[i-1]
+		B[,i] <- B[,i-1] + (r/p) * B[,i-1] * (1 - (B[,i-1] / k)^p) - catch[i-1]
 	B[B<0] <- 0
 	return(B)
 }
+
+
 
 ll_obs <- function(r,k,catch,index,p=1)
 {
@@ -45,12 +58,17 @@ ll_obs_q <- function(r,k,qhat,catch,index,p=1)
 	# Get biomass
 	Bhat <- projectB(r,k,catch,p)
 	# qhat
-	#qhat <- exp(sum(log(index / Bhat[1:n])) / n)
-	indexhat <- qhat * Bhat
-	vhat <- log(index / indexhat[1:n])
-	sigma2 <- sum(vhat^2 / n)
-	l <- prod(exp(-(vhat^2)/(2*sigma2))	/ sqrt(2*pi*sigma2))
-	ll <- log(l)
+
+#	indexhat <- qhat * Bhat
+#	vhat <- log(index / indexhat[1:n])
+#	sigma2 <- sum(vhat^2 / n)
+#	l <- prod(exp(-(vhat^2)/(2*sigma2))	/ sqrt(2*pi*sigma2))
+#	ll <- log(l)
+
+# As Punt F Research 1995
+CoverE <- qhat * ((Bhat[1:(length(Bhat)-1)] + Bhat[2:(length(Bhat))])/2)
+sigma2 <- sum((log(index) - log(CoverE))^2) / n
+ll <- -(n*log(sqrt(sigma2))) * (1 / (2*sigma2)) * sum((log(index) - log(CoverE))^2)
 	return(list(B=Bhat,qhat=qhat, sigma2=sigma2, ll=ll))
 }
 

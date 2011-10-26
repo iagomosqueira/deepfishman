@@ -236,8 +236,8 @@ speedy_b <- function(object)
 	#}
 	bt <- b_iters(C=object@catch, r=c(object@params['r',]),k=c(object@params['k',]),p=1,extinct_val=0)
 	# bt[] <- rnorm(10)
-	#b[] <- t(bt)
-	return(bc)
+	b[] <- t(bt)
+	return(b)
 }
 
 
