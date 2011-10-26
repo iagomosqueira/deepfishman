@@ -2,6 +2,7 @@
 
 hcr <- function(B,r,k,Blim)
 {
+  #browser()
   catch <- rep(NA,length(B))
   Bmsy <- k/2
   Msy <- r*k/4
