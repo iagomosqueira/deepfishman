@@ -1,0 +1,41 @@
+Impact of observation error on the performance of a simple harvest control rule
+Charlie Edwards and Finlay Scott
+
+Outline
+-------
+
+Conditioning of stock
+----------------------
+Start with the stock at unfished state (B = k)
+Fish for 10 years at some predetermined level. Probably quite high so that the
+stock is near equilibrium and B is about 20% of k.
+Possible to include noise on the stock recruitment relationship.
+
+1. Check that the HCR works
+---------------------------
+
+Assume perfect knowledge, i.e. observation error = 0.
+Also turn off SRR noise
+Set Blim = 0
+Project forward 20 years and try to manage stock
+Within each year:
+  Project 'true' stock forward using TAC set by HCR
+  Update perceived index and catch data (ageless) with no obs error
+  Perform assessment
+  Pass estimated parameters to the HCR function
+  Get TAC for next year
+Does the HCR get us to MSY?
+
+2. Investigate the impact of observation error
+----------------------------------------------
+Similar to (1) except that now we use observation error when constructing
+the perceived catch and index data.
+Do we use SRR noise? Maybe for the final simulations
+
+Performance statistics
+----------------------
+Total yield
+Net Present Value
+Probability of stock collapse
+Probability of reaching MSY within x years
+
