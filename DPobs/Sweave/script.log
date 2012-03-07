@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-2.3-1.40.12 (MiKTeX 2.9) (preloaded format=pdflatex 2011.9.16)  7 MAR 2012 11:30
+This is pdfTeX, Version 3.1415926-2.3-1.40.12 (MiKTeX 2.9) (preloaded format=pdflatex 2011.9.16)  7 MAR 2012 15:02
 entering extended mode
 **script.tex
 ("D:\My Documents\PROJECTS\DFM\cde\trunk\DPobs\Sweave\script.tex"
@@ -381,7 +381,7 @@ Package pdftex.def Info: script-genericSelectivityPlot.pdf used on input line 1
 <script-F_plot1.pdf, id=2, 433.62pt x 433.62pt>
 File: script-F_plot1.pdf Graphic file (type pdf)
  <use script-F_plot1.pdf>
-Package pdftex.def Info: script-F_plot1.pdf used on input line 142.
+Package pdftex.def Info: script-F_plot1.pdf used on input line 141.
 (pdftex.def)             Requested size: 364.19667pt x 364.21185pt.
 
 [1
@@ -390,92 +390,63 @@ Package pdftex.def Info: script-F_plot1.pdf used on input line 142.
 ex/config/pdftex.map}] [2 <D:/My Documents/PROJECTS/DFM/cde/trunk/DPobs/Sweave/
 script-genericSelectivityPlot.pdf>] [3 <D:/My Documents/PROJECTS/DFM/cde/trunk/
 DPobs/Sweave/script-F_plot1.pdf>]
-LaTeX Font Info:    Try loading font information for T1+aett on input line 156.
-
-
-("C:\Program Files\MiKTeX 2.9\tex\latex\ae\t1aett.fd"
-File: t1aett.fd 1997/11/16 Font definitions for T1/aett.
-)
 <script-hist_proj_plot.pdf, id=31, 433.62pt x 433.62pt>
 File: script-hist_proj_plot.pdf Graphic file (type pdf)
 
 <use script-hist_proj_plot.pdf>
-Package pdftex.def Info: script-hist_proj_plot.pdf used on input line 169.
+Package pdftex.def Info: script-hist_proj_plot.pdf used on input line 157.
 (pdftex.def)             Requested size: 364.19667pt x 364.21185pt.
-LaTeX Font Info:    Try loading font information for TS1+aer on input line 179.
-
-LaTeX Font Info:    No file TS1aer.fd. on input line 179.
-
-
-LaTeX Font Warning: Font shape `TS1/aer/m/n' undefined
-(Font)              using `TS1/cmr/m/n' instead
-(Font)              for symbol `textbullet' on input line 179.
-
-[4 <D:/My Documents/PROJECTS/DFM/cde/trunk/DPobs/Sweave/script-hist_proj_plot.p
-df>] <script-survey_sel_plot.pdf, id=43, 433.62pt x 433.62pt>
-File: script-survey_sel_plot.pdf Graphic file (type pdf)
-
-<use script-survey_sel_plot.pdf>
-Package pdftex.def Info: script-survey_sel_plot.pdf used on input line 217.
-(pdftex.def)             Requested size: 364.19667pt x 364.21185pt.
-
-<../dat/effCV.pdf, id=44, 505.89pt x 504.88625pt>
+ [4 <D:/My Documents/PROJECTS/DFM/cde/trunk/DPobs/Sweave/script-hist_proj_plot.
+pdf>]
+<../dat/effCV.pdf, id=42, 505.89pt x 504.88625pt>
 File: ../dat/effCV.pdf Graphic file (type pdf)
  <use ../dat/effCV.pdf>
-Package pdftex.def Info: ../dat/effCV.pdf used on input line 230.
+Package pdftex.def Info: ../dat/effCV.pdf used on input line 211.
 (pdftex.def)             Requested size: 364.19667pt x 363.47928pt.
 
-[5] [6 <D:/My Documents/PROJECTS/DFM/cde/trunk/DPobs/Sweave/script-survey_sel_p
-lot.pdf>] [7 <D:/My Documents/PROJECTS/DFM/cde/trunk/DPobs/dat/effCV.pdf>]
-<script-hcr_plot_sc1.pdf, id=69, 433.62pt x 433.62pt>
+<script-hcr_plot_sc1.pdf, id=43, 433.62pt x 433.62pt>
 File: script-hcr_plot_sc1.pdf Graphic file (type pdf)
 
 <use script-hcr_plot_sc1.pdf>
-Package pdftex.def Info: script-hcr_plot_sc1.pdf used on input line 279.
+Package pdftex.def Info: script-hcr_plot_sc1.pdf used on input line 238.
 (pdftex.def)             Requested size: 364.19667pt x 364.21185pt.
- [8 <D:/My Documents/PROJECTS/DFM/cde/trunk/DPobs/Sweave/script-hcr_plot_sc1.pd
-f>]
-<script-hcr_plot_sc3.pdf, id=78, 433.62pt x 433.62pt>
+
+<script-hcr_plot_sc3.pdf, id=44, 433.62pt x 433.62pt>
 File: script-hcr_plot_sc3.pdf Graphic file (type pdf)
 
 <use script-hcr_plot_sc3.pdf>
-Package pdftex.def Info: script-hcr_plot_sc3.pdf used on input line 311.
+Package pdftex.def Info: script-hcr_plot_sc3.pdf used on input line 249.
 (pdftex.def)             Requested size: 364.19667pt x 364.21185pt.
- [9 <D:/My Documents/PROJECTS/DFM/cde/trunk/DPobs/Sweave/script-hcr_plot_sc3.pd
-f>]
-("D:\My Documents\PROJECTS\DFM\cde\trunk\DPobs\Sweave\script.bbl") [10]
+ [5] [6 <D:/My Documents/PROJECTS/DFM/cde/trunk/DPobs/dat/effCV.pdf>] [7 <D:/My
+ Documents/PROJECTS/DFM/cde/trunk/DPobs/Sweave/script-hcr_plot_sc1.pdf>] [8 <D:
+/My Documents/PROJECTS/DFM/cde/trunk/DPobs/Sweave/script-hcr_plot_sc3.pdf>]
+("D:\My Documents\PROJECTS\DFM\cde\trunk\DPobs\Sweave\script.bbl") [9]
 ("D:\My Documents\PROJECTS\DFM\cde\trunk\DPobs\Sweave\script.aux")
-
-LaTeX Font Warning: Some font shapes were not available, defaults substituted.
-
 
 LaTeX Warning: There were multiply-defined labels.
 
  ) 
 Here is how much of TeX's memory you used:
- 3901 strings out of 494045
- 53155 string characters out of 3148336
- 112926 words of memory out of 3000000
- 7102 multiletter control sequences out of 15000+200000
- 28888 words of font info for 63 fonts, out of 3000000 for 9000
+ 3860 strings out of 494045
+ 52502 string characters out of 3148336
+ 112918 words of memory out of 3000000
+ 7072 multiletter control sequences out of 15000+200000
+ 26207 words of font info for 58 fonts, out of 3000000 for 9000
  715 hyphenation exceptions out of 8191
- 35i,9n,21p,289b,328s stack positions out of 5000i,500n,10000p,200000b,50000s
- <C:\Documents and Settings\ctte\Local Settings\Application Data\MiKTeX\2.9\f
-onts\pk\ljfour\jknappen\ec\dpi600\tcrm1000.pk><C:/Program Files/MiKTeX 2.9/font
-s/type1/public/amsfonts/cm/cmbx12.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/
-public/amsfonts/cm/cmmi10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/a
-msfonts/cm/cmmi12.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/
-cm/cmmi7.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr10.
-pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr12.pfb><C:/P
-rogram Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr17.pfb><C:/Program Fi
-les/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr7.pfb><C:/Program Files/MiKTeX
- 2.9/fonts/type1/public/amsfonts/cm/cmsy10.pfb><C:/Program Files/MiKTeX 2.9/fon
-ts/type1/public/amsfonts/cm/cmsy7.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/
-public/amsfonts/cm/cmti10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/a
-msfonts/cm/cmtt8.pfb>
-Output written on script.pdf (10 pages, 352537 bytes).
+ 35i,9n,21p,307b,232s stack positions out of 5000i,500n,10000p,200000b,50000s
+<C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmbx12.pfb><C:/Pr
+ogram Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmmi10.pfb><C:/Program Fi
+les/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmmi12.pfb><C:/Program Files/MiKT
+eX 2.9/fonts/type1/public/amsfonts/cm/cmmi7.pfb><C:/Program Files/MiKTeX 2.9/fo
+nts/type1/public/amsfonts/cm/cmr10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1
+/public/amsfonts/cm/cmr12.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/a
+msfonts/cm/cmr17.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/c
+m/cmr7.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmsy10.p
+fb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmsy7.pfb><C:/Pr
+ogram Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmti10.pfb>
+Output written on script.pdf (9 pages, 290047 bytes).
 PDF statistics:
- 132 PDF objects out of 1000 (max. 8388607)
+ 114 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 500000)
- 36 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 31 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -1,5 +1,5 @@
 % setwd(".")
-% Sweave("script.rnw", syntax="SweaveSyntaxNoweb")
+% rm(list=ls());Sweave("script.rnw", syntax="SweaveSyntaxNoweb")
 % pdflatex script.tex
 
 % Modify for all subsequent chunks: \SweaveOpts{echo=FALSE}
@@ -134,8 +134,7 @@ scenarios of fishing mortality:
 
 
 We begin by looking at scenario 3 only: starting from 0, $F$ will increase to $2F^{MSY}$
-before decreasing slightly over a period of 40 years. %We'll also multiply the $F$ value by lognormally distributed noise with a mean of 1 and a standard deviation of 0.1. 
-You can see this in Figure~\ref{fig:Fscenario}. 
+before decreasing slightly over a period of 40 years. You can see this in Figure~\ref{fig:Fscenario}. 
 
 \begin{figure}
 \centering
@@ -146,21 +145,10 @@ You can see this in Figure~\ref{fig:Fscenario}.
 
 \subsection{Historic biomass trajectory}
 
-
 Using the glory of $FLash$ we can now project the stock forward from time $t=0$ to $t=40$ under this fishing
-scenario. %We'll put a small amount of lognormally distributed noise onto the recruitment with a mean of 1 and a standard deviation of 0.3.
-To perform our projection we convert our generic stock (currently a $FLBRP$ object) into an $FLStock$ object,
+scenario. To perform our projection we convert our generic stock (currently a $FLBRP$ object) into an $FLStock$ object,
 define an $FLQuant$ containing the recruitment residuals, setup a control object and then project forward:
 
-\begin{Schunk}
-\begin{Sinput}
-> stk1 <- as(gen1, "FLStock")
-> stk1 <- window(stk1, end = maxt)
-> ctrl_F1 <- fwdControl(data.frame(year = 2:maxt, quantity = "f", val = F1))
-> sr_resid <- FLQuant(1, dimnames = list(age = 1, year = dimnames(stock.n(stk1))$year, iter = dimnames(stock.n(stk1))$iter))
-> stk1 <- fwd(stk1, ctrl = ctrl_F1, sr = list(model = model(gen1), params = params(gen1)), sr.residuals = sr_resid)
-\end{Sinput}
-\end{Schunk}
 
 The resulting stock object can be seen in Figure~\ref{fig:hist_proj}.
 
@@ -175,50 +163,43 @@ The resulting stock object can be seen in Figure~\ref{fig:hist_proj}.
 \section{Management scenarios}
 
 We compared three different managment scenarios:
-\begin{itemize}
+\begin{enumerate}
 \item perfect knowledge
 \item model based control rule
 \item empirical control rule
-\end{itemize}
+\end{enumerate}
 
-Management objectives are utilitarian, specified as both a target catch $C^{TAR}$ and catch rate $I^{TAR}$. 
-Given that $MEY < MSY$, these are specified arbitarily as $C^{TAR} = 0.9 C^{MSY}$ and $I^{TAR} = 0.9 q B^{MSY}$ with $q=1e-4$.
+Management objectives are utilitarian, specified as both a target catch $C^{TAR}$ and biomass $I^{TAR}$. 
+These were specified arbitarily as $C^{TAR} = C^{MSY}$ and $I^{TAR} = 0.9 q B^{MSY}$ with $q=1e-4$.
 Note that both targets are consistent with each other (i.e. it is feasible to achive both simultaneously).
 
 The harvest conrol rule defines the catch per year
 \[
-C_{y+1} = \frac{C^{TAR}G(B_y)}{I^{TAR}}
+C_{y+1} = \frac{C^{TAR}G(B_y)}{G(B^{TAR})}
 \]
-where $G(B_y)$ is our observation of the resource. For the scenarios listed above:
-\begin{itemize}
-\item $G(B_y) = qB_y$
-\item $G(B_y) = \hat{q}\hat{B}_y$
-\item $G(B_y) = I_y$
-\end{itemize}
+where $G(B)$ is our observation of the resource. For the scenarios listed above:
+\begin{enumerate}
+\item $G(B) = B$
+\item $G(B) = \hat{B}$
+\item $G(B) = I$
+\end{enumerate}
+
+To ensure comparibility of results, for all scenarios the values of $C^{TAR}$ and $B^{TAR}$ are assumed known. 
+For scenario 3, we obtain the target catch rate $I^{TAR}$ from the number and weight stock vectors associated with
+$B^{MSY}$ and assuming a catchability of $q=1e-4$. This was necessary to account for the different selectivity
+assumptions associated with caculation of the exploitable biomass. 
 
 Since scenario 2 requires an estimation step, we predict that as survey effort declines performance of this control rule will deteriorate.
-Specifically it will deteriorate at a faster rate than the control rule in scenario 3.
-
-Performance was measured as the probability of $C>C^{TAR}$ and $I>I^{TAR}$ after a 20 year projection period. Managment scenarios will
-be compared by a regression of performance against survey effort. 
+Specifically it will deteriorate at a faster rate than the control rule in scenario 3, which is empirical. Performance was measured as the 
+probability of $C\geq C^{TAR}$ and $B\geq B^{TAR}$ after a 40 year projection period. Managment scenarios will be compared by a regression of 
+performance against survey effort. 
 
 \section{Management strategy projection}
 
 
 \subsection{Getting the index data for the control rule}
 
-We're going to assume the index comes from a
-survey vessel so we need to set up a catch selectivity for the survey.
-It's going to be sigmoid that is fully selected at age 4 (Figure~\ref{fig:survey_sel}).
-
-
-\begin{figure}
-\centering
-\includegraphics{script-survey_sel_plot}
-\caption{The selectivity curve of the survey vessel}
-\label{fig:survey_sel}
-\end{figure}
-
+We're going to assume the index comes from a survey vessel, and that the resource is fully selected by the gear. 
 We use empirical survey data to estimate the relationship between uncertainty in our catch rate index and the survey effort. Specifically, data
 were extracted from the ICES International Bottom Trawl Survey (IBTS) database for the North Sea, and filtered for \textit{Gadus morhua} and the GOV gear type.
 For each year from 1983 to 2011, bootstrap samples of individual trawls were taken, from which a mean catch rate in numbers per tow ($\hat{I}$) could
@@ -233,83 +214,41 @@ from the data, from which we obtained the coefficient of variation (Figure~\ref{
 \end{figure} 
 
 
-We are going to generate historic survey data assuming the selectivity in Figure~\ref{fig:survey_sel}.
-We now apply this selectivity to the population, and sum to get the index of abundance.
-We assume that the survey takes place half way through the year
-and we'll scale the abundance down by a 1000 (i.e. catchability $q=1e-4$). There is no observation error. The index
-is asssumed to be perfectly known.
+We assume that the survey takes place half way through the year (before any catches have been taken)
+and with a constant catchability $q=1e-04$. 
 
-\begin{Schunk}
-\begin{Sinput}
-> index <- apply(sweep(stk2@stock.n * exp(-stk2@m/2) * stk2@stock.wt, 1:5, sselq, "*"), 2:6, sum) * 
-+     1e-04
-\end{Sinput}
-\end{Schunk}
 
 \section{Management simulation}
 
+\subsection{Stochasticity}
+
+
+Sources of stochasticity were as follows:
+\begin{enumerate}
+\item recruitment: multiplicative log-normal noise around the predicted recruitment
+\item observation: the survey catch rate was subjected to a degree of noise equivalent to that given in Figure~\ref{fig:effCV}
+for a specified level of effort
+\end{enumerate}
+
 \subsection{Scenario 1: perfect knowledge}
-\begin{Schunk}
-\begin{Sinput}
-> hcr <- function(catch, index, year) {
-+     CTAR <- 0.9 * as.numeric(refpts(gen1)[, "yield"][4])
-+     ITAR <- 0.9 * as.numeric(refpts(gen1)[, "biomass"][4]) * 1e-04
-+     ILIM <- 0
-+     GB <- as.numeric(quantSums(stock.n(stk2)[, year - 1] * stock.wt(stk2)[, year - 1] * catch.sel(gen1))) * 
-+         1e-04
-+     if (GB <= ILIM) {
-+         TAC <- 0
-+     }
-+     else {
-+         if (GB > ILIM & GB < ITAR) {
-+             TAC <- (CTAR * (GB - ILIM))/(ITAR - ILIM)
-+         }
-+         else {
-+             if (GB >= ITAR) {
-+                 TAC <- (CTAR * GB)/ITAR
-+             }
-+         }
-+     }
-+     ctrl <- fwdControl(data.frame(year = year, val = TAC, quantity = "catch"))
-+ }
-\end{Sinput}
-\end{Schunk}
+
 
 \begin{figure}
+\centering
 \includegraphics{script-hcr_plot_sc1}
-\caption{The results of the projection}
+\caption{Scenario 1: Performance of control rule assuming perfect knowledge of resource status. Vertical line represents start of projection period. 
+Horizontal line represents the target biomass $B^{TAR}$.}
 \label{fig:hcr_proj_biomass}
 \end{figure}
 
 \subsection{Scenario 3: empirical control rule}
-\begin{Schunk}
-\begin{Sinput}
-> hcr <- function(catch, index, year) {
-+     CTAR <- 0.9 * as.numeric(refpts(gen1)[, "yield"][4])
-+     ITAR <- 0.9 * as.numeric(refpts(gen1)[, "biomass"][4]) * 1e-04
-+     ILIM <- 0
-+     GB <- as.numeric(index[, year - 1])
-+     if (GB <= ILIM) {
-+         TAC <- 0
-+     }
-+     else {
-+         if (GB > ILIM & GB < ITAR) {
-+             TAC <- (CTAR * (GB - ILIM))/(ITAR - ILIM)
-+         }
-+         else {
-+             if (GB >= ITAR) {
-+                 TAC <- (CTAR * GB)/ITAR
-+             }
-+         }
-+     }
-+     ctrl <- fwdControl(data.frame(year = year, val = TAC, quantity = "catch"))
-+ }
-\end{Sinput}
-\end{Schunk}
+
 
 \begin{figure}
+\centering
 \includegraphics{script-hcr_plot_sc3}
-\caption{The results of the projection}
+\caption{Scenario 3: Performance of empirical control rule. Vertical line represents start of projection period. 
+Horizontal line represents the target biomass $B^{TAR}$.}
 \label{fig:hcr_proj_biomass}
 \end{figure}
 
