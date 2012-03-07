@@ -1,0 +1,9 @@
+\begin{thebibliography}{1}
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
+
+\bibitem[{Magnusson \& Hilborn(2007)}]{Magnusson:2007}
+Magnusson, A. \& Hilborn, R. (2007).
+\newblock What makes fisheries data informative.
+\newblock \emph{Fish and Fisheries}, 8, 337--358.
+
+\end{thebibliography}
