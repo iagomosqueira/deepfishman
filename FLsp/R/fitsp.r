@@ -213,17 +213,16 @@ for (index.count in 1:length(object@index))
 
     #browser()
 			# Using DEoptim
-	    out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
-	    names(out$optim$bestmem) <- names(start)
-      iter(object@params[names(out$optim$bestmem),], it) <- exp(out$optim$bestmem)
-      object@logLik[it] <- -out$optim$bestval
+        out <- do.call('DEoptim', c(list(fn=loglfoo, lower=lower, upper=upper, control=control)))
+        names(out$optim$bestmem) <- names(start)
+        iter(object@params[names(out$optim$bestmem),], it) <- exp(out$optim$bestmem)
+        object@logLik[it] <- -out$optim$bestval
+        cat("DEoptim best: ", exp(out$optim$bestmem), "\n")
 
-			cat("DEoptim best: ", exp(out$optim$bestmem), "\n")
-
-			# Finish off with optim? - Doesn't like infs
-#			cat("Trying with optim\n")
-#      out <- do.call('optim', c(list(par=exp(out$optim$bestmem), fn=loglfoo, method="BFGS",
-#        hessian=TRUE, gr=gr)))
+        # Finish off with optim? - Doesn't like infs
+        #			cat("Trying with optim\n")
+        #      out <- do.call('optim', c(list(par=exp(out$optim$bestmem), fn=loglfoo, method="BFGS",
+        #        hessian=TRUE, gr=gr)))
 
 
 # Use ucminf to finish off

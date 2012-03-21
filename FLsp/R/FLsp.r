@@ -370,28 +370,28 @@ setMethod("dims", signature(obj="FLsp"),
 
 
 # Really slow
-setMethod("iter", signature(object="FLsp"),
-	  function(object, it) {
+setMethod("iter", signature(obj="FLsp"),
+	  function(obj, it) {
 #browser()
-#			res <- callNextMethod(object,it)
+#			res <- callNextMethod(obj,it)
 #			res@index <- lapply(res@index,function(x) iter(x,it))
 # return(res)
 
     # FLArray
-    object <- qapply(object, FUN=iter, it)
+    obj <- qapply(obj, FUN=iter, it)
     # params
-    params(object) <- iter(params(object), it)
+    params(obj) <- iter(params(obj), it)
     # vcov
     if(length(dim(vcov)) > 2)
       if(dim(vcov)[3] > 1)
-        vcov(object) <- vcov(object)[,,it]
+        vcov(obj) <- vcov(obj)[,,it]
       else
-        vcov(object) <- vcov(object)[,,1]
+        vcov(obj) <- vcov(obj)[,,1]
     # logLik
-    logLik(object) <- iter(object@logLik, it)
+    logLik(obj) <- iter(obj@logLik, it)
 			# sort out indices
-			object@index <- lapply(object@index,function(x) iter(x,it))
-			return(object)
+			obj@index <- lapply(obj@index,function(x) iter(x,it))
+			return(obj)
 		})
 
 
@@ -538,7 +538,7 @@ setMethod("profile", signature(fitted="FLsp"),
     plot(x=profiled[["r"]], y=profiled[["ll_grad_r"]], type="l", axes=FALSE, xlab="",ylab="dll/dr", ylim=ylim)
     lines(x=c(-1e9,1e9),y=c(0,0),lty=2)
     par(mar=c(5.1,0,1,1))
-    plot(y=profiled[["k"]], x=profiled[["ll_grad_k"]], type="l", axes=FALSE, ylab= "", xlab="dll/dr",xlim=xlim)
+    plot(y=profiled[["k"]], x=profiled[["ll_grad_k"]], type="l", axes=FALSE, ylab= "", xlab="dll/dk",xlim=xlim)
     lines(y=c(-1e9,1e9),x=c(0,0),lty=2)
     par(mar=c(5.1,5.1,1,1))
 

@@ -1,16 +1,11 @@
-# FLsp test
-
-setwd("~/Work/deepfishman/trunk")
-#setwd("m:/Projects/Deepfishman/deepfishman")
+# Try different optimisers
+setwd("c:/Projects/Deepfishman/deepfishman")
 
 library(FLsp)
-#dyn.load("C:/R/library/FLsp/libs/i386/FLsp.dll")
 
 # Try SAA
-
-data <- read.csv("FLsp/data/NZRL.csv")
-#data <- read.csv("FLsp/data/NNH.csv")
-#data <- read.csv("FLsp/data/SAAL.csv")
+data(nzrl)
+data <- nzrl
 
 p <- 1
 # Polacheck's results
@@ -19,36 +14,109 @@ r <- 0.0659
 k <- 129000
 q <- 2.461e-5
 sigma <- 0.207
-# what do we get?
-sp <- .Call("flspCpp",data$catch,data$cpue,r,p,k)
-sp[["qhat"]]
-# Not bad!
 
+# what do we get?
+sp <- eval_FLsp(data$catch, data$cpue, r, k)
+
+# Not bad!
+sp[["qhat"]]
+
+# Just the likelihood
+ll <- get_logl(c(r,k),data$catch, data$cpue)
+
+# How do we deal with NA and Infs...
 ll_objfun <- function(params,catch,cpue)
 {
   r <- exp(params[1])
   k <- exp(params[2])
-  res <- .Call("flspCpp",catch,cpue,r,1,k)
-  if (is.nan(res[["ll"]])) res[["ll"]] <- NA
+  ll <- get_logl(c(r,k),catch, cpue)
+#  res <- .Call("flspCpp",catch,cpue,r,1,k)
+  #if (is.nan(res[["ll"]])) res[["ll"]] <- NA
   #if (is.na(res[["ll"]])) res[["ll"]] <- Inf
   cat("r: ", r, "\n")
   cat("k: ", k, "\n")
-  cat("ll: ", -res[["ll"]], "\n")
-  return(-res[["ll"]])
+  cat("ll: ", -ll, "\n")
+  return(-ll)
 }
 
 ll_gradfun <- function(params,catch,cpue)
 {
   r <- exp(params[1])
   k <- exp(params[2])
-  res <- .Call("flspCpp",catch,cpue,r,1,k)
-  cat("ll_grad_r: ", -res[["ll_grad_r"]], "\n")
-  cat("ll_grad_k: ", -res[["ll_grad_k"]], "\n")
-  return(c(-res[["ll_grad_r"]],-res[["ll_grad_k"]]))
+  #res <- .Call("flspCpp",catch,cpue,r,1,k)
+  res <- eval_FLsp(catch, cpue, r, k)
+  cat("ll_grad_r: ", -res[["ll_grads"]][1], "\n")
+  cat("ll_grad_k: ", -res[["ll_grads"]][2], "\n")
+  return(c(-res[["ll_grads"]][1],-res[["ll_grads"]][2]))
 }
 
-#ll_objfun(log(c(r,k)),data$catch,data$cpue)
+# Give the objective functions a go
+ll_objfun(log(c(r,k)),data$catch,data$cpue)
+ll_gradfun(log(c(r,k)),data$catch,data$cpue)
 
+#*******************************************************************************
+# Can't pass additional arguments to it
+# gsl
+library(gsl)
+
+# How do we deal with NA and Infs...
+ll_objfun_gsl <- function(params)
+{
+  r <- exp(params[1])
+  k <- exp(params[2])
+  ll <- get_logl(c(r,k),catch, cpue, p=1, extinct_val=1e-9)
+#  res <- .Call("flspCpp",catch,cpue,r,1,k)
+  if (is.nan(ll)) ll <- NA
+  #if (is.na(res[["ll"]])) res[["ll"]] <- Inf
+  cat("r: ", r, "\n")
+  cat("k: ", k, "\n")
+  cat("ll: ", -ll, "\n")
+  return(-ll)
+}
+
+ll_gradfun_gsl <- function(params)
+{
+  r <- exp(params[1])
+  k <- exp(params[2])
+  #res <- .Call("flspCpp",catch,cpue,r,1,k)
+  res <- eval_FLsp(catch, cpue, r, k, p=1, extinct_val=1e-9)
+  cat("ll_grad_r: ", -res[["ll_grads"]][1], "\n")
+  cat("ll_grad_k: ", -res[["ll_grads"]][2], "\n")
+  return(c(-res[["ll_grads"]][1],-res[["ll_grads"]][2]))
+}
+
+catch <- data$catch
+cpue <- data$cpue
+
+# bfgs doesn't work
+init_params <- log(c(0.1,100000))
+gsl_test <- multimin(x = init_params, f=ll_objfun_gsl, df=ll_gradfun_gsl, method="bfgs")
+
+# doesn't work conjugate-fr
+init_params <- log(c(0.1,100000))
+gsl_test <- multimin(x = init_params, f=ll_objfun_gsl, df=ll_gradfun_gsl, method="conjugate-fr")
+
+# conjugate-pr, doesn't work
+init_params <- log(c(0.1,100000))
+gsl_test <- multimin(x = init_params, f=ll_objfun_gsl, df=ll_gradfun_gsl, method="conjugate-pr")
+
+# steepest descent
+init_params <- log(c(0.1,100000))
+gsl_test <- multimin(x = init_params, f=ll_objfun_gsl, df=ll_gradfun_gsl, method="steepest-descent")
+
+
+
+# example
+x0 <- c(-1.2, 1)
+f <- function(x) (1 - x[1])^2 + 100 * (x[2] - x[1]^2)^2
+df <- function(x) c(-2*(1 - x[1]) + 100 * 2 * (x[2] - x[1]^2) * (-2*x[1]),
+100 * 2 * (x[2] - x[1]^2))
+# The simple way to call multimin.
+state <- multimin(x0, f, df)
+
+
+
+#*******************************************************************************
 #test <- optim(c(1,1000),fn=ll_objfun,gr=ll_gradfun,method="L-BFGS-B", lower=c(1e-6,1e-6), upper=c(Inf,Inf),catch=saa$catch,cpue=saa$cpue)
 
 test <- optim(log(c(0.5,100000)),fn=ll_objfun,gr=ll_gradfun,method="BFGS", catch=data$catch,cpue=data$cpue)
@@ -137,6 +205,9 @@ sp[["ll"]]
 
 sum(nlsres[["res"]]^2)
 sum(nlsjacres[["res"]]^2)
+
+
+
 
 # Conclusion
 # optim doesn't work at all. Even with gradients and parscaling

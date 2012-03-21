@@ -151,8 +151,8 @@ void project_biomass(adouble* B, NumericVector C, double p, adouble r, adouble k
   for (yr = 1; yr<C.size(); yr++)
   {
     B[yr] = B[yr-1] + (r / p) * B[yr-1] * (1 - pow((B[yr-1] / k),p)) - C(yr-1);
-    //B[yr] = fmax(B[yr],1e-9);
-    B[yr] = fmax(B[yr],0);
+    B[yr] = fmax(B[yr],1e-9);
+    //B[yr] = fmax(B[yr],0);
   }
   //Rprintf("Leaving project biomass\n");
 }
