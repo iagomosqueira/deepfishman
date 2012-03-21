@@ -60,6 +60,7 @@ Imperial College London, Ascot, UK}
 #library(FLsp)
 library(FLAssess)
 library(FLH)
+library(FLaspm)
 library(ggplot2)
 library(xtable)
 library(mvtnorm)
@@ -86,10 +87,10 @@ sR <- 5
 # maturity
 mat95 <- 6
 # SRR
-s <- 0.75
-v <- 1e3
+slope <- 0.75
+SSB0 <- 1e3
 # Make the stock
-gen1 <- genBRP(age=1:maxage, Linf=Linf, k=k, a1=a1, sL=sL, sR=sR, mat95=mat95, s=s, v=v,minfbar=5,maxfbar=5)
+gen1 <- genBRP(age=1:maxage, Linf=Linf, k=k, a1=a1, sL=sL, sR=sR, mat95=mat95, s=slope, v=SSB0,minfbar=5,maxfbar=5)
 @    
 
 % Table of parameters
@@ -109,8 +110,8 @@ $mat95$      & \Sexpr{mat95}\\
 \hline
 \multicolumn{2}{|c|}{SRR}\\
 \hline
-$s$         & \Sexpr{s}\\
-$v$         & \Sexpr{v}\\
+Steepness $h$         & \Sexpr{slope}\\
+Virgin Biomass $B0$         & \Sexpr{SSB0}\\
 \hline
 \end{tabular}
 \caption{Parameters for generating the generic stock with $FLH$}
@@ -156,7 +157,7 @@ scenarios of fishing mortality:
 \item one-way trip, harvest rate gradually increases
 \item no change, constant at a somewhat low harvest rate
 \item good contrast, stock is fished down to less than half its initial size, then allowed to rebuild
-\item rebuild only, stock begins at low abundance and is allowed to rebuild under low F
+\item rebuild only, stock begins at low abundance and is allowed to rebuild under low fishing mortality
 \end{enumerate}
 
 <<label=single_F_scenario1,echo=FALSE>>=
@@ -179,7 +180,7 @@ F1 <- maxF*sin(seq(from=0,to=2 * pi/3,length=maxt))[-1]
 @ 
 
 We begin by looking at scenario 3 only: starting from 0, $F$ will increase to $\Sexpr{maxFfactor}F^{MSY}$
-before decreasing slightly over a period of \Sexpr{maxt} years. You can see this in Figure~\ref{fig:Fscenario}. 
+before decreasing slightly over a period of \Sexpr{maxt} years (Figure~\ref{fig:Fscenario}). 
 
 \begin{figure}
 \centering
@@ -218,8 +219,9 @@ print(plot(FLStocks(stk1)))
 \label{fig:hist_proj}
 \end{figure}
 
+\section{Management strategy projection}
 
-\section{Management scenarios}
+\subsection{Management scenarios}
 
 We compared three different managment scenarios:
 \begin{enumerate}
@@ -228,8 +230,7 @@ We compared three different managment scenarios:
 \item empirical control rule
 \end{enumerate}
 
-Management objectives are utilitarian, specified as both a target catch $C^{TAR}$ and biomass $B^{TAR}$. 
-These were specified arbitarily as $C^{TAR} = C^{MSY}$ and $B^{TAR} = B^{MSY}$.
+Management objectives were specified as a target catch $C^{TAR} = C^{MSY}$ and biomass $B^{TAR} = B^{MSY}$. 
 Note that both targets are consistent with each other (i.e. it is feasible to achive both simultaneously).
 
 The harvest conrol rule defines the catch per year
@@ -244,20 +245,18 @@ where $G(B)$ is our observation of the resource. For the scenarios listed above:
 \end{enumerate}
 
 To ensure comparibility of results, for all scenarios the values of $C^{TAR}$ and $B^{TAR}$ were assumed known. 
-For scenario 3, we obtain the target catch rate $I^{TAR}$ from the number and weight stock vectors associated with
-$B^{MSY}$ and assuming a catchability of $q=1e-4$. This was necessary to account for the different selectivity
-assumptions associated with caculation of exploitable biomass for the commercial fleet and survey vessel.
+For scenario 3, we observe the survey catch rate $I$ only. Since the survey and commercial catches are obtained under differing
+selectivity assumptions $G(B^{TAR}) = I^{TAR} \neq qB^{TAR}$. Instead we calculate $I^{TAR}$ directly from the numbers vector $N^{TAR}_a$
+associated with $B^{TAR}$ and assuming a constant survey catchability. Thus $I^{TAR} = q\sum_a{w_a N^{TAR}_a}$.
 
 Since scenario 2 requires an estimation step, we predict that as survey effort declines performance of this control rule will deteriorate.
 Specifically it will deteriorate at a faster rate than the control rule in scenario 3, which is empirical. Performance was measured as the 
 probability of $C\geq C^{TAR}$ and $B\geq B^{TAR}$ after a 40 year projection period. Managment scenarios will be compared by a regression of 
 performance against survey effort. 
 
-\section{Management strategy projection}
-
 <<echo=FALSE>>=
 # Now we set up for management simulation
-proj_nyr  <- 40
+proj_nyr  <- 4
 proj_strt <- dims(stk1)$maxyear
 stk2      <- stf(stk1,proj_nyr)
 proj_end  <- proj_strt + proj_nyr
@@ -282,16 +281,13 @@ from the data, from which we obtained the coefficient of variation (Figure~\ref{
 \label{fig:effCV}
 \end{figure} 
 
-<<label=survey_generation,echo=FALSE>>=
+<<echo=FALSE>>=
 q.comm <- 1e-4
 q.surv <- 1e-4
 @
 
 We assume that the survey takes place at the beginning of the year (before any catches have been taken)
 and with a constant catchability $q=\Sexpr{q.surv}$. 
-
-
-\section{Management simulation}
 
 \subsection{Stochasticity}
 
@@ -306,13 +302,18 @@ Sources of stochasticity were as follows:
 for a specified level of effort
 \end{enumerate}
 
+\section{Preliminary runs}
+
+We ran deterministic projections for all three management scenarios to ensure that they are behaving as expected (i.e. converging on $B^{TAR}$ and $C^{TAR}$).
+These are shown in Figures~\ref{fig:hcr_proj_biomass_sc1}, \ref{fig:hcr_proj_biomass_sc2} and \ref{fig:hcr_proj_biomass_sc3}.
+
 \subsection{Scenario 1: perfect knowledge}
-<<echo=FALSE>>=
+<<label=hcr_sc1,echo=FALSE>>=
 hcr <- function(catch,index,year) {
 
   CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
-  BTAR <- as.numeric(refpts(gen1)[,"biomass"][4])   # target bexp
-  BLIM <- 0                                         # limit bexp
+  BTAR <- as.numeric(refpts(gen1)[,"biomass"][4])   # target exploitable biomass
+  BLIM <- 0                                         # limit exploitable biomass
   
   GB <- as.numeric(index[,year-1]) 
   
@@ -326,14 +327,15 @@ hcr <- function(catch,index,year) {
 }
 @
 
-<<echo=FALSE>>=
-# perfectly known biomass
+<<label=run_sc1,echo=FALSE,term=FALSE>>=
 index <- quantSums(sweep(stock.n(stk2) * stock.wt(stk2),1,catch.sel(gen1),"*")) 
 for(y in (proj_strt+1):proj_end) {
 
+  # control rule
   ctrl <- hcr(catch(stk2),index,y)
+  # project
   stk2 <- fwd(stk2,ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
-  
+  # exploitable biomass
   index[,y] <- quantSums(stock.n(stk2)[,y] * stock.wt(stk2)[,y] * catch.sel(gen1)) 
 }
 @
@@ -341,29 +343,31 @@ for(y in (proj_strt+1):proj_end) {
 \begin{figure}
 \centering
 <<label=hcr_plot_sc1,fig=TRUE,echo=FALSE>>=
-print(ggplot(data.frame(time=1:proj_end, B=c(quantSums(sweep(stk2@stock.n * stk2@stock.wt,1,catch.sel(gen1),"*"))))) 
-  + geom_line(aes(x=time,y=B)) 
-  + geom_line(aes(x=time,y=BMSY),data=data.frame(time=1:proj_end, BMSY=as.numeric(refpts(gen1)[,"biomass"][4])))
+print(ggplot(data.frame(Time=1:proj_end, B=c(quantSums(sweep(stk2@stock.n * stk2@stock.wt,1,catch.sel(gen1),"*"))))) 
+  + geom_line(aes(x=Time,y=B)) 
+  + geom_line(aes(x=Time,y=BMSY),data=data.frame(Time=1:proj_end, BMSY=as.numeric(refpts(gen1)[,"biomass"][4])))
   + geom_line(aes(x=proj_strt,y=B))
   )
 @
 \caption{Scenario 1: Performance of control rule assuming perfect knowledge of resource status. Vertical line represents start of projection period. 
 Horizontal line represents the target biomass $B^{TAR}$.}
-\label{fig:hcr_proj_biomass}
+\label{fig:hcr_proj_biomass_sc1}
 \end{figure}
 
 \subsection{Scenario 2: model based control rule}
 <<echo=FALSE>>=
-
-# use FLaspm
-
 hcr <- function(catch,index,year) {
 
+  # get estimated exploitable biomass from FLaspm
+  srm <- FLaspm(catch=catch[,1:year-1], index=FLQuants(index1 = index[,1:year-1]),M=m(gen1),hh=slope,sel=landings.sel(gen1), mat=mat(gen1), wght=stock.wt(gen1),amax=range(gen1)['max'], amin=range(gen1)['min'])
+  model(srm) <- aspm.Francis.C()
+  srm <- fmle(srm)
+
   CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
-  BTAR <- as.numeric(refpts(gen1)[,"biomass"][4])   # target bexp
-  BLIM <- 0                                         # limit bexp
+  BTAR <- as.numeric(refpts(gen1)[,"biomass"][4])   # target exploitable biomass
+  BLIM <- 0                                         # limit exploitable biomass
   
-  GB <- as.numeric(index[,year-1]) 
+  GB <- as.numeric(exp.biomass(srm)[,year-1]) 
   
   if(GB<=BLIM) { TAC <- 0
   } else { if(GB>BLIM & GB<BTAR) { TAC <- (CTAR * (GB - BLIM))/(BTAR - BLIM) 
@@ -375,33 +379,32 @@ hcr <- function(catch,index,year) {
 }
 @
 
-<<echo=FALSE>>=
-# estimated biomass
+<<echo=FALSE,term=FALSE>>=
 index <- quantSums(stk2@stock.n * stk2@stock.wt) * q.surv
 for(y in (proj_strt+1):proj_end) {
 
+  # control rule
   ctrl <- hcr(catch(stk2),index,y)
+  # project
   stk2 <- fwd(stk2,ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
-  
+  # update survey index
   index[,y] <- quantSums(stk2@stock.n[,y] * stk2@stock.wt[,y]) * q.surv
 }
 @
 
 \begin{figure}
 \centering
-<<label=hcr_plot_sc3,fig=TRUE,echo=FALSE>>=
-print(ggplot(data.frame(time=1:proj_end, B=c(quantSums(sweep(stk2@stock.n * stk2@stock.wt,1,catch.sel(gen1),"*"))))) 
-  + geom_line(aes(x=time,y=B)) 
-  + geom_line(aes(x=time,y=BMSY),data=data.frame(time=1:proj_end, BMSY=as.numeric(refpts(gen1)[,"biomass"][4])))
+<<label=hcr_plot_sc2,fig=TRUE,echo=FALSE>>=
+print(ggplot(data.frame(Time=1:proj_end, B=c(quantSums(sweep(stk2@stock.n * stk2@stock.wt,1,catch.sel(gen1),"*"))))) 
+  + geom_line(aes(x=Time,y=B)) 
+  + geom_line(aes(x=Time,y=BMSY),data=data.frame(Time=1:proj_end, BMSY=as.numeric(refpts(gen1)[,"biomass"][4])))
   + geom_line(aes(x=proj_strt,y=B))
   )
-
 @
-\caption{Scenario 3: Performance of empirical control rule. Vertical line represents start of projection period. 
+\caption{Scenario 2: Performance of model-based control rule. Vertical line represents start of projection period. 
 Horizontal line represents the target biomass $B^{TAR}$.}
-\label{fig:hcr_proj_biomass}
+\label{fig:hcr_proj_biomass_sc2}
 \end{figure}
-
 
 
 \subsection{Scenario 3: empirical control rule}
@@ -424,14 +427,15 @@ hcr <- function(catch,index,year) {
 }
 @
 
-<<echo=FALSE>>=
-# survey index only
+<<echo=FALSE,term=FALSE>>=
 index <- quantSums(stk2@stock.n * stk2@stock.wt) * q.surv
 for(y in (proj_strt+1):proj_end) {
 
+  # control rule
   ctrl <- hcr(catch(stk2),index,y)
+  # project
   stk2 <- fwd(stk2,ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
-  
+  # survey index
   index[,y] <- quantSums(stk2@stock.n[,y] * stk2@stock.wt[,y]) * q.surv
 }
 @
@@ -439,17 +443,53 @@ for(y in (proj_strt+1):proj_end) {
 \begin{figure}
 \centering
 <<label=hcr_plot_sc3,fig=TRUE,echo=FALSE>>=
-print(ggplot(data.frame(time=1:proj_end, B=c(quantSums(sweep(stk2@stock.n * stk2@stock.wt,1,catch.sel(gen1),"*"))))) 
-  + geom_line(aes(x=time,y=B)) 
-  + geom_line(aes(x=time,y=BMSY),data=data.frame(time=1:proj_end, BMSY=as.numeric(refpts(gen1)[,"biomass"][4])))
+print(ggplot(data.frame(Time=1:proj_end, B=c(quantSums(sweep(stk2@stock.n * stk2@stock.wt,1,catch.sel(gen1),"*"))))) 
+  + geom_line(aes(x=Time,y=B)) 
+  + geom_line(aes(x=Time,y=BMSY),data=data.frame(Time=1:proj_end, BMSY=as.numeric(refpts(gen1)[,"biomass"][4])))
   + geom_line(aes(x=proj_strt,y=B))
   )
-
 @
 \caption{Scenario 3: Performance of empirical control rule. Vertical line represents start of projection period. 
 Horizontal line represents the target biomass $B^{TAR}$.}
-\label{fig:hcr_proj_biomass}
+\label{fig:hcr_proj_biomass_sc3}
 \end{figure}
+
+\section{Stochastic results}
+
+\subsection{Scenario 1}
+
+<<echo=FALSE>>=
+<<hcr_sc1>>
+
+nit <- 20
+
+# historic sr residuals
+sr_resid <- FLQuant(rlnorm(maxt*nit,0,srr_sd),dimnames=list(age=1,year=dimnames(stock.n(stk1))$year,iter=1:nit))
+stk1 <- propagate(stk1,nit)
+stk1 <- fwd(stk1, ctrl=ctrl_F1, sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
+  
+# set up FLStock
+stk2 <- stf(stk1,proj_nyr)
+  
+# future sr residuals
+sr_resid <- window(sr_resid,start=1,end=proj_end)
+sr_resid[,(proj_strt+1):proj_end] <- rlnorm(proj_nyr*nit,0,srr_sd)
+
+index <- quantSums(sweep(stock.n(stk2) * stock.wt(stk2),1,catch.sel(gen1),"*"))
+   
+for(i in 1:nit) {
+  
+  for(y in (proj_strt+1):proj_end) {
+
+    # control rule
+    ctrl <- hcr(catch(iter(stk2,i)),iter(index,i),y)
+    # project
+    iter(stk2,i) <- fwd(iter(stk2,i),ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=iter(sr_resid,i))
+    # exploitable biomass
+    index[,y,,,,i] <- quantSums(stock.n(stk2)[,y,,,,i] * stock.wt(stk2)[,y,,,,i] * catch.sel(gen1)) 
+  }
+}
+@
 
 
 <<echo=FALSE,term=FALSE>>=

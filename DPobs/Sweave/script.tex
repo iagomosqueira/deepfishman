@@ -84,8 +84,8 @@ $mat95$      & 6\\
 \hline
 \multicolumn{2}{|c|}{SRR}\\
 \hline
-$s$         & 0.75\\
-$v$         & 1000\\
+$steepness$         & 0.75\\
+$Virgin SSB$         & 1000\\
 \hline
 \end{tabular}
 \caption{Parameters for generating the generic stock with $FLH$}
@@ -129,12 +129,12 @@ scenarios of fishing mortality:
 \item one-way trip, harvest rate gradually increases
 \item no change, constant at a somewhat low harvest rate
 \item good contrast, stock is fished down to less than half its initial size, then allowed to rebuild
-\item rebuild only, stock begins at low abundance and is allowed to rebuild under low F
+\item rebuild only, stock begins at low abundance and is allowed to rebuild under low fishing mortality
 \end{enumerate}
 
 
 We begin by looking at scenario 3 only: starting from 0, $F$ will increase to $2F^{MSY}$
-before decreasing slightly over a period of 40 years. You can see this in Figure~\ref{fig:Fscenario}. 
+before decreasing slightly over a period of 40 years (Figure~\ref{fig:Fscenario}). 
 
 \begin{figure}
 \centering
@@ -159,8 +159,9 @@ The resulting stock object can be seen in Figure~\ref{fig:hist_proj}.
 \label{fig:hist_proj}
 \end{figure}
 
+\section{Management strategy projection}
 
-\section{Management scenarios}
+\subsection{Management scenarios}
 
 We compared three different managment scenarios:
 \begin{enumerate}
@@ -169,8 +170,8 @@ We compared three different managment scenarios:
 \item empirical control rule
 \end{enumerate}
 
-Management objectives are utilitarian, specified as both a target catch $C^{TAR}$ and biomass $I^{TAR}$. 
-These were specified arbitarily as $C^{TAR} = C^{MSY}$ and $I^{TAR} = 0.9 q B^{MSY}$ with $q=1e-4$.
+Management objectives are utilitarian, specified as both a target catch $C^{TAR}$ and biomass $B^{TAR}$. 
+These were specified arbitarily as $C^{TAR} = C^{MSY}$ and $B^{TAR} = B^{MSY}$.
 Note that both targets are consistent with each other (i.e. it is feasible to achive both simultaneously).
 
 The harvest conrol rule defines the catch per year
@@ -184,22 +185,20 @@ where $G(B)$ is our observation of the resource. For the scenarios listed above:
 \item $G(B) = I$
 \end{enumerate}
 
-To ensure comparibility of results, for all scenarios the values of $C^{TAR}$ and $B^{TAR}$ are assumed known. 
-For scenario 3, we obtain the target catch rate $I^{TAR}$ from the number and weight stock vectors associated with
-$B^{MSY}$ and assuming a catchability of $q=1e-4$. This was necessary to account for the different selectivity
-assumptions associated with caculation of the exploitable biomass. 
+To ensure comparibility of results, for all scenarios the values of $C^{TAR}$ and $B^{TAR}$ were assumed known. 
+For scenario 3, we observe the survey catch rate $I$ only. Since the survey and commercial catches are obtained under differing
+selectivity assumptions $G(B^{TAR}) = I^{TAR} \neq qB^{TAR}$. Instead we calculate $I^{TAR}$ directly from the numbers vector $N^{TAR}_a$
+associated with $B^{TAR}$ and assuming a constant survey catchability. Thus $I^{TAR} = q\sum_a{w_a N^{TAR}_a}$.
 
 Since scenario 2 requires an estimation step, we predict that as survey effort declines performance of this control rule will deteriorate.
 Specifically it will deteriorate at a faster rate than the control rule in scenario 3, which is empirical. Performance was measured as the 
 probability of $C\geq C^{TAR}$ and $B\geq B^{TAR}$ after a 40 year projection period. Managment scenarios will be compared by a regression of 
 performance against survey effort. 
 
-\section{Management strategy projection}
-
 
 \subsection{Getting the index data for the control rule}
 
-We're going to assume the index comes from a survey vessel, and that the resource is fully selected by the gear. 
+We assume the index comes from a survey vessel, and that the resource is fully selected by the gear. 
 We use empirical survey data to estimate the relationship between uncertainty in our catch rate index and the survey effort. Specifically, data
 were extracted from the ICES International Bottom Trawl Survey (IBTS) database for the North Sea, and filtered for \textit{Gadus morhua} and the GOV gear type.
 For each year from 1983 to 2011, bootstrap samples of individual trawls were taken, from which a mean catch rate in numbers per tow ($\hat{I}$) could
@@ -214,11 +213,8 @@ from the data, from which we obtained the coefficient of variation (Figure~\ref{
 \end{figure} 
 
 
-We assume that the survey takes place half way through the year (before any catches have been taken)
+We assume that the survey takes place at the beginning of the year (before any catches have been taken)
 and with a constant catchability $q=1e-04$. 
-
-
-\section{Management simulation}
 
 \subsection{Stochasticity}
 
@@ -230,6 +226,11 @@ Sources of stochasticity were as follows:
 for a specified level of effort
 \end{enumerate}
 
+\section{Preliminary runs}
+
+We ran deterministic projections for all three management scenarios to ensure that they are behaving as expected (i.e. converging on $B^{TAR}$ and $C^{TAR}$).
+These are shown in Figures~\ref{fig:hcr_proj_biomass_sc1}, \ref{fig:hcr_proj_biomass_sc2} and \ref{fig:hcr_proj_biomass_sc3}.
+
 \subsection{Scenario 1: perfect knowledge}
 
 
@@ -238,8 +239,19 @@ for a specified level of effort
 \includegraphics{script-hcr_plot_sc1}
 \caption{Scenario 1: Performance of control rule assuming perfect knowledge of resource status. Vertical line represents start of projection period. 
 Horizontal line represents the target biomass $B^{TAR}$.}
-\label{fig:hcr_proj_biomass}
+\label{fig:hcr_proj_biomass_sc1}
 \end{figure}
+
+\subsection{Scenario 2: model based control rule}
+
+\begin{figure}
+\centering
+\includegraphics{script-hcr_plot_sc2}
+\caption{Scenario 2: Performance of model-based control rule. Vertical line represents start of projection period. 
+Horizontal line represents the target biomass $B^{TAR}$.}
+\label{fig:hcr_proj_biomass_sc2}
+\end{figure}
+
 
 \subsection{Scenario 3: empirical control rule}
 
@@ -249,8 +261,13 @@ Horizontal line represents the target biomass $B^{TAR}$.}
 \includegraphics{script-hcr_plot_sc3}
 \caption{Scenario 3: Performance of empirical control rule. Vertical line represents start of projection period. 
 Horizontal line represents the target biomass $B^{TAR}$.}
-\label{fig:hcr_proj_biomass}
+\label{fig:hcr_proj_biomass_sc3}
 \end{figure}
+
+\section{Stochastic results}
+
+\subsection{Scenario 1}
+
 
 
 
