@@ -84,8 +84,8 @@ $mat95$      & 6\\
 \hline
 \multicolumn{2}{|c|}{SRR}\\
 \hline
-$steepness$         & 0.75\\
-$Virgin SSB$         & 1000\\
+Steepness $h$         & 0.75\\
+Virgin Biomass $B0$         & 1000\\
 \hline
 \end{tabular}
 \caption{Parameters for generating the generic stock with $FLH$}
@@ -170,8 +170,7 @@ We compared three different managment scenarios:
 \item empirical control rule
 \end{enumerate}
 
-Management objectives are utilitarian, specified as both a target catch $C^{TAR}$ and biomass $B^{TAR}$. 
-These were specified arbitarily as $C^{TAR} = C^{MSY}$ and $B^{TAR} = B^{MSY}$.
+Management objectives were specified as a target catch $C^{TAR} = C^{MSY}$ and biomass $B^{TAR} = B^{MSY}$. 
 Note that both targets are consistent with each other (i.e. it is feasible to achive both simultaneously).
 
 The harvest conrol rule defines the catch per year
@@ -205,10 +204,13 @@ For each year from 1983 to 2011, bootstrap samples of individual trawls were tak
 be estimated. The number of bootstrap samples represented the hypothesised survey effort. For each year and survey effort, we sampled 1000 values of $\hat{I}$
 from the data, from which we obtained the coefficient of variation (Figure~\ref{fig:effCV}).
 
+
 \begin{figure}
 \centering
 \includegraphics{../dat/effCV.pdf}
-\caption{Estimated relationship between CV of the estimated catch rate and survey effort. Boxplots represent the variation across years.}
+\caption{Estimated relationship between CV of the estimated catch rate and survey effort. Boxplots represent the variation across years. 
+The mean across years is represented by the fitted red line $\hat{CV}[\hat{I}] = \alpha E ^ \beta$, where $alpha=3.93$ and
+$\beta = -0.5$.}
 \label{fig:effCV}
 \end{figure} 
 
@@ -244,6 +246,35 @@ Horizontal line represents the target biomass $B^{TAR}$.}
 
 \subsection{Scenario 2: model based control rule}
 
+\begin{Schunk}
+\begin{Soutput}
+iter:  1 
+Running SANN
+Running Other Method
+iter    0 value -217.395083
+final  value -217.395083 
+converged
+iter:  1 
+Running SANN
+Running Other Method
+iter    0 value -222.200109
+final  value -222.200109 
+converged
+iter:  1 
+Running SANN
+Running Other Method
+iter    0 value -226.324683
+final  value -226.324683 
+converged
+iter:  1 
+Running SANN
+Running Other Method
+iter    0 value -229.871225
+final  value -229.871225 
+converged
+\end{Soutput}
+\end{Schunk}
+
 \begin{figure}
 \centering
 \includegraphics{script-hcr_plot_sc2}
@@ -267,6 +298,7 @@ Horizontal line represents the target biomass $B^{TAR}$.}
 \section{Stochastic results}
 
 \subsection{Scenario 1}
+
 
 
 
