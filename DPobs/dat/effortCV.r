@@ -31,7 +31,19 @@ for(y in 1:length(years)) {
 
 save(dat,dat.cv,file='NSIBTS_cod_surv_dat.Rdata')
 boxplot(dat.cv,outline=F,ylab=expression(paste('CV [',italic(hat(I)),']')),xlab='Survey effort (annual no. of tows)',main='')
+#savePlot('effCV.pdf',type='pdf')
+#dev.off()
+
+#load(file='NSIBTS_cod_surv_dat.Rdata')
+
+mdl <- cv ~ alpha * effort ^ beta
+
+dat.fit <- data.frame(effort=rep(eff.seq,each=length(years)),cv=c(dat.cv))
+fit <- nls(mdl,data=dat.fit,start=list(alpha=1,beta=-0.5))
+lines(predict(fit,data.frame(effort=eff.seq)),col=2,lwd=3)
 savePlot('effCV.pdf',type='pdf')
 dev.off()
 
+cv.pred <- function(effort) predict(fit,data.frame(effort))
 
+save(fit,cv.pred,file='cv_pred_func.Rdata')

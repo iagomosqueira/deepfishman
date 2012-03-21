@@ -274,10 +274,18 @@ For each year from 1983 to 2011, bootstrap samples of individual trawls were tak
 be estimated. The number of bootstrap samples represented the hypothesised survey effort. For each year and survey effort, we sampled 1000 values of $\hat{I}$
 from the data, from which we obtained the coefficient of variation (Figure~\ref{fig:effCV}).
 
+<<echo=FALSE>>=
+load('../dat/cv_pred_func.Rdata')
+cv_alpha <- coef(fit)['alpha']
+cv_beta <- coef(fit)['beta']
+@
+
 \begin{figure}
 \centering
 \includegraphics{../dat/effCV.pdf}
-\caption{Estimated relationship between CV of the estimated catch rate and survey effort. Boxplots represent the variation across years.}
+\caption{Estimated relationship between CV of the estimated catch rate and survey effort. Boxplots represent the variation across years. 
+The mean across years is represented by the fitted red line $\hat{CV}[\hat{I}] = \alpha E ^ \beta$, where $E$ is the survey effort,
+$alpha=\Sexpr{round(cv_alpha,2)}$ and $\beta = \Sexpr{round(cv_beta,2)}$.}
 \label{fig:effCV}
 \end{figure} 
 
@@ -461,7 +469,9 @@ Horizontal line represents the target biomass $B^{TAR}$.}
 <<echo=FALSE>>=
 <<hcr_sc1>>
 
-nit <- 20
+# get survey cv from cv.pred() function
+
+nit <- 2
 
 # historic sr residuals
 sr_resid <- FLQuant(rlnorm(maxt*nit,0,srr_sd),dimnames=list(age=1,year=dimnames(stock.n(stk1))$year,iter=1:nit))
