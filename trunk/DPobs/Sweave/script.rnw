@@ -60,7 +60,7 @@ Imperial College London, Ascot, UK}
 #library(FLsp)
 library(FLAssess)
 library(FLH)
-library(FLaspm)
+#library(FLaspm)
 library(ggplot2)
 library(xtable)
 library(mvtnorm)
@@ -256,7 +256,7 @@ performance against survey effort.
 
 <<echo=FALSE>>=
 # Now we set up for management simulation
-proj_nyr  <- 4
+proj_nyr  <- 60
 proj_strt <- dims(stk1)$maxyear
 stk2      <- stf(stk1,proj_nyr)
 proj_end  <- proj_strt + proj_nyr
@@ -315,12 +315,27 @@ for a specified level of effort
 We ran deterministic projections for all three management scenarios to ensure that they are behaving as expected (i.e. converging on $B^{TAR}$ and $C^{TAR}$).
 These are shown in Figures~\ref{fig:hcr_proj_biomass_sc1}, \ref{fig:hcr_proj_biomass_sc2} and \ref{fig:hcr_proj_biomass_sc3}.
 
+<<>>=
+# fit stock assessment model and get CTAR and BTAR
+source("../cde/sra.r")
+
+index <- quantSums(sweep(stock.n(stk2) * stock.wt(stk2),1,catch.sel(gen1),"*")) 
+fit <- optim(SSB0,fn = logl,catch=catch(stk2)[,1:maxt],index=index[,1:maxt],hh=slope,M=m(gen1),mat=mat(gen1),sel=landings.sel(gen1),wght=stock.wt(gen1),amin=range(gen1)['min'],amax=range(gen1)['max'],method = "L-BFGS-B",lower = c(800),upper = c(1500),hessian = T)
+out<-pdyn(B0=fit$par,catch=catch(stk2)[,1:maxt],index=index[,1:maxt],hh=slope,M=m(gen1),mat=mat(gen1),sel=landings.sel(gen1),wght=stock.wt(gen1),amin=range(gen1)['min'],amax=range(gen1)['max'])
+#plot(as.vector(index)[1:40])
+#lines(out$Ipred)
+
+msy <- msy.sra(B0=fit$par,catch=catch(stk2)[,1:maxt],index=index[,1:maxt],hh=slope,M=m(gen1),mat=mat(gen1),sel=landings.sel(gen1),wght=stock.wt(gen1),amin=range(gen1)['min'],amax=range(gen1)['max'])
+CTAR <- msy$MSY
+BTAR <- msy$MSY/msy$F
+@
+
 \subsection{Scenario 1: perfect knowledge}
 <<label=hcr_sc1,echo=FALSE>>=
 hcr <- function(catch,index,year) {
 
-  CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
-  BTAR <- as.numeric(refpts(gen1)[,"biomass"][4])   # target exploitable biomass
+  #CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
+  #BTAR <- as.numeric(refpts(gen1)[,"biomass"][4])   # target exploitable biomass
   BLIM <- 0                                         # limit exploitable biomass
   
   GB <- as.numeric(index[,year-1]) 
@@ -366,16 +381,15 @@ Horizontal line represents the target biomass $B^{TAR}$.}
 <<echo=FALSE>>=
 hcr <- function(catch,index,year) {
 
-  # get estimated exploitable biomass from FLaspm
-  srm <- FLaspm(catch=catch[,1:year-1], index=FLQuants(index1 = index[,1:year-1]),M=m(gen1),hh=slope,sel=landings.sel(gen1), mat=mat(gen1), wght=stock.wt(gen1),amax=range(gen1)['max'], amin=range(gen1)['min'])
-  model(srm) <- aspm.Francis.C()
-  srm <- fmle(srm)
+  # get estimated exploitable biomass from SRA
+  fit <- optim(SSB0,fn = logl,catch=catch,index=index,hh=slope,M=m(gen1),mat=mat(gen1),sel=landings.sel(gen1),wght=stock.wt(gen1),amin=range(gen1)['min'],amax=range(gen1)['max'],method = "L-BFGS-B",lower = c(800),upper = c(1500),hessian = T)
+  out<-pdyn(B0=fit$par,catch=catch,index=index,hh=slope,M=m(gen1),mat=mat(gen1),sel=landings.sel(gen1),wght=stock.wt(gen1),amin=range(gen1)['min'],amax=range(gen1)['max'])
 
-  CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
-  BTAR <- as.numeric(refpts(gen1)[,"biomass"][4])   # target exploitable biomass
+  #CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
+  #BTAR <- as.numeric(refpts(gen1)[,"biomass"][4])   # target exploitable biomass
   BLIM <- 0                                         # limit exploitable biomass
   
-  GB <- as.numeric(exp.biomass(srm)[,year-1]) 
+  GB <- as.numeric(out$Bexp[year-1]) 
   
   if(GB<=BLIM) { TAC <- 0
   } else { if(GB>BLIM & GB<BTAR) { TAC <- (CTAR * (GB - BLIM))/(BTAR - BLIM) 
@@ -388,15 +402,15 @@ hcr <- function(catch,index,year) {
 @
 
 <<echo=FALSE,term=FALSE>>=
-index <- quantSums(stk2@stock.n * stk2@stock.wt) * q.surv
+index <- quantSums(sweep(stock.n(stk2) * stock.wt(stk2),1,catch.sel(gen1),"*")) * q.surv
 for(y in (proj_strt+1):proj_end) {
 
   # control rule
-  ctrl <- hcr(catch(stk2),index,y)
+  ctrl <- hcr(catch(stk2)[,1:(y-1)],index[,1:(y-1)],y)
   # project
   stk2 <- fwd(stk2,ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
   # update survey index
-  index[,y] <- quantSums(stk2@stock.n[,y] * stk2@stock.wt[,y]) * q.surv
+  index[,y] <- quantSums(stock.n(stk2)[,y] * stock.wt(stk2)[,y] * catch.sel(gen1)) * q.surv
 }
 @
 
@@ -405,7 +419,7 @@ for(y in (proj_strt+1):proj_end) {
 <<label=hcr_plot_sc2,fig=TRUE,echo=FALSE>>=
 print(ggplot(data.frame(Time=1:proj_end, B=c(quantSums(sweep(stk2@stock.n * stk2@stock.wt,1,catch.sel(gen1),"*"))))) 
   + geom_line(aes(x=Time,y=B)) 
-  + geom_line(aes(x=Time,y=BMSY),data=data.frame(Time=1:proj_end, BMSY=as.numeric(refpts(gen1)[,"biomass"][4])))
+  + geom_line(aes(x=Time,y=BMSY),data=data.frame(Time=1:proj_end, BMSY=BTAR))
   + geom_line(aes(x=proj_strt,y=B))
   )
 @
@@ -419,8 +433,8 @@ Horizontal line represents the target biomass $B^{TAR}$.}
 <<echo=FALSE>>=
 hcr <- function(catch,index,year) {
 
-  CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
-  ITAR <- 367.25 * q.surv                           # survey catch rate equivalent to target bexp
+  #CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
+  ITAR <- BTAR * q.surv                             # survey catch rate equivalent to target bexp
   ILIM <- 0                                         # limit bexp
   
   GB <- as.numeric(index[,year-1]) 
@@ -436,7 +450,7 @@ hcr <- function(catch,index,year) {
 @
 
 <<echo=FALSE,term=FALSE>>=
-index <- quantSums(stk2@stock.n * stk2@stock.wt) * q.surv
+index <- quantSums(sweep(stock.n(stk2) * stock.wt(stk2),1,catch.sel(gen1),"*")) * q.surv
 for(y in (proj_strt+1):proj_end) {
 
   # control rule
@@ -444,7 +458,7 @@ for(y in (proj_strt+1):proj_end) {
   # project
   stk2 <- fwd(stk2,ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
   # survey index
-  index[,y] <- quantSums(stk2@stock.n[,y] * stk2@stock.wt[,y]) * q.surv
+  index[,y] <- quantSums(stock.n(stk2)[,y] * stock.wt(stk2)[,y] * catch.sel(gen1)) * q.surv
 }
 @
 
