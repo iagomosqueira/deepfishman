@@ -209,8 +209,8 @@ from the data, from which we obtained the coefficient of variation (Figure~\ref{
 \centering
 \includegraphics{../dat/effCV.pdf}
 \caption{Estimated relationship between CV of the estimated catch rate and survey effort. Boxplots represent the variation across years. 
-The mean across years is represented by the fitted red line $\hat{CV}[\hat{I}] = \alpha E ^ \beta$, where $alpha=3.93$ and
-$\beta = -0.5$.}
+The mean across years is represented by the fitted red line $\hat{CV}[\hat{I}] = \alpha E ^ \beta$, where $E$ is the survey effort,
+$alpha=3.93$ and $\beta = -0.5$.}
 \label{fig:effCV}
 \end{figure} 
 
@@ -233,6 +233,24 @@ for a specified level of effort
 We ran deterministic projections for all three management scenarios to ensure that they are behaving as expected (i.e. converging on $B^{TAR}$ and $C^{TAR}$).
 These are shown in Figures~\ref{fig:hcr_proj_biomass_sc1}, \ref{fig:hcr_proj_biomass_sc2} and \ref{fig:hcr_proj_biomass_sc3}.
 
+\begin{Schunk}
+\begin{Sinput}
+> source("../cde/sra.r")
+> index <- quantSums(sweep(stock.n(stk2) * stock.wt(stk2), 1, catch.sel(gen1), "*"))
+> fit <- optim(SSB0, fn = logl, catch = catch(stk2)[, 1:maxt], index = index[, 1:maxt], hh = slope, 
++     M = m(gen1), mat = mat(gen1), sel = landings.sel(gen1), wght = stock.wt(gen1), amin = range(gen1)["min"], 
++     amax = range(gen1)["max"], method = "L-BFGS-B", lower = c(800), upper = c(1500), hessian = T)
+> out <- pdyn(B0 = fit$par, catch = catch(stk2)[, 1:maxt], index = index[, 1:maxt], hh = slope, 
++     M = m(gen1), mat = mat(gen1), sel = landings.sel(gen1), wght = stock.wt(gen1), amin = range(gen1)["min"], 
++     amax = range(gen1)["max"])
+> msy <- msy.sra(B0 = fit$par, catch = catch(stk2)[, 1:maxt], index = index[, 1:maxt], hh = slope, 
++     M = m(gen1), mat = mat(gen1), sel = landings.sel(gen1), wght = stock.wt(gen1), amin = range(gen1)["min"], 
++     amax = range(gen1)["max"])
+> CTAR <- msy$MSY
+> BTAR <- msy$MSY/msy$F
+\end{Sinput}
+\end{Schunk}
+
 \subsection{Scenario 1: perfect knowledge}
 
 
@@ -246,34 +264,6 @@ Horizontal line represents the target biomass $B^{TAR}$.}
 
 \subsection{Scenario 2: model based control rule}
 
-\begin{Schunk}
-\begin{Soutput}
-iter:  1 
-Running SANN
-Running Other Method
-iter    0 value -217.395083
-final  value -217.395083 
-converged
-iter:  1 
-Running SANN
-Running Other Method
-iter    0 value -222.200109
-final  value -222.200109 
-converged
-iter:  1 
-Running SANN
-Running Other Method
-iter    0 value -226.324683
-final  value -226.324683 
-converged
-iter:  1 
-Running SANN
-Running Other Method
-iter    0 value -229.871225
-final  value -229.871225 
-converged
-\end{Soutput}
-\end{Schunk}
 
 \begin{figure}
 \centering
@@ -298,7 +288,6 @@ Horizontal line represents the target biomass $B^{TAR}$.}
 \section{Stochastic results}
 
 \subsection{Scenario 1}
-
 
 
 
