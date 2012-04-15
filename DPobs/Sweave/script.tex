@@ -34,12 +34,9 @@
 \bibliographystyle{ecol_let}
 
 \AtBeginDocument{
-\DefineVerbatimEnvironment{Sinput}{Verbatim} {xleftmargin=2em,fontsize=
-\footnotesize}
-\DefineVerbatimEnvironment{Soutput}{Verbatim}{xleftmargin=2em,fontsize=
-\footnotesize}
-\DefineVerbatimEnvironment{Scode}{Verbatim}{xleftmargin=2em,fontsize=
-\footnotesize}
+\DefineVerbatimEnvironment{Sinput}{Verbatim} {xleftmargin=2em,fontsize=\footnotesize}
+\DefineVerbatimEnvironment{Soutput}{Verbatim}{xleftmargin=2em,fontsize=\footnotesize}
+\DefineVerbatimEnvironment{Scode}{Verbatim}{xleftmargin=2em,fontsize=\footnotesize}
 }
 
 % Title page
@@ -210,7 +207,7 @@ from the data, from which we obtained the coefficient of variation (Figure~\ref{
 \includegraphics{../dat/effCV.pdf}
 \caption{Estimated relationship between CV of the estimated catch rate and survey effort. Boxplots represent the variation across years. 
 The mean across years is represented by the fitted red line $\hat{CV}[\hat{I}] = \alpha E ^ \beta$, where $E$ is the survey effort,
-$alpha=3.93$ and $\beta = -0.5$.}
+$\alpha=3.93$ and $\beta = -0.5$.}
 \label{fig:effCV}
 \end{figure} 
 
@@ -231,64 +228,65 @@ for a specified level of effort
 \section{Preliminary runs}
 
 We ran deterministic projections for all three management scenarios to ensure that they are behaving as expected (i.e. converging on $B^{TAR}$ and $C^{TAR}$).
-These are shown in Figures~\ref{fig:hcr_proj_biomass_sc1}, \ref{fig:hcr_proj_biomass_sc2} and \ref{fig:hcr_proj_biomass_sc3}.
+These are shown in Figures~\ref{fig:hcr_det_biomass} and \ref{fig:hcr_det_catch}.
 
-\begin{Schunk}
-\begin{Sinput}
-> source("../cde/sra.r")
-> index <- quantSums(sweep(stock.n(stk2) * stock.wt(stk2), 1, catch.sel(gen1), "*"))
-> fit <- optim(SSB0, fn = logl, catch = catch(stk2)[, 1:maxt], index = index[, 1:maxt], hh = slope, 
-+     M = m(gen1), mat = mat(gen1), sel = landings.sel(gen1), wght = stock.wt(gen1), amin = range(gen1)["min"], 
-+     amax = range(gen1)["max"], method = "L-BFGS-B", lower = c(800), upper = c(1500), hessian = T)
-> out <- pdyn(B0 = fit$par, catch = catch(stk2)[, 1:maxt], index = index[, 1:maxt], hh = slope, 
-+     M = m(gen1), mat = mat(gen1), sel = landings.sel(gen1), wght = stock.wt(gen1), amin = range(gen1)["min"], 
-+     amax = range(gen1)["max"])
-> msy <- msy.sra(B0 = fit$par, catch = catch(stk2)[, 1:maxt], index = index[, 1:maxt], hh = slope, 
-+     M = m(gen1), mat = mat(gen1), sel = landings.sel(gen1), wght = stock.wt(gen1), amin = range(gen1)["min"], 
-+     amax = range(gen1)["max"])
-> CTAR <- msy$MSY
-> BTAR <- msy$MSY/msy$F
-\end{Sinput}
-\end{Schunk}
 
-\subsection{Scenario 1: perfect knowledge}
+
+
+
+
 
 
 \begin{figure}
 \centering
-\includegraphics{script-hcr_plot_sc1}
-\caption{Scenario 1: Performance of control rule assuming perfect knowledge of resource status. Vertical line represents start of projection period. 
+\includegraphics{script-019}
+\caption{Performance of control rules against exploitable biomass target. Vertical line represents start of projection period. 
 Horizontal line represents the target biomass $B^{TAR}$.}
-\label{fig:hcr_proj_biomass_sc1}
+\label{fig:hcr_det_biomass}
 \end{figure}
 
-\subsection{Scenario 2: model based control rule}
-
-
 \begin{figure}
 \centering
-\includegraphics{script-hcr_plot_sc2}
-\caption{Scenario 2: Performance of model-based control rule. Vertical line represents start of projection period. 
-Horizontal line represents the target biomass $B^{TAR}$.}
-\label{fig:hcr_proj_biomass_sc2}
-\end{figure}
-
-
-\subsection{Scenario 3: empirical control rule}
-
-
-\begin{figure}
-\centering
-\includegraphics{script-hcr_plot_sc3}
-\caption{Scenario 3: Performance of empirical control rule. Vertical line represents start of projection period. 
-Horizontal line represents the target biomass $B^{TAR}$.}
-\label{fig:hcr_proj_biomass_sc3}
+\includegraphics{script-020}
+\caption{Performance of control rules against catch target. Vertical line represents start of projection period. 
+Horizontal line represents the target catch $C^{TAR}$.}
+\label{fig:hcr_det_catch}
 \end{figure}
 
 \section{Stochastic results}
 
-\subsection{Scenario 1}
 
+
+
+
+\begin{figure}
+\centering
+\includegraphics{script-025}
+\caption{Performance of control rules against exploitable biomass target, for different survey effort values.}
+\label{fig:hcr_stoch_biomass}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics{script-026}
+\caption{Renormalised performance of control rules against exploitable biomass target, for different survey effort values.}
+\label{fig:hcr_stoch_biomass_norm}
+\end{figure}
+
+\begin{table}
+\centering
+\begin{tabular}{|c|c|}
+\hline
+Scenario & Regression coefficient\\
+\hline
+1: Perfect knowledge & -2.14831e-16\\
+2: Model based HCR   & -2.20065\\
+3: Empirical HCR     & 0.00141366\\
+\hline
+\end{tabular}
+\caption{Reference points for the generic stock with $FLH$}
+\label{tab:genericRefPoints}
+\end{table}
 
 
 
