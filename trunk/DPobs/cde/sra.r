@@ -57,8 +57,8 @@ msy.sra <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
   msy.obj <- function(F,alpha,beta) {
   
     for(a in 2:nag)
-      PF[a] = PF[a-1]*exp(-M[a-1])*(1-sel[a-1]*F);
-    PF[nag-1] = PF[nag-1] + PF[nag-1]*exp(-M[nag-1])*(1-sel[nag-1]*F);
+      PF[a] <- PF[a-1]*exp(-M[a-1])*(1-sel[a-1]*F);
+    PF[nag-1] <- PF[nag-1] + PF[nag-1]*exp(-M[nag-1])*(1-sel[nag-1]*F);
     
     SPRF <- sum(PF * mat * wght)
     
