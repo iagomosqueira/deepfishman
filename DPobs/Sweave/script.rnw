@@ -349,7 +349,6 @@ hcr <- function(catch,index,year) {
 <<echo=FALSE,term=FALSE>>=
 index <- quantSums(sweep(stock.n(stk_proj) * stock.wt(stk_proj),1,catch.sel(gen1),"*")) 
 for(y in (proj_strt+1):proj_end) {
-
   # control rule
   ctrl <- hcr(catch(stk_proj),index,y)
   # project
@@ -388,7 +387,6 @@ hcr <- function(catch,index,year) {
 <<echo=FALSE,term=FALSE>>=
 index <- quantSums(sweep(stock.n(stk_proj) * stock.wt(stk_proj),1,catch.sel(gen1),"*")) * q.surv
 for(y in (proj_strt+1):proj_end) {
-
   # control rule
   ctrl <- hcr(catch(stk_proj)[,1:(y-1)],index[,1:(y-1)],y)
   # project
@@ -423,7 +421,6 @@ hcr <- function(catch,index,year) {
 <<echo=FALSE,term=FALSE>>=
 index <- quantSums(sweep(stock.n(stk_proj) * stock.wt(stk_proj),1,catch.sel(gen1),"*")) * q.surv
 for(y in (proj_strt+1):proj_end) {
-
   # control rule
   ctrl <- hcr(catch(stk_proj)[,1:(y-1)],index[,1:(y-1)],y)
   # project
@@ -534,20 +531,22 @@ index <- index_init
 stk_proj <- stk_init
 
 for(e in 1:length(eff_seq)) {
-   
+    cat("e: ", e, "\n")
   for(i in 1:nit) {
-  
+      cat("\ti: ", i, "\n")
     index.iter <- iter(index,i)
     stk_proj.iter <- iter(stk_proj,i)
     sr_resid.iter <- iter(sr_resid,i)
     
     for(y in (proj_strt+1):proj_end) {
-  
+      cat("\t\ty: ", y, "\n")
       # control rule
       ctrl <- hcr(catch(stk_proj.iter),index.iter,y)
       # project
-      stk_proj.iter <- fwd(stk_proj.iter,ctrl=ctrl,sr.model=sr_model,sr.params=sr_params,sr.residuals=sr_resid.iter)
-      # exploitable biomass
+      # Problem with iters here - residuals needs to have dimnames starting at 1
+      dimnames(sr_resid.iter)$iter <- "1"
+      stk_proj.iter <- fwd(stk_proj.iter,ctrl=ctrl,sr = list(model=sr_model,params=sr_params),sr.residuals=sr_resid.iter)
+    # exploitable biomassx`
       index.iter[,y] <- quantSums(stock.n(stk_proj.iter)[,y] * stock.wt(stk_proj.iter)[,y] * catch.sel(gen1)) 
     }
     
