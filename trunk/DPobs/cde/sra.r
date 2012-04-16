@@ -74,3 +74,12 @@ msy.sra <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
 
   return(list(F=opt$maximum,MSY=opt$objective))
 }
+
+# overload fwd()
+setMethod("fwd",signature(x="FLQuant",y="FLQuant"),
+  function(x,y) {
+  
+  }
+)
+
+
