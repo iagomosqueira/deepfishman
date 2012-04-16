@@ -76,10 +76,10 @@ msy.sra <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
 }
 
 # overload fwd()
-setMethod("fwd",signature(x="FLQuant",y="FLQuant"),
-  function(x,y) {
-  
-  }
-)
+#setMethod("fwd",signature(x="FLQuant",y="FLQuant"),
+#  function(x,y) {
+#  
+#  }
+#)
 
 

@@ -87,7 +87,7 @@ mat95 <- 6
 slope <- 0.75
 SSB0 <- 1e3
 # Make the stock
-gen1 <- genBRP(age=1:maxage, Linf=Linf, k=k, a1=a1, sL=sL, sR=sR, mat95=mat95, s=slope, v=SSB0,minfbar=5,maxfbar=5)
+gen <- genBRP(age=1:maxage, Linf=Linf, k=k, a1=a1, sL=sL, sR=sR, mat95=mat95, s=slope, v=SSB0,minfbar=5,maxfbar=5)
 @    
 
 % Table of parameters
@@ -121,9 +121,9 @@ Virgin Biomass $B0$         & \Sexpr{SSB0}\\
 \hline
 \multicolumn{2}{|c|}{Reference points}\\
 \hline
-$MSY$       & \Sexpr{signif(c(refpts(gen1)[,"yield"])[4])}\\
-$B^{MSY}$   & \Sexpr{signif(c(refpts(gen1)[,"biomass"])[4])}\\
-$F^{MSY}$   & \Sexpr{signif(c(refpts(gen1)[,"harvest"])[4])}\\
+$MSY$       & \Sexpr{signif(c(refpts(gen)[,"yield"])[4])}\\
+$B^{MSY}$   & \Sexpr{signif(c(refpts(gen)[,"biomass"])[4])}\\
+$F^{MSY}$   & \Sexpr{signif(c(refpts(gen)[,"harvest"])[4])}\\
 \hline
 \end{tabular}
 \caption{Reference points for the generic stock with $FLH$}
@@ -133,7 +133,7 @@ $F^{MSY}$   & \Sexpr{signif(c(refpts(gen1)[,"harvest"])[4])}\\
 \begin{figure}
 \centering
 <<fig=TRUE,echo=FALSE>>=
-print(ggplot(as.data.frame(catch.sel(gen1))) + geom_line(aes(age,data)) + ylab("Catch selectivity") + xlab("Age"))
+print(ggplot(as.data.frame(catch.sel(gen))) + geom_line(aes(age,data)) + ylab("Catch selectivity") + xlab("Age"))
 @
 \caption{Double normal catch selectivity curve for the generic stock with parameters $a1=\Sexpr{a1}$, $sL=\Sexpr{sL}$ and $sR=\Sexpr{sR}$.}
 \label{fig:generic_selectivity}
@@ -159,7 +159,7 @@ scenarios of fishing mortality:
 
 <<echo=FALSE>>=
 maxt <- 40
-fmsy <- c(refpts(gen1)[,'harvest'])[4]
+fmsy <- c(refpts(gen)[,'harvest'])[4]
 maxFfactor <- 2
 maxF <- maxFfactor * fmsy
 
@@ -196,13 +196,13 @@ scenario. To perform our projection we convert our generic stock (currently a $F
 define an $FLQuant$ containing the recruitment residuals, setup a control object and then project forward:
 
 <<echo=FALSE>>=
-stk_hist <- as(gen1, 'FLStock')
+stk_hist <- as(gen, 'FLStock')
 stk_hist <- window(stk_hist,end=maxt)
 ctrl_F1 <- fwdControl(data.frame(year=2:maxt, quantity="f",val=F1))
 #sr_resid <- FLQuant(rlnorm(dims(stk_hist)$year * dims(stk_hist)$iter,0,srr_sd),
 #  dimnames=list(age=1,year=dimnames(stock.n(stk_hist))$year,iter=dimnames(stock.n(stk_hist))$iter))
 sr_resid <- FLQuant(1,dimnames=list(age=1,year=dimnames(stock.n(stk_hist))$year,iter=dimnames(stock.n(stk_hist))$iter))
-stk_hist <- fwd(stk_hist, ctrl=ctrl_F1, sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
+stk_hist <- fwd(stk_hist, ctrl=ctrl_F1, sr=list(model=model(gen), params=params(gen)), sr.residuals=sr_resid)
 @
 
 The resulting stock object can be seen in Figure~\ref{fig:hist_proj}.
@@ -255,11 +255,16 @@ performance against survey effort.
 # Now we set up for management simulation
 proj_nyr  <- 60
 proj_strt <- dims(stk_hist)$maxyear
-stk_proj  <- stf(stk_hist,proj_nyr)
+stk_init  <- stf(stk_hist,proj_nyr)
 proj_end  <- proj_strt + proj_nyr
-# with sr residuals
+# sr residuals
 sr_resid <- window(sr_resid,start=1,end=proj_end)
-sr_resid[,(proj_strt+1):proj_end] <- 1 #rlnorm(proj_nyr,0,srr_sd)
+sr_resid[,(proj_strt+1):proj_end] <- 1
+# catchabilities
+q.comm <- 1e-4
+q.surv <- 1e-4
+# index
+index_init <- quantSums(sweep(stock.n(stk_init) * stock.wt(stk_init),1,catch.sel(gen),"*")) * q.surv
 @
 
 \subsection{Getting the index data for the control rule}
@@ -286,26 +291,8 @@ $\alpha=\Sexpr{round(cv_alpha,2)}$ and $\beta = \Sexpr{round(cv_beta,2)}$.}
 \label{fig:effCV}
 \end{figure} 
 
-<<echo=FALSE>>=
-q.comm <- 1e-4
-q.surv <- 1e-4
-@
-
 We assume that the survey takes place at the beginning of the year (before any catches have been taken)
 and with a constant catchability $q=\Sexpr{q.surv}$. 
-
-\subsection{Stochasticity}
-
-<<echo=FALSE>>=
-srr_sd <- 0.3
-@
-
-Sources of stochasticity were as follows:
-\begin{enumerate}
-\item recruitment: multiplicative log-normal noise around the predicted recruitment
-\item observation: the survey catch rate was subjected to a degree of noise equivalent to that given in Figure~\ref{fig:effCV}
-for a specified level of effort
-\end{enumerate}
 
 \section{Preliminary runs}
 
@@ -316,45 +303,61 @@ These are shown in Figures~\ref{fig:hcr_det_biomass} and \ref{fig:hcr_det_catch}
 # fit stock assessment model and get CTAR and BTAR
 source("../cde/sra.r")
 
-index <- quantSums(sweep(stock.n(stk_proj) * stock.wt(stk_proj),1,catch.sel(gen1),"*")) 
-fit <- optim(SSB0,fn = logl,catch=catch(stk_proj)[,1:maxt],index=index[,1:maxt],hh=slope,M=m(gen1),mat=mat(gen1),sel=landings.sel(gen1),wght=stock.wt(gen1),amin=range(gen1)['min'],amax=range(gen1)['max'],method = "L-BFGS-B",lower = c(800),upper = c(1500),hessian = T)
-out<-pdyn(B0=fit$par,catch=catch(stk_proj)[,1:maxt],index=index[,1:maxt],hh=slope,M=m(gen1),mat=mat(gen1),sel=landings.sel(gen1),wght=stock.wt(gen1),amin=range(gen1)['min'],amax=range(gen1)['max'])
+#index <- quantSums(sweep(stock.n(stk_proj) * stock.wt(stk_proj),1,catch.sel(gen),"*")) 
+#fit <- optim(SSB0,fn = logl,catch=catch(stk_proj)[,1:maxt],index=index[,1:maxt],hh=slope,M=m(gen),mat=mat(gen),sel=landings.sel(gen),wght=stock.wt(gen),amin=range(gen)['min'],amax=range(gen)['max'],method = "L-BFGS-B",lower = c(800),upper = c(1500),hessian = T)
+#out<-pdyn(B0=fit$par,catch=catch(stk_proj)[,1:maxt],index=index[,1:maxt],hh=slope,M=m(gen),mat=mat(gen),sel=landings.sel(gen),wght=stock.wt(gen),amin=range(gen)['min'],amax=range(gen)['max'])
 #plot(as.vector(index)[1:40])
 #lines(out$Ipred)
 
-msy <- msy.sra(B0=fit$par,catch=catch(stk_proj)[,1:maxt],index=index[,1:maxt],hh=slope,M=m(gen1),mat=mat(gen1),sel=landings.sel(gen1),wght=stock.wt(gen1),amin=range(gen1)['min'],amax=range(gen1)['max'])
-CTAR <- msy$MSY
-BTAR <- msy$MSY/msy$F
+#msy <- msy.sra(B0=fit$par,catch=catch(stk_proj)[,1:maxt],index=index[,1:maxt],hh=slope,M=m(gen),mat=mat(gen),sel=landings.sel(gen),wght=stock.wt(gen),amin=range(gen)['min'],amax=range(gen)['max'])
+#CTAR <- msy$MSY
+#BTAR <- msy$MSY/msy$F
+
+# define targets as global variables
+CTAR <- as.numeric(refpts(gen)[,"yield"][4])     # target catch
+BTAR <- as.numeric(refpts(gen)[,"biomass"][4])   # target exploitable biomass
+BLIM <- 0                                         # limit exploitable biomass
+ITAR <- BTAR * q.surv                             # survey catch rate equivalent to target bexp
+ILIM <- 0                                         # limit bexp
+
+# access parameters
+sr_model <- model(gen)
+sr_params <- params(gen)
+sel <- catch.sel(gen)
+
 @
 
 <<label=hcr_sc1,echo=FALSE>>=
 hcr <- function(catch,index,year) {
 
-  #CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
-  #BTAR <- as.numeric(refpts(gen1)[,"biomass"][4])   # target exploitable biomass
-  BLIM <- 0                                         # limit exploitable biomass
+  GB <- as.vector(index[,year-1]) 
   
-  GB <- as.numeric(index[,year-1]) 
+  #if(GB<=BLIM) { TAC <- 0
+  #} else { if(GB>BLIM & GB<BTAR) { TAC <- (CTAR * (GB - BLIM))/(BTAR - BLIM) 
+  #} else { if(GB>=BTAR) { TAC <- (CTAR * GB)/BTAR
+  #}}}
   
-  if(GB<=BLIM) { TAC <- 0
-  } else { if(GB>BLIM & GB<BTAR) { TAC <- (CTAR * (GB - BLIM))/(BTAR - BLIM) 
-  } else { if(GB>=BTAR) { TAC <- (CTAR * GB)/BTAR
-  }}}
+  TAC <- (CTAR * GB)/BTAR
 
-  ctrl <- fwdControl(data.frame(year=year,val=TAC,quantity="catch"))
+  ctrl <- fwdControl(data.frame(year=year,val=TAC[1],quantity="catch"))
+  ctrl@trgtArray <- array(dim=c(1,3,length(TAC)),dimnames=list(1,c("min","val","max"),iter=1:length(TAC)))
+  ctrl@trgtArray[,"val",] <- TAC 
   
+  return(ctrl)
 }
 @
 
 <<echo=FALSE,term=FALSE>>=
-index <- quantSums(sweep(stock.n(stk_proj) * stock.wt(stk_proj),1,catch.sel(gen1),"*")) 
+index    <- index_init/q.surv
+stk_proj <- stk_init
+
 for(y in (proj_strt+1):proj_end) {
   # control rule
   ctrl <- hcr(catch(stk_proj),index,y)
   # project
-  stk_proj <- fwd(stk_proj,ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
+  stk_proj <- fwd(stk_proj,ctrl=ctrl,sr=list(model=sr_model, params=sr_params), sr.residuals=sr_resid)
   # exploitable biomass
-  index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * catch.sel(gen1)) 
+  index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * sel) 
 }
 
 index_sc1 <- index
@@ -364,35 +367,42 @@ stk_sc1   <- stk_proj
 <<label=hcr_sc2,echo=FALSE>>=
 hcr <- function(catch,index,year) {
 
-  # get estimated exploitable biomass from SRA
-  fit.sra <- optim(SSB0,fn = logl,catch=catch,index=index,hh=slope,M=m(gen1),mat=mat(gen1),sel=landings.sel(gen1),wght=stock.wt(gen1),amin=range(gen1)['min'],amax=range(gen1)['max'],method = "L-BFGS-B",lower = c(800),upper = c(1500),hessian = T)
-  out<-pdyn(B0=fit.sra$par,catch=catch,index=index,hh=slope,M=m(gen1),mat=mat(gen1),sel=landings.sel(gen1),wght=stock.wt(gen1),amin=range(gen1)['min'],amax=range(gen1)['max'])
+  GB <- numeric(dim(catch)[6])
 
-  #CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
-  #BTAR <- as.numeric(refpts(gen1)[,"biomass"][4])   # target exploitable biomass
-  BLIM <- 0                                         # limit exploitable biomass
-  
-  GB <- as.numeric(out$Bexp[year-1]) 
-  
-  if(GB<=BLIM) { TAC <- 0
-  } else { if(GB>BLIM & GB<BTAR) { TAC <- (CTAR * (GB - BLIM))/(BTAR - BLIM) 
-  } else { if(GB>=BTAR) { TAC <- (CTAR * GB)/BTAR
-  }}}
+  for(i in 1:length(GB)) {
+    # get estimated exploitable biomass from SRA
+    fit.sra <- optim(SSB0,fn = logl,catch=iter(catch,i),index=iter(index,i),hh=slope,M=m(gen),mat=mat(gen),sel=landings.sel(gen),wght=stock.wt(gen),amin=range(gen)['min'],amax=range(gen)['max'],method = "L-BFGS-B",lower = c(800),upper = c(1500),hessian = T)
+    out<-pdyn(B0=fit.sra$par,catch=iter(catch,i),index=iter(index,i),hh=slope,M=m(gen),mat=mat(gen),sel=landings.sel(gen),wght=stock.wt(gen),amin=range(gen)['min'],amax=range(gen)['max'])
+    GB[i] <- out$Bexp[year-1]
+  }
+    
+  #if(GB<=BLIM) { TAC <- 0
+  #} else { if(GB>BLIM & GB<BTAR) { TAC <- (CTAR * (GB - BLIM))/(BTAR - BLIM) 
+  #} else { if(GB>=BTAR) { TAC <- (CTAR * GB)/BTAR
+  #}}}
 
-  ctrl <- fwdControl(data.frame(year=year,val=TAC,quantity="catch"))
+  TAC <- (CTAR * GB)/BTAR
+
+  ctrl <- fwdControl(data.frame(year=year,val=TAC[1],quantity="catch"))
+  ctrl@trgtArray <- array(dim=c(1,3,length(TAC)),dimnames=list(1,c("min","val","max"),iter=1:length(TAC)))
+  ctrl@trgtArray[,"val",] <- TAC 
+  
+  return(ctrl)
   
 }
 @
 
 <<echo=FALSE,term=FALSE>>=
-index <- quantSums(sweep(stock.n(stk_proj) * stock.wt(stk_proj),1,catch.sel(gen1),"*")) * q.surv
+index    <- index_init
+stk_proj <- stk_init
+
 for(y in (proj_strt+1):proj_end) {
   # control rule
   ctrl <- hcr(catch(stk_proj)[,1:(y-1)],index[,1:(y-1)],y)
   # project
-  stk_proj <- fwd(stk_proj,ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
+  stk_proj <- fwd(stk_proj,ctrl=ctrl,sr=list(model=sr_model,params=sr_params),sr.residuals=sr_resid)
   # update survey index
-  index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * catch.sel(gen1)) * q.surv
+  index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * sel) * q.surv
 }
 
 index_sc2 <- index
@@ -401,32 +411,36 @@ stk_sc2   <- stk_proj
 
 <<label=hcr_sc3,echo=FALSE>>=
 hcr <- function(catch,index,year) {
-
-  #CTAR <- as.numeric(refpts(gen1)[,"yield"][4])     # target catch
-  ITAR <- BTAR * q.surv                             # survey catch rate equivalent to target bexp
-  ILIM <- 0                                         # limit bexp
   
   GB <- as.numeric(index[,year-1]) 
   
-  if(GB<=ILIM) { TAC <- 0
-  } else { if(GB>ILIM & GB<ITAR) { TAC <- (CTAR * (GB - ILIM))/(ITAR - ILIM) 
-  } else { if(GB>=ITAR) { TAC <- (CTAR * GB)/ITAR
-  }}}
+  #if(GB<=ILIM) { TAC <- 0
+  #} else { if(GB>ILIM & GB<ITAR) { TAC <- (CTAR * (GB - ILIM))/(ITAR - ILIM) 
+  #} else { if(GB>=ITAR) { TAC <- (CTAR * GB)/ITAR
+  #}}}
 
-  ctrl <- fwdControl(data.frame(year=year,val=TAC,quantity="catch"))
+  TAC <- (CTAR * GB)/ITAR
+
+  ctrl <- fwdControl(data.frame(year=year,val=TAC[1],quantity="catch"))
+  ctrl@trgtArray <- array(dim=c(1,3,length(TAC)),dimnames=list(1,c("min","val","max"),iter=1:length(TAC)))
+  ctrl@trgtArray[,"val",] <- TAC 
+  
+  return(ctrl)
   
 }
 @
 
 <<echo=FALSE,term=FALSE>>=
-index <- quantSums(sweep(stock.n(stk_proj) * stock.wt(stk_proj),1,catch.sel(gen1),"*")) * q.surv
+index    <- index_init
+stk_proj <- stk_init
+
 for(y in (proj_strt+1):proj_end) {
   # control rule
   ctrl <- hcr(catch(stk_proj)[,1:(y-1)],index[,1:(y-1)],y)
   # project
-  stk_proj <- fwd(stk_proj,ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
+  stk_proj <- fwd(stk_proj,ctrl=ctrl,sr=list(model=sr_model,params=sr_params),sr.residuals=sr_resid)
   # survey index
-  index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * catch.sel(gen1)) * q.surv
+  index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * sel) * q.surv
 }
 
 index_sc3 <- index
@@ -437,7 +451,7 @@ stk_sc3   <- stk_proj
 \centering
 <<fig=TRUE,echo=FALSE>>=
 
-dfr_det <- data.frame(Time=1:proj_end, B1=c(quantSums(sweep(stk_sc1@stock.n * stk_sc1@stock.wt,1,catch.sel(gen1),"*"))),B2=c(quantSums(sweep(stk_sc2@stock.n * stk_sc2@stock.wt,1,catch.sel(gen1),"*"))),B3=c(quantSums(sweep(stk_sc3@stock.n * stk_sc3@stock.wt,1,catch.sel(gen1),"*"))))
+dfr_det <- data.frame(Time=1:proj_end, B1=c(quantSums(sweep(stk_sc1@stock.n * stk_sc1@stock.wt,1,catch.sel(gen),"*"))),B2=c(quantSums(sweep(stk_sc2@stock.n * stk_sc2@stock.wt,1,catch.sel(gen),"*"))),B3=c(quantSums(sweep(stk_sc3@stock.n * stk_sc3@stock.wt,1,catch.sel(gen),"*"))))
 
 print(ggplot(dfr_det)
   + geom_line(aes(x=Time,y=B1),linetype=1) 
@@ -445,6 +459,7 @@ print(ggplot(dfr_det)
   + geom_line(aes(x=Time,y=B3),linetype=3)
   + geom_line(aes(x=Time,y=BTAR),data=data.frame(Time=1:proj_end, BTAR=BTAR))
   + geom_line(aes(x=proj_strt,y=c(0,max(dfr_det$B1,dfr_det$B2,dfr_det$B3))))
+  + ylab("Exploitable Biomass") + xlab("Time")
   )
 @
 \caption{Performance of control rules against exploitable biomass target. Vertical line represents start of projection period. 
@@ -464,6 +479,7 @@ print(ggplot(dfr_det)
   + geom_line(aes(x=Time,y=C3),linetype=3)
   + geom_line(aes(x=Time,y=CTAR),data=data.frame(Time=1:proj_end, CTAR=CTAR))
   + geom_line(aes(x=proj_strt,y=c(0,max(dfr_det$C1,dfr_det$C2,dfr_det$C3))))
+  + ylab("Catch") + xlab("Time")
   )
 @
 \caption{Performance of control rules against catch target. Vertical line represents start of projection period. 
@@ -473,27 +489,33 @@ Horizontal line represents the target catch $C^{TAR}$.}
 
 \section{Stochastic results}
 
+Sources of stochasticity were as follows:
+\begin{enumerate}
+\item recruitment: multiplicative log-normal noise around the predicted recruitment
+\item observation: the survey catch rate was subjected to a degree of noise equivalent to that given in Figure~\ref{fig:effCV}
+for a specified level of effort
+\end{enumerate}
+
+
 <<echo=FALSE>>=
-nit <- 20
-eff_seq <- seq(100,1000,200)
+srr_sd <- 0.3
+nit <- 100
+eff_seq <- c(100,1000) #seq(100,1000,200)
 
 # historic sr residuals
 sr_resid <- FLQuant(rlnorm(maxt*nit,0,srr_sd),dimnames=list(age=1,year=dimnames(stock.n(stk_hist))$year,iter=1:nit))
 stk_hist <- propagate(stk_hist,nit)
-stk_hist <- fwd(stk_hist, ctrl=ctrl_F1, sr=list(model=model(gen1), params=params(gen1)), sr.residuals=sr_resid)
+stk_hist <- fwd(stk_hist,ctrl=ctrl_F1,sr=list(model=sr_model,params=sr_params),sr.residuals=sr_resid)
   
 # set up FLStock and get components
 stk_init <- stf(stk_hist,proj_nyr)
-n_init <-
-wt <- 
-sel <- 
   
 # future sr residuals
 sr_resid <- window(sr_resid,start=1,end=proj_end)
 sr_resid[,(proj_strt+1):proj_end] <- rlnorm(proj_nyr*nit,0,srr_sd)
 
 # initialise index
-index_init <- quantSums(sweep(stock.n(stk_init) * stock.wt(stk_init),1,catch.sel(gen1),"*"))
+index_init <- quantSums(sweep(stock.n(stk_init) * stock.wt(stk_init),1,sel,"*"))
 
 # simulate observation error
 load('../dat/cv_pred_func.Rdata')
@@ -512,15 +534,11 @@ for(e in 1:length(eff_seq)) {
 rm(fit,cv.pred)
 
 # set up FLStocks object
-stk_sclist <- vector('list',3)
-names(stk_sclist) <- c('Sc1','Sc2','Sc3')
+#stk_sclist <- vector('list',3)
+#names(stk_sclist) <- c('Sc1','Sc2','Sc3')
 
 # set up results matrix
 res_bexp <- data.frame(effort=eff_seq,Sc1=NA,Sc2=NA,Sc3=NA)
-
-# access sr parameters
-sr_model <- model(gen1)
-sr_params <- params(gen1)
 
 @
 
@@ -531,33 +549,19 @@ index <- index_init
 stk_proj <- stk_init
 
 for(e in 1:length(eff_seq)) {
-    cat("e: ", e, "\n")
-  for(i in 1:nit) {
-      cat("\ti: ", i, "\n")
-    index.iter <- iter(index,i)
-    stk_proj.iter <- iter(stk_proj,i)
-    sr_resid.iter <- iter(sr_resid,i)
-    
-    for(y in (proj_strt+1):proj_end) {
-      cat("\t\ty: ", y, "\n")
-      # control rule
-      ctrl <- hcr(catch(stk_proj.iter),index.iter,y)
-      # project
-      # Problem with iters here - residuals needs to have dimnames starting at 1
-      dimnames(sr_resid.iter)$iter <- "1"
-      stk_proj.iter <- fwd(stk_proj.iter,ctrl=ctrl,sr = list(model=sr_model,params=sr_params),sr.residuals=sr_resid.iter)
-    # exploitable biomassx`
-      index.iter[,y] <- quantSums(stock.n(stk_proj.iter)[,y] * stock.wt(stk_proj.iter)[,y] * catch.sel(gen1)) 
-    }
-    
-    iter(index,i) <- index.iter
-    iter(stk_proj,i) <- stk_proj.iter
+
+  for(y in (proj_strt+1):proj_end) {
+    # control rule
+    ctrl <- hcr(catch(stk_proj),index,y)
+    # project
+    stk_proj <- fwd(stk_proj,ctrl=ctrl,sr = list(model=sr_model,params=sr_params),sr.residuals=sr_resid)
+    # exploitable biomass
+    index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * sel) 
   }
   
   # difference between results and ideal information case 
-  res_bexp[e,'Sc1'] <- dfr_det[proj_end,'B1'] - c(iterMeans(quantSums(sweep(stk_proj@stock.n[,proj_end] * stk_proj@stock.wt[,proj_end],1,catch.sel(gen1),"*"))))
+  res_bexp[e,'Sc1'] <- dfr_det[proj_end,'B1'] - c(iterMeans(quantSums(sweep(stk_proj@stock.n[,proj_end] * stk_proj@stock.wt[,proj_end],1,catch.sel(gen),"*"))))
 }
-
 @
 
 <<echo=FALSE>>=
@@ -568,21 +572,18 @@ stk_proj <- stk_init
 
 for(e in 1:length(eff_seq)) {
    
-  for(i in 1:nit) {
-    
-    for(y in (proj_strt+1):proj_end) {
-  
-      # control rule
-      ctrl <- hcr(catch(stk_proj)[,1:(y-1),,,,i],index[,1:(y-1),,,,i],y)
-      # project
-      iter(stk_proj,i) <- fwd(iter(stk_proj,i),ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=iter(sr_resid,i))
-      # update survey index
-      index[,y,,,,i] <- quantSums(stock.n(stk_proj)[,y,,,,i] * stock.wt(stk_proj)[,y,,,,i] * catch.sel(gen1)) * q.surv * index_epsilon[e,y-proj_strt,i]
-    }
+  for(y in (proj_strt+1):proj_end) {
+
+    # control rule
+    ctrl <- hcr(catch(stk_proj)[,1:(y-1)],index[,1:(y-1)],y)
+    # project
+    stk_proj <- fwd(stk_proj,ctrl=ctrl,sr=list(model=sr_model, params=sr_params), sr.residuals=sr_resid)
+    # update survey index
+    index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * sel) * q.surv * index_epsilon[e,y-proj_strt,i]
   }
   
   # difference between results and ideal information case 
-  res_bexp[e,'Sc2'] <- dfr_det[proj_end,'B2'] - c(iterMeans(quantSums(sweep(stk_proj@stock.n[,proj_end] * stk_proj@stock.wt[,proj_end],1,catch.sel(gen1),"*"))))
+  res_bexp[e,'Sc2'] <- dfr_det[proj_end,'B2'] - c(iterMeans(quantSums(sweep(stk_proj@stock.n[,proj_end] * stk_proj@stock.wt[,proj_end],1,sel,"*"))))
 }
 
 @
@@ -595,21 +596,18 @@ stk_proj <- stk_init
 
 for(e in 1:length(eff_seq)) {
    
-  for(i in 1:nit) {
-    
-    for(y in (proj_strt+1):proj_end) {
-  
-      # control rule
-      ctrl <- hcr(catch(stk_proj)[,1:(y-1),,,,i],index[,1:(y-1),,,,i],y)
-      # project
-      iter(stk_proj,i) <- fwd(iter(stk_proj,i),ctrl=ctrl,sr=list(model=model(gen1), params=params(gen1)), sr.residuals=iter(sr_resid,i))
-      # update survey index
-      index[,y,,,,i] <- quantSums(stock.n(stk_proj)[,y,,,,i] * stock.wt(stk_proj)[,y,,,,i] * catch.sel(gen1)) * q.surv * index_epsilon[e,y-proj_strt,i]
-    }
+  for(y in (proj_strt+1):proj_end) {
+
+    # control rule
+    ctrl <- hcr(catch(stk_proj)[,1:(y-1)],index[,1:(y-1)],y)
+    # project
+    stk_proj <- fwd(stk_proj,ctrl=ctrl,sr=list(model=sr_model,params=sr_params),sr.residuals=sr_resid)
+    # update survey index
+    index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * sel) * q.surv * index_epsilon[e,y-proj_strt,]
   }
   
   # difference between results and ideal information case 
-  res_bexp[e,'Sc3'] <- dfr_det[proj_end,'B3'] - c(iterMeans(quantSums(sweep(stk_proj@stock.n[,proj_end] * stk_proj@stock.wt[,proj_end],1,catch.sel(gen1),"*"))))
+  res_bexp[e,'Sc3'] <- dfr_det[proj_end,'B3'] - c(iterMeans(quantSums(sweep(stk_proj@stock.n[,proj_end] * stk_proj@stock.wt[,proj_end],1,sel,"*"))))
 }
 
 @
@@ -622,6 +620,7 @@ print(ggplot(dfr_stoch)
   + geom_line(aes(x=Effort,y=B1),linetype=1) 
   + geom_line(aes(x=Effort,y=B2),linetype=2)
   + geom_line(aes(x=Effort,y=B3),linetype=3)
+  + ylab("Relative Exploitable Biomass") + xlab("Effort")
   )
 @
 \caption{Performance of control rules against exploitable biomass target, for different survey effort values.}
@@ -636,6 +635,7 @@ print(ggplot(dfr_stoch)
   + geom_line(aes(x=Effort,y=B1_norm),linetype=1) 
   + geom_line(aes(x=Effort,y=B2_norm),linetype=2)
   + geom_line(aes(x=Effort,y=B3_norm),linetype=3)
+  + ylab("Relative Exploitable Biomass") + xlab("Effort")
   )
 @
 \caption{Renormalised performance of control rules against exploitable biomass target, for different survey effort values.}

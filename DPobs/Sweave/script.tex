@@ -211,19 +211,8 @@ $\alpha=3.93$ and $\beta = -0.5$.}
 \label{fig:effCV}
 \end{figure} 
 
-
 We assume that the survey takes place at the beginning of the year (before any catches have been taken)
 and with a constant catchability $q=1e-04$. 
-
-\subsection{Stochasticity}
-
-
-Sources of stochasticity were as follows:
-\begin{enumerate}
-\item recruitment: multiplicative log-normal noise around the predicted recruitment
-\item observation: the survey catch rate was subjected to a degree of noise equivalent to that given in Figure~\ref{fig:effCV}
-for a specified level of effort
-\end{enumerate}
 
 \section{Preliminary runs}
 
@@ -239,7 +228,7 @@ These are shown in Figures~\ref{fig:hcr_det_biomass} and \ref{fig:hcr_det_catch}
 
 \begin{figure}
 \centering
-\includegraphics{script-019}
+\includegraphics{script-017}
 \caption{Performance of control rules against exploitable biomass target. Vertical line represents start of projection period. 
 Horizontal line represents the target biomass $B^{TAR}$.}
 \label{fig:hcr_det_biomass}
@@ -247,7 +236,7 @@ Horizontal line represents the target biomass $B^{TAR}$.}
 
 \begin{figure}
 \centering
-\includegraphics{script-020}
+\includegraphics{script-018}
 \caption{Performance of control rules against catch target. Vertical line represents start of projection period. 
 Horizontal line represents the target catch $C^{TAR}$.}
 \label{fig:hcr_det_catch}
@@ -255,20 +244,28 @@ Horizontal line represents the target catch $C^{TAR}$.}
 
 \section{Stochastic results}
 
+Sources of stochasticity were as follows:
+\begin{enumerate}
+\item recruitment: multiplicative log-normal noise around the predicted recruitment
+\item observation: the survey catch rate was subjected to a degree of noise equivalent to that given in Figure~\ref{fig:effCV}
+for a specified level of effort
+\end{enumerate}
+
+
 
 
 
 
 \begin{figure}
 \centering
-\includegraphics{script-025}
+\includegraphics{script-023}
 \caption{Performance of control rules against exploitable biomass target, for different survey effort values.}
 \label{fig:hcr_stoch_biomass}
 \end{figure}
 
 \begin{figure}
 \centering
-\includegraphics{script-026}
+\includegraphics{script-024}
 \caption{Renormalised performance of control rules against exploitable biomass target, for different survey effort values.}
 \label{fig:hcr_stoch_biomass_norm}
 \end{figure}
@@ -279,9 +276,9 @@ Horizontal line represents the target catch $C^{TAR}$.}
 \hline
 Scenario & Regression coefficient\\
 \hline
-1: Perfect knowledge & -5.06689e-17\\
-2: Model based HCR   & -1.53592e-16\\
-3: Empirical HCR     & -0.970636\\
+1: Perfect knowledge & -2.14831e-16\\
+2: Model based HCR   & 0.0134763\\
+3: Empirical HCR     & -0.0125865\\
 \hline
 \end{tabular}
 \caption{Regression of renormalised performance statistic against survey effort}
