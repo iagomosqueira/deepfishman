@@ -209,7 +209,7 @@ The resulting stock object can be seen in Figure~\ref{fig:hist_proj}.
 
 \begin{figure}
 \centering
-<<label=hist_proj_plot,fig=TRUE,echo=FALSE>>=
+<<fig=TRUE,echo=FALSE>>=
 print(plot(FLStocks(stk_hist)))
 @
 \caption{Historic stock dynamics}
