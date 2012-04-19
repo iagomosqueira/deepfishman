@@ -20,9 +20,9 @@ double pop_index_sigma(double*,double*);
 
 // global variables
 int ymin,ymax,ymin_obj,ymax_obj,amin,amax,nyr,nyr_obj,nag;
-double hh,*F,*M;
+double hh,*H,*M;
 double *mat,*wght,*sel;
-double *Cb,*I;
+double *C,*I;
 double alp,bet;
 
 extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax,SEXP R_ymin_obj,SEXP R_ymax_obj) {
@@ -59,7 +59,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 
   ymin = INTEGER_VALUE(R_ymin);
   ymax = INTEGER_VALUE(R_ymax);
-  nyr  = ymax - ymin + 1;
+  nyr  = ymax - ymin + 2;
 
   ymin_obj = INTEGER_VALUE(R_ymin_obj);
   ymax_obj = INTEGER_VALUE(R_ymax_obj);
@@ -70,7 +70,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   ///////////////////
  
   // catch
-  Cb = REAL(R_catch);
+  C = REAL(R_catch);
 
   // index
   I = REAL(R_index);
@@ -101,7 +101,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 
   double *B     = new double[nyr];  
   double *Bexp  = new double[nyr];  
-  double *F     = new double[nyr];    
+  double *H     = new double[nyr];    
   double *Ipred = new double[nyr_obj];
 
   // initialise doubles
@@ -112,7 +112,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   nLogLk = 0.;
   
   // :: predicted index
-  pop_index(B0,B,Bexp,F,Ipred);
+  pop_index(B0,B,Bexp,H,Ipred);
   
   // :: calculate sigma
   sigma = pop_index_sigma(I,Ipred);
@@ -121,7 +121,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   sigma2 = pow(sigma,2);
   for(y=0;y<nyr_obj;y++) {
     if(Ipred[y]>0. && I[y]>0.) {
-      nLogLk += log(sigma2) + pow(I[y]-Ipred[y],2)/sigma2;
+      nLogLk += log(sigma2) + pow(I[y]-Ipred[y],2.)/sigma2;
     }
   }
 
@@ -170,16 +170,16 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 
   setAttrib(_Bexp,R_NamesSymbol,dyr);
 
-  // F
-  SEXP _F;
-  PROTECT(_F = allocVector(REALSXP,nyr));
+  // H
+  SEXP _H;
+  PROTECT(_H = allocVector(REALSXP,nyr));
  
   p=0;
   for(y=0;y<nyr;y++) {
-    REAL(_F)[p++] = F[y];
+    REAL(_H)[p++] = H[y];
   }
 
-  setAttrib(_F,R_NamesSymbol,dyr);
+  setAttrib(_H,R_NamesSymbol,dyr);
 
   // Ipred
   SEXP _Ipred;
@@ -217,7 +217,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   PROTECT(out = allocVector(VECSXP,7));
   SET_VECTOR_ELT(out,0,_B);
   SET_VECTOR_ELT(out,1,_Bexp);
-  SET_VECTOR_ELT(out,2,_F);
+  SET_VECTOR_ELT(out,2,_H);
   SET_VECTOR_ELT(out,3,_Ipred);
   SET_VECTOR_ELT(out,4,_sigma);
   SET_VECTOR_ELT(out,5,_nLogLk);
@@ -227,7 +227,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   PROTECT(names = allocVector(STRSXP,7));
   SET_STRING_ELT(names,0,mkChar("B"));
   SET_STRING_ELT(names,1,mkChar("Bexp"));
-  SET_STRING_ELT(names,2,mkChar("F"));
+  SET_STRING_ELT(names,2,mkChar("H"));
   SET_STRING_ELT(names,3,mkChar("Ipred"));
   SET_STRING_ELT(names,4,mkChar("sigma"));
   SET_STRING_ELT(names,5,mkChar("nLogLk"));
@@ -237,7 +237,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   UNPROTECT(25);
 
   // clean up
-  delete[] B,Bexp,F,Ipred;
+  delete[] B,Bexp,H,Ipred;
 
   UNPROTECT(2);
   return out;
@@ -248,7 +248,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 // FUNCTIONS //
 ///////////////
 
-void pop_dyn(double B0,double *B,double *Bexp,double *F) { 
+void pop_dyn(double B0,double *B,double *Bexp,double *H) { 
 
   int a,y;
 
@@ -256,10 +256,8 @@ void pop_dyn(double B0,double *B,double *Bexp,double *F) {
   double *P = new double[nag];
 
   double R0;
-  double **C = new double*[nag];
   double **N = new double*[nag];
   for(a=0;a<nag;a++) {
-    C[a] = new double[nyr];
     N[a] = new double[nyr];
   }
 
@@ -273,19 +271,6 @@ void pop_dyn(double B0,double *B,double *Bexp,double *F) {
   R0 = B0 / rho;
   for(a=0;a<nag;a++)
     N[a][0] = R0 * P[a];
-
-  B[0] = 0.;
-  Bexp[0] = 0.;
-  for(a=0;a<nag;a++) {
-    B[0] += N[a][0] * mat[a] * wght[a];
-    Bexp[0] += N[a][0] * sel[a] * wght[a];
-  }
-
-  F[0] = 1.;
-  if(Bexp[0]>0.) F[0] = Cb[0] / Bexp[0];
-  if(F[0]<0.)    F[0] = 0.;
-  if(F[0]>1.)    F[0] = 1.;
-  if(F[0]>0.)    Bexp[0] = Cb[0] / F[0];
   
   // set up S-R parameters
 
@@ -295,6 +280,21 @@ void pop_dyn(double B0,double *B,double *Bexp,double *F) {
   // Loop through the years
 
   for(y=1;y<nyr;y++) {
+  
+    // biomass
+    B[y-1] = 0.;
+    Bexp[y-1] = 0.;
+    for(a=0;a<nag;a++) {
+      B[y-1] += N[a][y-1] * mat[a] * wght[a];
+      Bexp[y-1] += N[a][y-1] * sel[a] * wght[a] * exp(-M[a]/2.);
+    }
+
+    // harvest
+    H[y-1] = 1.;
+    if(Bexp[y-1]>0.) H[y-1] = C[y-1] / Bexp[y-1];
+    if(H[y-1]<0.)    H[y-1] = 0.;
+    if(H[y-1]>1.)    H[y-1] = 1.;
+    if(H[y-1]>0.)    Bexp[y-1] = C[y-1] / H[y-1];
 
     // recruitment
 
@@ -303,36 +303,33 @@ void pop_dyn(double B0,double *B,double *Bexp,double *F) {
     // adult dynamics
 
     for(a=1;a<nag;a++)
-      N[a][y] = N[a-1][y-1]*exp(-M[a-1])*(1-sel[a-1]*F[y-1]);
-    N[nag-1][y] = N[nag-1][y] + N[nag-1][y-1]*exp(-M[nag-1])*(1-sel[nag-1]*F[y-1]);
+      N[a][y] = N[a-1][y-1]*exp(-M[a-1])*(1-sel[a-1]*H[y-1]);
+    N[nag-1][y] = N[nag-1][y] + N[nag-1][y-1]*exp(-M[nag-1])*(1-sel[nag-1]*H[y-1]);
 
-    B[y] = 0.;
-    Bexp[y] = 0.;
-    for(a=0;a<nag;a++) {
-      B[y] += N[a][y] * mat[a] * wght[a];
-      Bexp[y] += N[a][y] * sel[a] * wght[a];
-    }
-
-    F[y] = 1.;
-    if(Bexp[y]>0.) F[y] = Cb[y] / Bexp[y];
-    if(F[y]<0.)    F[y] = 0.;
-    if(F[y]>1.)    F[y] = 1.;
-    if(F[y]>0.)    Bexp[y] = Cb[y] / F[y];
   }
-
+  
+  // current biomass
+  B[nyr-1] = 0.;
+  Bexp[nyr-1] = 0.;
+  for(a=0;a<nag;a++) {
+    B[nyr-1] += N[a][nyr-1] * mat[a] * wght[a];
+    Bexp[nyr-1] += N[a][nyr-1] * sel[a] * wght[a] * exp(-M[a]/2.);
+  }
+  
+  // current H
+  H[nyr-1] = 0.;
+  
   // clean up
   delete[] P;
 
   for(a=0;a<nag;a++) {
-    delete[] C[a];
     delete[] N[a];
   }
-  delete[] C;
   delete[] N;
 
 }
 
-void pop_index(double B0,double *B,double *Bexp,double *F,double *Ipred) {
+void pop_index(double B0,double *B,double *Bexp,double *H,double *Ipred) {
 
   int y,y_obj;
   int n = 0;
@@ -340,7 +337,7 @@ void pop_index(double B0,double *B,double *Bexp,double *F,double *Ipred) {
   double q = 0.;
   double tmp = 0.;
   
-  pop_dyn(B0,B,Bexp,F);
+  pop_dyn(B0,B,Bexp,H);
 
   for(y_obj=0,y=ymin_obj-ymin;y_obj<nyr_obj;y_obj++,y++) {
     if(I[y_obj]>0. && Bexp[y]>0.) {
