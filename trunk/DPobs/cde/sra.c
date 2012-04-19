@@ -19,13 +19,13 @@ void pop_index(double,double*,double*,double*,double*);
 double pop_index_sigma(double*,double*);
 
 // global variables
-int ymin,ymax,ymin_obj,ymax_obj,amin,amax,nyr,nyr_obj,nag;
+int ymin,ymax,amin,amax,nyr,nag;
 double hh,*H,*M;
 double *mat,*wght,*sel;
 double *C,*I;
 double alp,bet;
 
-extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax,SEXP R_ymin_obj,SEXP R_ymax_obj) {
+extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax) {
 
   //local variables
   int a,y;
@@ -46,8 +46,6 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   PROTECT(R_amax   = AS_NUMERIC(R_amax));
   PROTECT(R_ymin   = AS_NUMERIC(R_ymin));
   PROTECT(R_ymax   = AS_NUMERIC(R_ymax));
-  PROTECT(R_ymin_obj   = AS_NUMERIC(R_ymin_obj));
-  PROTECT(R_ymax_obj   = AS_NUMERIC(R_ymax_obj));
   
   ////////////////
   // DIMENSIONS //
@@ -60,10 +58,6 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   ymin = INTEGER_VALUE(R_ymin);
   ymax = INTEGER_VALUE(R_ymax);
   nyr  = ymax - ymin + 2;
-
-  ymin_obj = INTEGER_VALUE(R_ymin_obj);
-  ymax_obj = INTEGER_VALUE(R_ymax_obj);
-  nyr_obj  = ymax_obj - ymin_obj + 1;
   
   ///////////////////
   // PRELIMINARIES //
@@ -102,7 +96,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   double *B     = new double[nyr];  
   double *Bexp  = new double[nyr];  
   double *H     = new double[nyr];    
-  double *Ipred = new double[nyr_obj];
+  double *Ipred = new double[nyr];
 
   // initialise doubles
   B0 = NUMERIC_VALUE(R_B0);
@@ -119,7 +113,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 
   // :: calculate negative log-likelihood
   sigma2 = pow(sigma,2);
-  for(y=0;y<nyr_obj;y++) {
+  for(y=0;y<nyr;y++) {
     if(Ipred[y]>0. && I[y]>0.) {
       nLogLk += log(sigma2) + pow(I[y]-Ipred[y],2.)/sigma2;
     }
@@ -130,7 +124,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   ////////////
   int p;
   int iAge,iYear;
-  SEXP dag,dyr,dyr_obj,names,dimnames,params,srnames;
+  SEXP dag,dyr,names,dimnames,params,srnames;
 
   // create dimension names
   PROTECT(dag = allocVector(INTSXP,nag));
@@ -141,11 +135,6 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   PROTECT(dyr = allocVector(INTSXP,nyr));
   for(iYear=ymin,y=0;y<nyr;iYear++,y++) {
     INTEGER(dyr)[y] = iYear;
-  }
-
-  PROTECT(dyr_obj = allocVector(INTSXP,nyr_obj));
-  for(iYear=ymin_obj,y=0;y<nyr_obj;iYear++,y++) {
-    INTEGER(dyr_obj)[y] = iYear;
   }
 
   // B
@@ -183,14 +172,14 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 
   // Ipred
   SEXP _Ipred;
-  PROTECT(_Ipred = allocVector(REALSXP,nyr_obj));
+  PROTECT(_Ipred = allocVector(REALSXP,nyr));
  
   p=0;
-  for(y=0;y<nyr_obj;y++) {
+  for(y=0;y<nyr;y++) {
     REAL(_Ipred)[p++] = Ipred[y];
   }
 
-  setAttrib(_Ipred,R_NamesSymbol,dyr_obj);
+  setAttrib(_Ipred,R_NamesSymbol,dyr);
 
   // sigma
   SEXP _sigma;
@@ -234,7 +223,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   SET_STRING_ELT(names,6,mkChar("srpar"));
   setAttrib(out,R_NamesSymbol,names);
 
-  UNPROTECT(25);
+  UNPROTECT(22);
 
   // clean up
   delete[] B,Bexp,H,Ipred;
@@ -331,7 +320,7 @@ void pop_dyn(double B0,double *B,double *Bexp,double *H) {
 
 void pop_index(double B0,double *B,double *Bexp,double *H,double *Ipred) {
 
-  int y,y_obj;
+  int y;
   int n = 0;
 
   double q = 0.;
@@ -339,30 +328,30 @@ void pop_index(double B0,double *B,double *Bexp,double *H,double *Ipred) {
   
   pop_dyn(B0,B,Bexp,H);
 
-  for(y_obj=0,y=ymin_obj-ymin;y_obj<nyr_obj;y_obj++,y++) {
-    if(I[y_obj]>0. && Bexp[y]>0.) {
-      tmp += log(I[y_obj]/Bexp[y]);
+  for(y=0;y<nyr;y++) {
+    if(I[y]>0. && Bexp[y]>0.) {
+      tmp += log(I[y]/Bexp[y]);
       n++;
     }
   }
 
   if(n>0) q = exp(tmp/n);
 
-  for(y_obj=0,y=ymin_obj-ymin;y_obj<nyr_obj;y_obj++,y++) {
-    Ipred[y_obj] = q*Bexp[y];
+  for(y=0;y<nyr;y++) {
+    Ipred[y] = q*Bexp[y];
   }
 }
 
 double pop_index_sigma(double *I,double *Ipred) {
 
-  int y_obj;
+  int y;
   int n = 0;
 
   double tmp = 0.;
   
-  for(y_obj=0;y_obj<nyr_obj;y_obj++) {
-    if(I[y_obj]>0. && Ipred[y_obj]>0. && !ISNA(Ipred[y_obj])) {
-      tmp += pow(log(I[y_obj]/Ipred[y_obj]),2);
+  for(y=0;y<nyr;y++) {
+    if(I[y]>0. && Ipred[y]>0. && !ISNA(Ipred[y])) {
+      tmp += pow(log(I[y]/Ipred[y]),2);
       n++;
     }
   }
