@@ -6,10 +6,8 @@ dyn.load('../cde/sra.dll')
 pdyn <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
   
   #browser()
-  ymin     <- dims(catch)$minyear
-  ymax     <- dims(catch)$maxyear
-  ymin_obj <- dims(index)$minyear
-  ymax_obj <- dims(index)$maxyear
+  ymin     <- 1
+  ymax     <- length(catch)
   #browser()
   B0     <- as.numeric(B0)
   catch  <- as.vector(catch)
@@ -22,7 +20,7 @@ pdyn <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
   amin   <- as.numeric(amin)
   amax   <- as.numeric(amax)
   #browser()
-  out <- .Call('fit',B0,catch,index,hh,M,mat,sel,wght,amin,amax,ymin,ymax,ymin_obj,ymax_obj)
+  out <- .Call('fit',B0,catch,index,hh,M,mat,sel,wght,amin,amax,ymin,ymax)
   
   return(out)
 }
@@ -54,25 +52,25 @@ msy.sra <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
   PF <- numeric(nag)
   PF[1] <- 1
   
-  msy.obj <- function(F,alpha,beta) {
+  msy.obj <- function(H,alpha,beta) {
   
     for(a in 2:nag)
-      PF[a] <- PF[a-1]*exp(-M[a-1])*(1-sel[a-1]*F);
-    PF[nag-1] <- PF[nag-1] + PF[nag-1]*exp(-M[nag-1])*(1-sel[nag-1]*F);
+      PF[a] <- PF[a-1]*exp(-M[a-1])*(1-sel[a-1]*H);
+    PF[nag-1] <- PF[nag-1] + PF[nag-1]*exp(-M[nag-1])*(1-sel[nag-1]*H);
     
     SPRF <- sum(PF * mat * wght)
     
     RF <- alpha - beta/SPRF
     NF <- RF * PF
     
-    Y <- sum(NF * wght * sel * F)
+    Y <- sum(NF * wght * sel * H * exp(-M[a]/2))
     
     return(Y)
   }
   
   opt <- optimise(msy.obj,c(0.1,0.9),alp,bet,maximum=T)
 
-  return(list(F=opt$maximum,MSY=opt$objective))
+  return(list(H=opt$maximum,MSY=opt$objective))
 }
 
 # overload fwd()
