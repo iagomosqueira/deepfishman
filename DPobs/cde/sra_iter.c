@@ -14,13 +14,13 @@
 using namespace std;
 
 // global functions
-void pop_dyn(double,double**,double**,double**);
+void pop_dyn(double);
 
 // global variables
 int ymin,ymax,amin,amax,nyr,nag,nit;
-double hh,*H,*M;
+double hh,*M;
 double *mat,*wght,*sel;
-double **C;
+double **C,**B,**Bexp,**H;
 
 extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax,SEXP R_nit) {
 
@@ -71,10 +71,11 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
     C[y] =  new double[nit];
     
   p = 0;
-  for(y=0;y<nyr;y++)
-    for(i=0;i<nit;i++) {
+  for(i=0;i<nit;i++) {
+    for(y=0;y<(nyr-1);y++)
       C[y][i] = REAL(R_catch)[p++];
-    }
+    C[nyr-1][i] = NA_REAL;
+  }
 
   // steepness
   hh = NUMERIC_VALUE(R_hh);
@@ -95,9 +96,9 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   // RUN MODEL //
   ///////////////
   
-  double **B    = new double*[nyr];
-  double **Bexp = new double*[nyr];
-  double **H    = new double*[nyr];
+  B    = new double*[nyr];
+  Bexp = new double*[nyr];
+  H    = new double*[nyr];
   for(y=0;y<nyr;y++) {
     B[y]    =  new double[nit];
     Bexp[y] =  new double[nit];
@@ -105,7 +106,7 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   }    
   
   // run model
-  pop_dyn(B0,B,Bexp,H);
+  pop_dyn(B0);
 
   ////////////
   // Output //
@@ -124,10 +125,11 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   }
 
   // B, Bexp, H
-  SEXP _B,_Bexp,_H;
+  SEXP _B,_Bexp,_H,_C;
   PROTECT(_B    = allocMatrix(REALSXP,nyr,nit));
   PROTECT(_Bexp = allocMatrix(REALSXP,nyr,nit));
   PROTECT(_H    = allocMatrix(REALSXP,nyr,nit));
+  PROTECT(_C    = allocMatrix(REALSXP,nyr,nit));
   
   p=0;
   for(i=0;i<nit;i++)
@@ -135,6 +137,7 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
       REAL(_B)[p]    = B[y][i];
       REAL(_Bexp)[p] = Bexp[y][i];
       REAL(_H)[p]    = H[y][i];
+      REAL(_C)[p]    = C[y][i];
       p++;
     }
 
@@ -150,27 +153,39 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   setAttrib(_B,R_DimNamesSymbol,dimnames);
   setAttrib(_Bexp,R_DimNamesSymbol,dimnames);
   setAttrib(_H,R_DimNamesSymbol,dimnames);
+  setAttrib(_C,R_DimNamesSymbol,dimnames);
 
   // create combined output list
   SEXP out;
-  PROTECT(out = allocVector(VECSXP,3));
+  PROTECT(out = allocVector(VECSXP,4));
   SET_VECTOR_ELT(out,0,_B);
   SET_VECTOR_ELT(out,1,_Bexp);
   SET_VECTOR_ELT(out,2,_H);
+  SET_VECTOR_ELT(out,3,_C);
 
   // assign names
-  PROTECT(names = allocVector(STRSXP,3));
-  SET_STRING_ELT(names,0,mkChar("B"));
-  SET_STRING_ELT(names,1,mkChar("Bexp"));
+  PROTECT(names = allocVector(STRSXP,4));
+  SET_STRING_ELT(names,0,mkChar("ssb"));
+  SET_STRING_ELT(names,1,mkChar("bexp"));
   SET_STRING_ELT(names,2,mkChar("H"));
+  SET_STRING_ELT(names,3,mkChar("catch"));
   setAttrib(out,R_NamesSymbol,names);
 
-  UNPROTECT(22);
+  UNPROTECT(21);
 
   // clean up
-  //delete[] B,Bexp,H;
+  for(y=0;y<nyr;y++) {
+    delete[] B[y];
+    delete[] Bexp[y];
+    delete[] H[y];
+    delete[] C[y];
+  }
+  delete[] B;
+  delete[] Bexp;
+  delete[] H;
+  delete[] C;
 
-  UNPROTECT(2);
+  UNPROTECT(1);
   return out;
   
 }
@@ -179,7 +194,7 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
 // FUNCTIONS //
 ///////////////
 
-void pop_dyn(double B0,double **B,double **Bexp,double **H) { 
+void pop_dyn(double B0) { 
 
   int a,y,i;
   double alp,bet;
@@ -259,12 +274,16 @@ void pop_dyn(double B0,double **B,double **Bexp,double **H) {
   }
   
   // clean up
-  //delete[] P;
-
-  //for(a=0;a<nag;a++) {
-  //  delete[] N[a];
-  //}
-  //delete[] N;
+  delete[] P;
+  
+  for(a=0;a<nag;a++) {
+    for(y=0;y<nyr;y++) {
+      delete[] N[a][y];
+    }
+  }
+  for(a=0;a<nag;a++) 
+    delete[] N[a];
+  delete[] N;
 
 }
 
