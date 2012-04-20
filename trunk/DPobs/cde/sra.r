@@ -1,9 +1,31 @@
 
 # Population dynamics
 dyn.load('../cde/sra.dll')
+dyn.load('../cde/sra_iter.dll')
 #dyn.unload('../cde/sra.dll')
 
-pdyn <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
+pdyn <- function(B0,catch,hh,M,mat,sel,wght,amin,amax) {
+  
+  ymin     <- 1
+  ymax     <- dim(catch)[1]
+  nit      <- dim(catch)[2]
+  
+  B0     <- as.numeric(B0)
+  catch  <- as.vector(catch)
+  hh     <- as.numeric(hh)
+  M      <- as.vector(M)
+  mat    <- as.vector(mat)
+  sel    <- as.vector(sel)
+  wght   <- as.vector(wght)
+  amin   <- as.numeric(amin)
+  amax   <- as.numeric(amax)
+
+  out <- .Call('run',B0,catch,hh,M,mat,sel,wght,amin,amax,ymin,ymax,nit)
+  
+  return(out)
+}
+
+fit.func <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
   
   #browser()
   ymin     <- 1
@@ -25,14 +47,9 @@ pdyn <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
   return(out)
 }
 
-pdyn.index <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
-
-  FLQuant(pdyn(B0,catch,index,hh,M,mat,sel,wght,amin,amax)[['Ipred']],dimnames=dimnames(index))
-}
-
 logl <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
     
-  pdyn(B0,catch,index,hh,M,mat,sel,wght,amin,amax)[['nLogLk']]
+  fit.func(B0,catch,index,hh,M,mat,sel,wght,amin,amax)[['nLogLk']]
 }
   
 fit.sra <- function(catch,index,hh,M,mat,sel,wght,amin,amax) {
@@ -43,7 +60,7 @@ fit.sra <- function(catch,index,hh,M,mat,sel,wght,amin,amax) {
 
 msy.sra <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
 
-  tmp <- pdyn(B0,catch,index,hh,M,mat,sel,wght,amin,amax)
+  tmp <- fit.func(B0,catch,index,hh,M,mat,sel,wght,amin,amax)
   alp <- tmp$srpar['alpha']
   bet <- tmp$srpar['beta']
   
@@ -79,5 +96,13 @@ msy.sra <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
 #  
 #  }
 #)
+
+MSE <- function(stk) {
+  
+  tmp <- stk[['theta']][(proj_strt+1):(proj_end-1),] - stk[['catch']][(proj_strt+1):(proj_end-1),]
+  apply(tmp,2,function(x) 1/mean(x^2))
+
+}
+
 
 
