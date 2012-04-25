@@ -54,40 +54,37 @@ proj_end  <- proj_strt + proj_nyr
 sr_resid <- window(sr_resid,start=1,end=proj_end)
 sr_resid[,(proj_strt+1):proj_end] <- 1
 
-# get catch and index
+# set catchability
 catchability <- 1e-4
+
+# get catch
 catch_hist <- matrix(catch(stk_hist)[,,drop=TRUE],hist_nyr,1)
 
-# get historic biomass according to sra operating model
-nit <- 200
+# get historic dynamics according to sra operating model
+# with no iterations
 out<-pdyn(SSB0,catch_hist,slope,M,mat,sel,wt,amin,amax)
-stk <- vector('list',6)
-names(stk) <- c('catch','index','H','ssb','bexp','theta')
-stk[[1]] <- matrix(NA,hist_nyr+proj_nyr,nit)
-stk[[2]] <- matrix(NA,hist_nyr+proj_nyr,nit)
-stk[[3]] <- matrix(NA,hist_nyr+proj_nyr,nit)
-stk[[4]] <- matrix(NA,hist_nyr+proj_nyr,nit)
-stk[[5]] <- matrix(NA,hist_nyr+proj_nyr,nit)
-stk[[6]] <- matrix(NA,hist_nyr+proj_nyr,nit)
+stk_opt <- vector('list',6)
+names(stk_opt) <- c('catch','index','H','ssb','bexp','theta')
+stk_opt[[1]] <- matrix(NA,hist_nyr+proj_nyr,1)
+stk_opt[[2]] <- matrix(NA,hist_nyr+proj_nyr,1)
+stk_opt[[3]] <- matrix(NA,hist_nyr+proj_nyr,1)
+stk_opt[[4]] <- matrix(NA,hist_nyr+proj_nyr,1)
+stk_opt[[5]] <- matrix(NA,hist_nyr+proj_nyr,1)
+stk_opt[[6]] <- matrix(NA,hist_nyr+proj_nyr,1)
 
-for(i in 1:nit) {
-  stk[[1]][1:(hist_nyr+1),i] <- out$catch
-  stk[[2]][1:(hist_nyr+1),i] <- out$bexp * catchability
-  stk[[3]][1:(hist_nyr+1),i] <- out$H
-  stk[[4]][1:(hist_nyr+1),i] <- out$ssb
-  stk[[5]][1:(hist_nyr+1),i] <- out$bexp
-}
-
+stk_opt[[1]][1:(hist_nyr+1),1] <- out$catch
+stk_opt[[2]][1:(hist_nyr+1),1] <- out$bexp * catchability
+stk_opt[[3]][1:(hist_nyr+1),1] <- out$H
+stk_opt[[4]][1:(hist_nyr+1),1] <- out$ssb
+stk_opt[[5]][1:(hist_nyr+1),1] <- out$bexp
 
 # management targets
-msy <- msy.sra(SSB0,stk[['catch']][1:hist_nyr,1],stk[['index']][1:hist_nyr,1],slope,M,mat,sel,wt,amin,amax)
+msy <- msy.sra(SSB0,stk_opt[['catch']][1:hist_nyr,1],stk_opt[['index']][1:hist_nyr,1],slope,M,mat,sel,wt,amin,amax)
 CTAR <- msy$MSY
 BTAR <- msy$MSY/msy$H
 ITAR <- BTAR * catchability
 
-# define 'optimum' catch theta
-stk_opt <- stk
-
+# describe 'optimum' situation
 hcr_opt <- function(bexp,year) {
 
   GB <- as.vector(bexp[year-1,]) 
@@ -101,7 +98,7 @@ for(y in (proj_strt+1):(proj_end-1)) {
   # control rule
   stk_opt$catch[y,] <- hcr_opt(stk_opt$bexp,y)
   # project
-  out <- pdyn(SSB0,stk_opt$catch[1:y,],slope,M,mat,sel,wt,amin,amax)
+  out <- pdyn(SSB0,as.matrix(stk_opt$catch[1:y,]),slope,M,mat,sel,wt,amin,amax)
   stk_opt[[2]][y,]   <- out$bexp[y,] * catchability
   stk_opt[[3]][y,]   <- out$H[y,]
   stk_opt[[4]][y+1,] <- out$ssb[y+1,]
@@ -117,9 +114,11 @@ print(ggplot(dfr_opt)
   + ylab("SSB/K and Harvest") + xlab("Time")
   )
 
-# now work out performance statistic E[(TAC-theta)^2] for HCR
-eff_seq <- seq(500,10000,500)#10^(2:6)
-ryr_seq <- 1:10
+# PERFORMANCE SIMULATIONS
+
+nit <- 200
+eff_seq <- seq(1000,10000,1000)#10^(2:6)
+ryr_seq <- c(5,10,15,20,25,30)
 
 # simulate observation error
 load('../dat/cv_pred_func.Rdata')
@@ -137,9 +136,27 @@ for(e in 1:length(eff_seq)) {
       
 }
 
-# results array; dim=c(eff,hcr,iter)
+# results array; dim=c(eff,ryr,iter)
 rarr <- array(dim=c(length(eff_seq),length(ryr_seq),nit))
 dimnames(rarr) <- list(effort=eff_seq,ryr=ryr_seq,iter=1:nit)
+
+# get historic dynamics over iterations
+out <- pdyn(SSB0,catch_hist,slope,M,mat,sel,wt,amin,amax)
+
+stk_hist <- vector('list',4)
+names(stk_hist) <- c('catch','index','bexp','theta')
+stk_hist[[1]] <- matrix(NA,hist_nyr+proj_nyr,nit)
+stk_hist[[2]] <- matrix(NA,hist_nyr+proj_nyr,nit)
+stk_hist[[3]] <- matrix(NA,hist_nyr+proj_nyr,nit)
+stk_hist[[4]] <- matrix(NA,hist_nyr+proj_nyr,nit)
+
+for(i in 1:nit) {
+  stk_hist$catch[1:(hist_nyr+1),i] <- out$catch
+  stk_hist$index[1:(hist_nyr+1),i] <- out$bexp * catchability
+  stk_hist$bexp[1:(hist_nyr+1),i]  <- out$bexp
+}
+
+
 
 # HCR I: mean of historic survey index
 
@@ -156,7 +173,7 @@ for(e in 1:length(eff_seq)) {
 
   for(r in 1:length(ryr_seq)) {
 
-    stk_emp <- stk
+    stk_emp <- stk_hist
 
     for(y in (proj_strt+1):(proj_end-1)) {
     
@@ -168,10 +185,8 @@ for(e in 1:length(eff_seq)) {
     
       # project
       out <- pdyn(SSB0,stk_emp$catch[1:y,],slope,M,mat,sel,wt,amin,amax)
-      stk_emp[[2]][y,]   <- out$bexp[y,] * catchability * index_epsilon[e,y,]
-      stk_emp[[3]][y,]   <- out$H[y,]
-      stk_emp[[4]][y+1,] <- out$ssb[y+1,]
-      stk_emp[[5]][y+1,] <- out$bexp[y+1,]
+      stk_emp$index[y,]  <- out$bexp[y,] * catchability * index_epsilon[e,y,]
+      stk_emp$bexp[y+1,] <- out$bexp[y+1,]
     }
   
     rarr[e,r,] <- MSE(stk_emp)
@@ -202,9 +217,11 @@ save(rarr,rmat,hcr_emp,file='../res/hcr_emp.Rdata')
 
 hcr_reg <- function(index,year,ryr=1) {
 
-  tmp <- c(index[(year-ryr-1):(year-1)])
-  cf  <- coef(lm(tmp~c(1:(ryr+1))))
-  GB  <- sum(cf[1],cf[2] * (ryr+1),na.rm=TRUE) 
+  tmp <- index[(year-ryr-1):(year-1),]
+  GB  <- apply(tmp,2,function(x) {
+                      cf  <- coef(lm(x~c(1:(ryr+1))))
+                      sum(cf[1],cf[2] * (ryr+2),na.rm=TRUE) 
+                      })
   
   TAC <- (CTAR * GB)/ITAR 
   
@@ -215,28 +232,26 @@ for(e in 1:length(eff_seq)) {
 
   for(r in 1:length(ryr_seq)) {
 
-    for(i in 1:nit) {
+    stk_reg <- stk_hist
 
-      stk_reg <- stk
-
-      for(y in (proj_strt+1):(proj_end-1)) {
+    for(y in (proj_strt+1):(proj_end-1)) {
     
-        # control rule
-        stk_reg$catch[y] <- hcr_reg(stk_reg$index,y,ryr_seq[r])
-        stk_reg$theta[y] <- hcr_opt(stk_reg$bexp,y)
-      
-        # project
-        out <- pdyn(SSB0,stk_reg$catch[1:y],stk_reg$index[1:y],slope,M,mat,sel,wt,amin,amax)
-        stk_reg[[2]][y]   <- out$Bexp[y] * catchability * index_epsilon[e,y,i]
-        stk_reg[[3]][y]   <- out$H[y]
-        stk_reg[[4]][y+1] <- out$B[y+1]
-        stk_reg[[5]][y+1] <- out$Bexp[y+1]
-      }
+      cat(eff_seq[e],ryr_seq[r],y,'\n')
+  
+      # control rule
+      stk_reg$catch[y,] <- hcr_reg(stk_reg$index,y,ryr_seq[r])
+      stk_reg$theta[y,] <- hcr_opt(stk_reg$bexp,y)
     
-      rarr[e,r,i] <- 1/mean(((stk_reg[['theta']][(proj_strt+1):(proj_end-1)] - stk_reg[['catch']][(proj_strt+1):(proj_end-1)])[stk_reg[['H']][(proj_strt+1):(proj_end-1)]<1])^2)
+      # project
+      out <- pdyn(SSB0,stk_reg$catch[1:y,],slope,M,mat,sel,wt,amin,amax)
+      stk_reg$index[y,]  <- out$bexp[y,] * catchability * index_epsilon[e,y,]
+      stk_reg$bexp[y+1,] <- out$bexp[y+1,]
     }
+  
+    rarr[e,r,] <- MSE(stk_reg)
   }  
 }
+
 
 rmat <- apply(rarr,1:2,mean)
 windows(width=18)
@@ -254,95 +269,87 @@ abline(h=ryr_seq[ryr_max],lwd=2,lty=3)
 plot(ryr_seq,rmat[eff_max,],ylab='Efficiency',xlab='Retrospecitve years',main='',type='l')
 plot(eff_seq,rmat[,ryr_max],ylab='Efficiency',xlab='Survey effort',main='',type='l')
 savePlot(file='../res/hcr_reg.pdf',type='pdf')
-save(rarr,rmat,hcr_emp,file='../res/hcr_reg.Rdata')
+save(rarr,rmat,hcr_reg,file='../res/hcr_reg.Rdata')
+
+# HCR III: smoothed historic index
+hcr_smt <- function() {
+
+}
 
 
-<<label=hcr_sc2,echo=FALSE>>=
-hcr <- function(catch,index,year) {
+# HCR IV: model based control rule
+hcr_mdl <- function(catch,index,year,ryr=1) {
 
-  GB <- numeric(dim(catch)[6])
+  GB <- dim(catch)[2]
+  
+  index[1:(year-ryr-2),] <- NA
 
   for(i in 1:length(GB)) {
     # get estimated exploitable biomass from SRA
-    fit.sra <- optim(SSB0,fn = logl,catch=iter(catch,i),index=iter(index,i),hh=slope,M=m(gen),mat=mat(gen),sel=landings.sel(gen),wght=stock.wt(gen),amin=range(gen)['min'],amax=range(gen)['max'],method = "L-BFGS-B",lower = c(800),upper = c(1500),hessian = T)
-    out<-pdyn(B0=fit.sra$par,catch=iter(catch,i),index=iter(index,i),hh=slope,M=m(gen),mat=mat(gen),sel=landings.sel(gen),wght=stock.wt(gen),amin=range(gen)['min'],amax=range(gen)['max'])
-    GB[i] <- out$Bexp[year-1]
+    #optim(990,fn=logl,catch=stk_mdl$catch[1:(y-1),i],index=stk_mdl$index[1:(y-1),i]*rlnorm(40,0,0.1),hh=slope,M=M,mat=mat,sel=sel,wght=wt,amin=amin,amax=amax,method = "L-BFGS-B",lower = c(100),upper = c(10000)) 
+    B0 <- fit.sra(catch[1:(y-1),i],index[1:(y-1),i],slope,M,mat,sel,wt,amin,amax)$par 
+    #cat(B0,"\n")
+    GB[i] <- fit.func(B0,catch[1:(y-1),i],index[1:(y-1),i],slope,M,mat,sel,wt,amin,amax)$Ipred[year]
   }
-    
-  #if(GB<=BLIM) { TAC <- 0
-  #} else { if(GB>BLIM & GB<BTAR) { TAC <- (CTAR * (GB - BLIM))/(BTAR - BLIM) 
-  #} else { if(GB>=BTAR) { TAC <- (CTAR * GB)/BTAR
-  #}}}
-
-  TAC <- (CTAR * GB)/BTAR
-
-  ctrl <- fwdControl(data.frame(year=year,val=TAC[1],quantity="catch"))
-  ctrl@trgtArray <- array(dim=c(1,3,length(TAC)),dimnames=list(1,c("min","val","max"),iter=1:length(TAC)))
-  ctrl@trgtArray[,"val",] <- TAC 
   
-  return(ctrl)
-  
-}
-@
-
-<<echo=FALSE,term=FALSE>>=
-index    <- index_init
-stk_proj <- stk_init
-
-for(y in (proj_strt+1):proj_end) {
-  # control rule
-  ctrl <- hcr(catch(stk_proj)[,1:(y-1)],index[,1:(y-1)],y)
-  # project
-  stk_proj <- fwd(stk_proj,ctrl=ctrl,sr=list(model=sr_model,params=sr_params),sr.residuals=sr_resid)
-  # update survey index
-  index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * sel) * q.surv
-}
-
-index_sc2 <- index
-stk_sc2   <- stk_proj
-@
-
-<<label=hcr_sc3,echo=FALSE>>=
-hcr <- function(catch,index,year) {
-  
-  GB <- as.numeric(index[,year-1]) 
-  
-  #if(GB<=ILIM) { TAC <- 0
-  #} else { if(GB>ILIM & GB<ITAR) { TAC <- (CTAR * (GB - ILIM))/(ITAR - ILIM) 
-  #} else { if(GB>=ITAR) { TAC <- (CTAR * GB)/ITAR
-  #}}}
-
   TAC <- (CTAR * GB)/ITAR
 
-  ctrl <- fwdControl(data.frame(year=year,val=TAC[1],quantity="catch"))
-  ctrl@trgtArray <- array(dim=c(1,3,length(TAC)),dimnames=list(1,c("min","val","max"),iter=1:length(TAC)))
-  ctrl@trgtArray[,"val",] <- TAC 
-  
-  return(ctrl)
+  return(TAC)
   
 }
-@
 
-<<echo=FALSE,term=FALSE>>=
-index    <- index_init
-stk_proj <- stk_init
+# check out likelihood profile
+#tmp <- c()
+#er <- rlnorm(40,0,0.4)
+#tmp_catch <- stk_mdl$catch[1:40,1]
+#tmp_index <- stk_mdl$index[1:40,1]*er 
+#tmp_index[1:30] <- NA
+#for(B0 in seq(500,2000,100)) tmp <- c(tmp,logl(B0,tmp_catch,tmp_index,slope,M,mat,sel,wt,amin,amax))
+#plot(seq(500,2000,100),tmp,type='l')
 
-for(y in (proj_strt+1):proj_end) {
-  # control rule
-  ctrl <- hcr(catch(stk_proj)[,1:(y-1)],index[,1:(y-1)],y)
-  # project
-  stk_proj <- fwd(stk_proj,ctrl=ctrl,sr=list(model=sr_model,params=sr_params),sr.residuals=sr_resid)
-  # survey index
-  index[,y] <- quantSums(stock.n(stk_proj)[,y] * stock.wt(stk_proj)[,y] * sel) * q.surv
+for(e in 1:length(eff_seq)) {
+
+  for(r in 1:length(ryr_seq)) {
+
+    stk_mdl <- stk_hist
+
+    for(y in (proj_strt+1):(proj_end-1)) {
+    
+      cat(eff_seq[e],ryr_seq[r],y,'\n')
+  
+      # control rule
+      stk_mdl$catch[y,] <- hcr_mdl(stk_mdl$catch,stk_mdl$index,y,ryr_seq[r])
+      stk_mdl$theta[y,] <- hcr_opt(stk_mdl$bexp,y)
+    
+      # project
+      out <- pdyn(SSB0,stk_mdl$catch[1:y,],slope,M,mat,sel,wt,amin,amax)
+      stk_mdl$index[y,]  <- out$bexp[y,] * catchability * index_epsilon[e,y,]
+      stk_mdl$bexp[y+1,] <- out$bexp[y+1,]
+    }
+  
+    rarr[e,r,] <- MSE(stk_mdl)
+  }  
 }
 
-index_sc3 <- index
-stk_sc3   <- stk_proj
-@
 
-\begin{figure}
-\centering
-<<fig=TRUE,echo=FALSE>>=
+rmat <- apply(rarr,1:2,mean)
+windows(width=18)
+par(mfrow=c(1,3))
+image(y=ryr_seq,x=eff_seq,z=rmat,ylab='Retrospective years of data',xlab='Survey effort',main='Efficiency',cex.lab=1.5,cex.axis=1.5)
+contour(y=ryr_seq,x=eff_seq,z=rmat,add=T,labels='')
+
+eff_max <- which.max(apply(rmat,1,mean)) 
+ryr_max <- which.max(apply(rmat,2,mean))
+
+abline(v=eff_seq[eff_max],lwd=2,lty=3)
+abline(h=ryr_seq[ryr_max],lwd=2,lty=3)
+
+# include marginals
+plot(ryr_seq,rmat[eff_max,],ylab='Efficiency',xlab='Retrospecitve years',main='',type='l')
+plot(eff_seq,rmat[,ryr_max],ylab='Efficiency',xlab='Survey effort',main='',type='l')
+savePlot(file='../res/hcr_mdl.pdf',type='pdf')
+save(rarr,rmat,hcr_mdl,file='../res/hcr_mdl.Rdata')
+
 
 dfr_det <- data.frame(Time=1:proj_end, B1=c(quantSums(sweep(stk_sc1@stock.n * stk_sc1@stock.wt,1,catch.sel(gen),"*"))),B2=c(quantSums(sweep(stk_sc2@stock.n * stk_sc2@stock.wt,1,catch.sel(gen),"*"))),B3=c(quantSums(sweep(stk_sc3@stock.n * stk_sc3@stock.wt,1,catch.sel(gen),"*"))))
 

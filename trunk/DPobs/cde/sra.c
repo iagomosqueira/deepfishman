@@ -14,15 +14,17 @@
 using namespace std;
 
 // global functions
-void pop_dyn(double,double*,double*,double*);
-void pop_index(double,double*,double*,double*,double*);
-double pop_index_sigma(double*,double*);
+void pop_dyn(double);
+double* index_calc(double);
+double q_calc(double);
+double sigma_calc(double*,double*);
 
 // global variables
 int ymin,ymax,amin,amax,nyr,nag;
 double hh,*H,*M;
 double *mat,*wght,*sel;
-double *C,*I;
+double *C,*I,*B,*Bexp,*Ipred;
+
 double alp,bet;
 
 extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax) {
@@ -90,13 +92,13 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 
   // doubles
   double B0;
-  double sigma,sigma2;
+  double q,sigma,sigma2;
   double nLogLk;
 
-  double *B     = new double[nyr];  
-  double *Bexp  = new double[nyr];  
-  double *H     = new double[nyr];    
-  double *Ipred = new double[nyr];
+  B     = new double[nyr];  
+  Bexp  = new double[nyr];  
+  H     = new double[nyr];    
+  Ipred = new double[nyr];
 
   // initialise doubles
   B0 = NUMERIC_VALUE(R_B0);
@@ -105,18 +107,21 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   // :: initialise likelihood
   nLogLk = 0.;
   
+  // :: catchability
+  q = q_calc(B0);
+  
   // :: predicted index
-  pop_index(B0,B,Bexp,H,Ipred);
+  Ipred = index_calc(q);
   
   // :: calculate sigma
-  sigma = pop_index_sigma(I,Ipred);
+  sigma = sigma_calc(I,Ipred);
 
   // :: calculate negative log-likelihood
-  sigma2 = pow(sigma,2);
-  for(y=0;y<nyr;y++) {
+  for(y=0;y<(nyr-1);y++) {
     if(Ipred[y]>0. && I[y]>0.) {
-      nLogLk += log(sigma2) + pow(I[y]-Ipred[y],2.)/sigma2;
+      nLogLk += log(sigma) + 0.5 * pow(log(I[y]/Ipred[y])/sigma,2.);
     }
+    if(H[y]==1.) nLogLk += 100.;
   }
 
   ////////////
@@ -181,6 +186,11 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 
   setAttrib(_Ipred,R_NamesSymbol,dyr);
 
+  // catchability
+  SEXP _q;
+  PROTECT(_q = allocVector(REALSXP,1));
+  REAL(_q)[0] = q;
+
   // sigma
   SEXP _sigma;
   PROTECT(_sigma = allocVector(REALSXP,1));
@@ -203,27 +213,29 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 
   // create combined output list
   SEXP out;
-  PROTECT(out = allocVector(VECSXP,7));
+  PROTECT(out = allocVector(VECSXP,8));
   SET_VECTOR_ELT(out,0,_B);
   SET_VECTOR_ELT(out,1,_Bexp);
   SET_VECTOR_ELT(out,2,_H);
   SET_VECTOR_ELT(out,3,_Ipred);
-  SET_VECTOR_ELT(out,4,_sigma);
-  SET_VECTOR_ELT(out,5,_nLogLk);
-  SET_VECTOR_ELT(out,6,_srpar);
+  SET_VECTOR_ELT(out,4,_q);
+  SET_VECTOR_ELT(out,5,_sigma);
+  SET_VECTOR_ELT(out,6,_nLogLk);
+  SET_VECTOR_ELT(out,7,_srpar);
 
   // assign names
-  PROTECT(names = allocVector(STRSXP,7));
+  PROTECT(names = allocVector(STRSXP,8));
   SET_STRING_ELT(names,0,mkChar("B"));
   SET_STRING_ELT(names,1,mkChar("Bexp"));
   SET_STRING_ELT(names,2,mkChar("H"));
   SET_STRING_ELT(names,3,mkChar("Ipred"));
-  SET_STRING_ELT(names,4,mkChar("sigma"));
-  SET_STRING_ELT(names,5,mkChar("nLogLk"));
-  SET_STRING_ELT(names,6,mkChar("srpar"));
+  SET_STRING_ELT(names,4,mkChar("q"));
+  SET_STRING_ELT(names,5,mkChar("sigma"));
+  SET_STRING_ELT(names,6,mkChar("nLogLk"));
+  SET_STRING_ELT(names,7,mkChar("srpar"));
   setAttrib(out,R_NamesSymbol,names);
 
-  UNPROTECT(22);
+  UNPROTECT(23);
 
   // clean up
   delete[] B,Bexp,H,Ipred;
@@ -237,7 +249,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 // FUNCTIONS //
 ///////////////
 
-void pop_dyn(double B0,double *B,double *Bexp,double *H) { 
+void pop_dyn(double B0) { 
 
   int a,y;
 
@@ -318,39 +330,47 @@ void pop_dyn(double B0,double *B,double *Bexp,double *H) {
 
 }
 
-void pop_index(double B0,double *B,double *Bexp,double *H,double *Ipred) {
+double* index_calc(double q) {
+
+  int y;
+
+  for(y=0;y<nyr;y++) {
+    Ipred[y] = q*Bexp[y];
+  }
+  return(Ipred);
+}
+
+double q_calc(double B0) {
 
   int y;
   int n = 0;
 
-  double q = 0.;
   double tmp = 0.;
   
-  pop_dyn(B0,B,Bexp,H);
+  pop_dyn(B0);
 
-  for(y=0;y<nyr;y++) {
-    if(I[y]>0. && Bexp[y]>0.) {
+  for(y=0;y<(nyr-1);y++) {
+    if(I[y]>0. && Bexp[y]>0. && !ISNA(I[y])) {
       tmp += log(I[y]/Bexp[y]);
       n++;
     }
   }
 
-  if(n>0) q = exp(tmp/n);
-
-  for(y=0;y<nyr;y++) {
-    Ipred[y] = q*Bexp[y];
+  if(n>0) { return(exp(tmp/n));
+  } else {  return(0.);
   }
+
 }
 
-double pop_index_sigma(double *I,double *Ipred) {
+double sigma_calc(double *I,double *Ipred) {
 
   int y;
   int n = 0;
 
   double tmp = 0.;
   
-  for(y=0;y<nyr;y++) {
-    if(I[y]>0. && Ipred[y]>0. && !ISNA(Ipred[y])) {
+  for(y=0;y<(nyr-1);y++) {
+    if(I[y]>0. && Ipred[y]>0. && !ISNA(I[y]) && !ISNA(Ipred[y])) {
       tmp += pow(log(I[y]/Ipred[y]),2);
       n++;
     }

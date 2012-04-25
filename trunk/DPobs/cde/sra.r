@@ -2,7 +2,7 @@
 # Population dynamics
 dyn.load('../cde/sra.dll')
 dyn.load('../cde/sra_iter.dll')
-#dyn.unload('../cde/sra.dll')
+dyn.unload('../cde/sra.dll')
 
 pdyn <- function(B0,catch,hh,M,mat,sel,wght,amin,amax) {
   
@@ -49,13 +49,13 @@ fit.func <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
 
 logl <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
     
-  fit.func(B0,catch,index,hh,M,mat,sel,wght,amin,amax)[['nLogLk']]
+  fit.func(B0,catch,index,hh,M,mat,sel,wght,amin,amax)[['nLogLk']] #- dnorm(B0,SSB0,0.1)
 }
   
 fit.sra <- function(catch,index,hh,M,mat,sel,wght,amin,amax) {
-
-  fit <- optim(SSB0,fn = logl,catch,index,hh,M,mat,sel,wght,amin,amax,method = "L-BFGS-B",lower = c(800),upper = c(1500),hessian = T)
-  return(fit$par)
+  #browser()
+  fit <- optim(SSB0,fn = logl,catch=catch,index=index,hh=hh,M=M,mat=mat,sel=sel,wght=wght,amin=amin,amax=amax,method = "L-BFGS-B",lower = c(500),upper = c(2000))
+  return(fit)
 }  
 
 msy.sra <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
