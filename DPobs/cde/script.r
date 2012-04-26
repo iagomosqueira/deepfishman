@@ -1,6 +1,6 @@
+
+
 # efficiency of estimators
-
-
 library(FLAssess)
 library(FLH)
 library(ggplot2)
@@ -34,8 +34,9 @@ maxF <- maxFfactor * fmsy
 F1 <- maxF*sin(seq(from=0,to=2 * pi/3,length=hist_nyr))[-1]
 stk_hist <- as(gen, 'FLStock')
 stk_hist <- window(stk_hist,end=hist_nyr)
+stk_hist <- propagate(stk_hist,2)
 ctrl_F1 <- fwdControl(data.frame(year=2:hist_nyr, quantity="f",val=F1))
-sr_resid <- FLQuant(1,dimnames=list(age=1,year=dimnames(stock.n(stk_hist))$year,iter=dimnames(stock.n(stk_hist))$iter))
+sr_resid <- FLQuant(rlnorm(1,0,sqrt(log(cv.sr+1))),dimnames=list(age=1,year=dimnames(stock.n(stk_hist))$year,iter=dimnames(stock.n(stk_hist))$iter))
 stk_hist <- fwd(stk_hist, ctrl=ctrl_F1, sr=list(model=model(gen), params=params(gen)), sr.residuals=sr_resid)
 
 # get information
@@ -132,17 +133,27 @@ for(e in 1:length(eff_seq)) {
   for(y in 1:(hist_nyr+proj_nyr)) {
     for(i in 1:nit) {
       index_epsilon[e,y,i] <- rlnorm(1,0,sqrt(log(cv.index+1)))
-    }}
-      
+    }
+  }    
 }
+
+sr_epsilon <- array(dim=c(hist_nyr+proj_nyr,nit))
+cv.sr    <- 0.1
+  
+for(y in 1:(hist_nyr+proj_nyr)) {
+  for(i in 1:nit) {
+    sr_epsilon[y,i] <- rlnorm(1,0,sqrt(log(cv.sr+1)))
+  }    
+}
+
+
+
 
 # results array; dim=c(eff,ryr,iter)
 rarr <- array(dim=c(length(eff_seq),length(ryr_seq),nit))
 dimnames(rarr) <- list(effort=eff_seq,ryr=ryr_seq,iter=1:nit)
 
 # get historic dynamics over iterations
-out <- pdyn(SSB0,catch_hist,slope,M,mat,sel,wt,amin,amax)
-
 stk_hist <- vector('list',4)
 names(stk_hist) <- c('catch','index','bexp','theta')
 stk_hist[[1]] <- matrix(NA,hist_nyr+proj_nyr,nit)
@@ -150,12 +161,42 @@ stk_hist[[2]] <- matrix(NA,hist_nyr+proj_nyr,nit)
 stk_hist[[3]] <- matrix(NA,hist_nyr+proj_nyr,nit)
 stk_hist[[4]] <- matrix(NA,hist_nyr+proj_nyr,nit)
 
-for(i in 1:nit) {
-  stk_hist$catch[1:(hist_nyr+1),i] <- out$catch
-  stk_hist$index[1:(hist_nyr+1),i] <- out$bexp * catchability
-  stk_hist$bexp[1:(hist_nyr+1),i]  <- out$bexp
+out <- pdyn(SSB0,matrix(rep(catch_hist,nit),ncol=nit),slope,M,mat,sel,wt,amin,amax,sr_epsilon[1:hist_nyr,])
+stk_hist$catch[1:(hist_nyr+1),] <- out$catch
+stk_hist$index[1:(hist_nyr+1),] <- out$bexp * catchability
+stk_hist$bexp[1:(hist_nyr+1),]  <- out$bexp
+
+# HCR 0: known stock dynamics
+hcr_opt <- function(catch,srr,year) {
+
+  srr[year-1,] <- 1
+  GB <- pdyn(SSB0,catch[1:(year-1),],slope,M,mat,sel,wt,amin,amax,srr[1:(year-1),])$bexp[year,] * catchability
+  
+  TAC <- (CTAR * GB)/ITAR 
+  
+  return(TAC)
 }
 
+stk_opt <- stk_hist
+
+for(y in (proj_strt+1):(proj_end-1)) {
+
+  # control rule
+  stk_opt$catch[y,] <- hcr_opt(stk_opt$catch,sr_epsilon,y)
+
+  # project
+  out <- pdyn(SSB0,stk_opt$catch[1:y,],slope,M,mat,sel,wt,amin,amax,sr_epsilon[1:y,])
+  stk_opt$index[y+1,]  <- out$bexp[y+1,] * catchability
+  stk_opt$bexp[y+1,]   <- out$bexp[y+1,]
+}
+
+for(y in (proj_strt+1):(proj_end-1)) {
+
+  stk_opt$theta[y,] <- (CTAR * stk_opt$index[y,])/ITAR 
+
+}
+
+median(MSE(stk_opt))
 
 
 # HCR I: mean of historic survey index

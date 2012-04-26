@@ -2,9 +2,9 @@
 # Population dynamics
 dyn.load('../cde/sra.dll')
 dyn.load('../cde/sra_iter.dll')
-dyn.unload('../cde/sra.dll')
+#dyn.unload('../cde/sra.dll')
 
-pdyn <- function(B0,catch,hh,M,mat,sel,wght,amin,amax) {
+pdyn <- function(B0,catch,hh,M,mat,sel,wght,amin,amax,srr) {
   
   ymin     <- 1
   ymax     <- dim(catch)[1]
@@ -19,8 +19,10 @@ pdyn <- function(B0,catch,hh,M,mat,sel,wght,amin,amax) {
   wght   <- as.vector(wght)
   amin   <- as.numeric(amin)
   amax   <- as.numeric(amax)
+  
+  srr    <- as.vector(srr)
 
-  out <- .Call('run',B0,catch,hh,M,mat,sel,wght,amin,amax,ymin,ymax,nit)
+  out <- .Call('run',B0,catch,hh,M,mat,sel,wght,amin,amax,ymin,ymax,nit,srr)
   
   return(out)
 }

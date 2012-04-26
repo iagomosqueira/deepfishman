@@ -20,9 +20,9 @@ void pop_dyn(double);
 int ymin,ymax,amin,amax,nyr,nag,nit;
 double hh,*M;
 double *mat,*wght,*sel;
-double **C,**B,**Bexp,**H;
+double **C,**B,**Bexp,**H,**srr;
 
-extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax,SEXP R_nit) {
+extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax,SEXP R_nit,SEXP R_srr) {
 
   //local variables
   int a,y,i,p;
@@ -43,6 +43,7 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   PROTECT(R_ymin   = AS_NUMERIC(R_ymin));
   PROTECT(R_ymax   = AS_NUMERIC(R_ymax));
   PROTECT(R_nit    = AS_NUMERIC(R_nit));
+  PROTECT(R_srr    = AS_NUMERIC(R_srr));
   
   ////////////////
   // DIMENSIONS //
@@ -77,6 +78,18 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
     C[nyr-1][i] = NA_REAL;
   }
 
+  // srr
+  srr = new double*[nyr];
+  for(y=0;y<nyr;y++)
+    srr[y] =  new double[nit];
+    
+  p = 0;
+  for(i=0;i<nit;i++) {
+    for(y=0;y<(nyr-1);y++)
+      srr[y][i] = REAL(R_srr)[p++];
+    srr[nyr-1][i] = NA_REAL;
+  }
+  
   // steepness
   hh = NUMERIC_VALUE(R_hh);
  
@@ -171,7 +184,7 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   SET_STRING_ELT(names,3,mkChar("catch"));
   setAttrib(out,R_NamesSymbol,names);
 
-  UNPROTECT(21);
+  UNPROTECT(22);
 
   // clean up
   for(y=0;y<nyr;y++) {
@@ -250,7 +263,7 @@ void pop_dyn(double B0) {
 
     // recruitment
 
-    N[0][y][i] = alp * B[y-1][i]/(bet + B[y-1][i]);
+    N[0][y][i] = alp * B[y-1][i]/(bet + B[y-1][i]) * srr[y-1][i];
 
     // adult dynamics
 
