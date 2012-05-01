@@ -306,7 +306,7 @@ void pop_dyn(double B0) {
     for(a=1;a<nag;a++)
       N[a][y] = N[a-1][y-1]*exp(-M[a-1])*(1-sel[a-1]*H[y-1]);
     N[nag-1][y] = N[nag-1][y] + N[nag-1][y-1]*exp(-M[nag-1])*(1-sel[nag-1]*H[y-1]);
-    Rprintf("%i,%f\n",y-1,B[y-1]);
+    //Rprintf("%i,%f\n",y-1,B[y-1]);
   }
   
   // current biomass
