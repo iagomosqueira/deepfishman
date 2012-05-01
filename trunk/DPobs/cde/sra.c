@@ -235,12 +235,12 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   SET_STRING_ELT(names,7,mkChar("srpar"));
   setAttrib(out,R_NamesSymbol,names);
 
-  UNPROTECT(23);
+  UNPROTECT(24);
 
   // clean up
   delete[] B,Bexp,H,Ipred;
 
-  UNPROTECT(2);
+  UNPROTECT(1);
   return out;
   
 }
@@ -306,7 +306,7 @@ void pop_dyn(double B0) {
     for(a=1;a<nag;a++)
       N[a][y] = N[a-1][y-1]*exp(-M[a-1])*(1-sel[a-1]*H[y-1]);
     N[nag-1][y] = N[nag-1][y] + N[nag-1][y-1]*exp(-M[nag-1])*(1-sel[nag-1]*H[y-1]);
-
+    Rprintf("%i,%f\n",y-1,B[y-1]);
   }
   
   // current biomass
