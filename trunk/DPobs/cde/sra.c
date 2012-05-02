@@ -127,6 +127,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   ////////////
   // Output //
   ////////////
+  /*
   int p;
   int iAge,iYear;
   SEXP dag,dyr,names,dimnames,params,srnames;
@@ -195,12 +196,12 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   SEXP _sigma;
   PROTECT(_sigma = allocVector(REALSXP,1));
   REAL(_sigma)[0] = sigma;
-
+  */
   // -logLk
   SEXP _nLogLk;
   PROTECT(_nLogLk = allocVector(REALSXP,1));
   REAL(_nLogLk)[0] = nLogLk;
-  
+  /*
   // SR par
   SEXP _srpar;
   PROTECT(_srpar = allocVector(REALSXP,2));
@@ -210,21 +211,21 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   SET_STRING_ELT(srnames,0,mkChar("alpha"));
   SET_STRING_ELT(srnames,1,mkChar("beta"));
   setAttrib(_srpar,R_NamesSymbol,srnames);
-
+  */
   // create combined output list
-  SEXP out;
-  PROTECT(out = allocVector(VECSXP,8));
-  SET_VECTOR_ELT(out,0,_B);
-  SET_VECTOR_ELT(out,1,_Bexp);
-  SET_VECTOR_ELT(out,2,_H);
-  SET_VECTOR_ELT(out,3,_Ipred);
-  SET_VECTOR_ELT(out,4,_q);
-  SET_VECTOR_ELT(out,5,_sigma);
-  SET_VECTOR_ELT(out,6,_nLogLk);
-  SET_VECTOR_ELT(out,7,_srpar);
+  //SEXP out;
+  //PROTECT(out = allocVector(VECSXP,1));
+  //SET_VECTOR_ELT(out,0,_nLogLk);
+  //SET_VECTOR_ELT(out,1,_Bexp);
+  //SET_VECTOR_ELT(out,2,_H);
+  //SET_VECTOR_ELT(out,3,_Ipred);
+  //SET_VECTOR_ELT(out,4,_q);
+  //SET_VECTOR_ELT(out,5,_sigma);
+  //SET_VECTOR_ELT(out,6,_nLogLk);
+  //SET_VECTOR_ELT(out,7,_srpar);
 
   // assign names
-  PROTECT(names = allocVector(STRSXP,8));
+  /*PROTECT(names = allocVector(STRSXP,8));
   SET_STRING_ELT(names,0,mkChar("B"));
   SET_STRING_ELT(names,1,mkChar("Bexp"));
   SET_STRING_ELT(names,2,mkChar("H"));
@@ -234,14 +235,15 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   SET_STRING_ELT(names,6,mkChar("nLogLk"));
   SET_STRING_ELT(names,7,mkChar("srpar"));
   setAttrib(out,R_NamesSymbol,names);
-
-  UNPROTECT(24);
+  */
+  UNPROTECT(12);
 
   // clean up
   delete[] B,Bexp,H,Ipred;
 
   UNPROTECT(1);
-  return out;
+  //return out;
+  return _nLogLk;
   
 }
 
