@@ -25,8 +25,6 @@ double hh,*H,*M;
 double *mat,*wght,*sel;
 double *C,*I,*B,*Bexp,*Ipred;
 
-double alp,bet;
-
 extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax) {
 
   //local variables
@@ -92,7 +90,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 
   // doubles
   double B0;
-  double q,sigma,sigma2;
+  double q,sigma;
   double nLogLk;
 
   B     = new double[nyr];  
@@ -127,119 +125,25 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   ////////////
   // Output //
   ////////////
-  /*
-  int p;
-  int iAge,iYear;
-  SEXP dag,dyr,names,dimnames,params,srnames;
 
-  // create dimension names
-  PROTECT(dag = allocVector(INTSXP,nag));
-  for(iAge=amin,a=0;a<nag;iAge++,a++) {
-    INTEGER(dag)[a] = iAge;
-  }
-
-  PROTECT(dyr = allocVector(INTSXP,nyr));
-  for(iYear=ymin,y=0;y<nyr;iYear++,y++) {
-    INTEGER(dyr)[y] = iYear;
-  }
-
-  // B
-  SEXP _B;
-  PROTECT(_B = allocVector(REALSXP,nyr));
-
-  p=0;
-  for(y=0;y<nyr;y++) {
-    REAL(_B)[p++] = B[y];
-  }
-
-  setAttrib(_B,R_NamesSymbol,dyr);
-
-  // Bexp
-  SEXP _Bexp;
-  PROTECT(_Bexp = allocVector(REALSXP,nyr));
-
-  p=0;
-  for(y=0;y<nyr;y++) {
-    REAL(_Bexp)[p++] = Bexp[y];
-  }
-
-  setAttrib(_Bexp,R_NamesSymbol,dyr);
-
-  // H
-  SEXP _H;
-  PROTECT(_H = allocVector(REALSXP,nyr));
- 
-  p=0;
-  for(y=0;y<nyr;y++) {
-    REAL(_H)[p++] = H[y];
-  }
-
-  setAttrib(_H,R_NamesSymbol,dyr);
-
-  // Ipred
-  SEXP _Ipred;
-  PROTECT(_Ipred = allocVector(REALSXP,nyr));
- 
-  p=0;
-  for(y=0;y<nyr;y++) {
-    REAL(_Ipred)[p++] = Ipred[y];
-  }
-
-  setAttrib(_Ipred,R_NamesSymbol,dyr);
-
-  // catchability
-  SEXP _q;
-  PROTECT(_q = allocVector(REALSXP,1));
-  REAL(_q)[0] = q;
-
-  // sigma
-  SEXP _sigma;
-  PROTECT(_sigma = allocVector(REALSXP,1));
-  REAL(_sigma)[0] = sigma;
-  */
   // -logLk
   SEXP _nLogLk;
   PROTECT(_nLogLk = allocVector(REALSXP,1));
   REAL(_nLogLk)[0] = nLogLk;
-  /*
-  // SR par
-  SEXP _srpar;
-  PROTECT(_srpar = allocVector(REALSXP,2));
-  REAL(_srpar)[0] = alp;
-  REAL(_srpar)[1] = bet;
-  PROTECT(srnames = allocVector(STRSXP,2));
-  SET_STRING_ELT(srnames,0,mkChar("alpha"));
-  SET_STRING_ELT(srnames,1,mkChar("beta"));
-  setAttrib(_srpar,R_NamesSymbol,srnames);
-  */
-  // create combined output list
-  //SEXP out;
-  //PROTECT(out = allocVector(VECSXP,1));
-  //SET_VECTOR_ELT(out,0,_nLogLk);
-  //SET_VECTOR_ELT(out,1,_Bexp);
-  //SET_VECTOR_ELT(out,2,_H);
-  //SET_VECTOR_ELT(out,3,_Ipred);
-  //SET_VECTOR_ELT(out,4,_q);
-  //SET_VECTOR_ELT(out,5,_sigma);
-  //SET_VECTOR_ELT(out,6,_nLogLk);
-  //SET_VECTOR_ELT(out,7,_srpar);
 
-  // assign names
-  /*PROTECT(names = allocVector(STRSXP,8));
-  SET_STRING_ELT(names,0,mkChar("B"));
-  SET_STRING_ELT(names,1,mkChar("Bexp"));
-  SET_STRING_ELT(names,2,mkChar("H"));
-  SET_STRING_ELT(names,3,mkChar("Ipred"));
-  SET_STRING_ELT(names,4,mkChar("q"));
-  SET_STRING_ELT(names,5,mkChar("sigma"));
-  SET_STRING_ELT(names,6,mkChar("nLogLk"));
-  SET_STRING_ELT(names,7,mkChar("srpar"));
-  setAttrib(out,R_NamesSymbol,names);
-  */
   UNPROTECT(12);
 
   // clean up
-  delete[] B,Bexp,H,Ipred;
+  delete[] mat;
+  delete[] wght;
+  delete[] sel;
+  delete[] H;
+  delete[] M;
+  delete[] C;
+  delete[] I;
+  delete[] B;
+  delete[] Bexp;
+  delete[] Ipred;
 
   UNPROTECT(1);
   //return out;
@@ -254,6 +158,8 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 void pop_dyn(double B0) { 
 
   int a,y;
+  
+  double alp,bet;
 
   double rho = 0.;
   double *P = new double[nag];
