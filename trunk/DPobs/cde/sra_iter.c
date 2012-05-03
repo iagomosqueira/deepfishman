@@ -21,6 +21,7 @@ int ymin,ymax,amin,amax,nyr,nag,nit;
 double hh,*M;
 double *mat,*wght,*sel;
 double **C,**B,**Bexp,**H,**srr;
+double alp,bet;
 
 extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax,SEXP R_nit,SEXP R_srr) {
 
@@ -125,7 +126,7 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   // Output //
   ////////////
   int iYear,iIter;
-  SEXP dyr,dit,names,dimnames;
+  SEXP dyr,dit,names,dimnames,srnames;
 
   PROTECT(dyr = allocVector(INTSXP,nyr));
   for(iYear=ymin,y=0;y<nyr;iYear++,y++) {
@@ -167,24 +168,36 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   setAttrib(_Bexp,R_DimNamesSymbol,dimnames);
   setAttrib(_H,R_DimNamesSymbol,dimnames);
   setAttrib(_C,R_DimNamesSymbol,dimnames);
+  
+  // SR par
+  SEXP _srpar;
+  PROTECT(_srpar = allocVector(REALSXP,2));
+  REAL(_srpar)[0] = alp;
+  REAL(_srpar)[1] = bet;
+  PROTECT(srnames = allocVector(STRSXP,2));
+  SET_STRING_ELT(srnames,0,mkChar("alpha"));
+  SET_STRING_ELT(srnames,1,mkChar("beta"));
+  setAttrib(_srpar,R_NamesSymbol,srnames);
 
   // create combined output list
   SEXP out;
-  PROTECT(out = allocVector(VECSXP,4));
+  PROTECT(out = allocVector(VECSXP,5));
   SET_VECTOR_ELT(out,0,_B);
   SET_VECTOR_ELT(out,1,_Bexp);
   SET_VECTOR_ELT(out,2,_H);
   SET_VECTOR_ELT(out,3,_C);
+  SET_VECTOR_ELT(out,4,_srpar);
 
   // assign names
-  PROTECT(names = allocVector(STRSXP,4));
+  PROTECT(names = allocVector(STRSXP,5));
   SET_STRING_ELT(names,0,mkChar("ssb"));
   SET_STRING_ELT(names,1,mkChar("bexp"));
   SET_STRING_ELT(names,2,mkChar("H"));
   SET_STRING_ELT(names,3,mkChar("catch"));
+  SET_STRING_ELT(names,4,mkChar("srpar"));
   setAttrib(out,R_NamesSymbol,names);
 
-  UNPROTECT(22);
+  UNPROTECT(24);
 
   // clean up
   for(y=0;y<nyr;y++) {
@@ -192,11 +205,13 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
     delete[] Bexp[y];
     delete[] H[y];
     delete[] C[y];
+    delete[] srr[y];
   }
   delete[] B;
   delete[] Bexp;
   delete[] H;
   delete[] C;
+  delete[] srr;
 
   UNPROTECT(1);
   return out;
@@ -210,7 +225,6 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
 void pop_dyn(double B0) { 
 
   int a,y,i;
-  double alp,bet;
 
   double rho = 0.;
   double *P = new double[nag];

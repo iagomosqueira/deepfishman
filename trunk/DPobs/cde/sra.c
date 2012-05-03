@@ -14,16 +14,13 @@
 using namespace std;
 
 // global functions
-void pop_dyn(double);
-double* index_calc(double);
-double q_calc(double);
-double sigma_calc(double*,double*);
+double* pop_dyn(double,double,double*,double*,double*,double*,double*);
+double  q_calc(double*,double*);
+double* index_calc(double,double*);
+double  sigma_calc(double*,double*);
 
 // global variables
-int ymin,ymax,amin,amax,nyr,nag;
-double hh,*H,*M;
-double *mat,*wght,*sel;
-double *C,*I,*B,*Bexp,*Ipred;
+int ymin,ymax,amin,amax,nyr,nag,lpen;
 
 extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax) {
 
@@ -64,64 +61,57 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   ///////////////////
  
   // catch
-  C = REAL(R_catch);
+  double* C = REAL(R_catch);
 
   // index
-  I = REAL(R_index);
+  double* I = REAL(R_index);
 
   // steepness
-  hh = NUMERIC_VALUE(R_hh);
+  double hh = NUMERIC_VALUE(R_hh);
  
   // natural mortality
-  M = REAL(R_M);
+  double* M = REAL(R_M);
 
   // maturity-at-age
-  mat = REAL(R_mat);
+  double* mat = REAL(R_mat);
 
   // weight-at-age
-  wght = REAL(R_wght);
+  double* wght = REAL(R_wght);
 
   // selectivity
-  sel = REAL(R_sel);
+  double* sel = REAL(R_sel);
   
   ///////////////
   // RUN MODEL //
   ///////////////
 
-  // doubles
-  double B0;
-  double q,sigma;
-  double nLogLk;
-
-  B     = new double[nyr];  
-  Bexp  = new double[nyr];  
-  H     = new double[nyr];    
-  Ipred = new double[nyr];
-
-  // initialise doubles
-  B0 = NUMERIC_VALUE(R_B0);
+  // initialise SSB
+  double B0 = NUMERIC_VALUE(R_B0);
   
   // run model
-  // :: initialise likelihood
-  nLogLk = 0.;
+  lpen = 0.;
+  double* Bexp = pop_dyn(B0,hh,M,mat,wght,sel,C);
   
   // :: catchability
-  q = q_calc(B0);
+  double q = q_calc(I,Bexp);
   
   // :: predicted index
-  Ipred = index_calc(q);
+  double* Ipred = index_calc(q,Bexp);
   
   // :: calculate sigma
-  sigma = sigma_calc(I,Ipred);
+  double sigma = sigma_calc(I,Ipred);
 
   // :: calculate negative log-likelihood
+  double nLogLk = 0.;
   for(y=0;y<(nyr-1);y++) {
-    if(Ipred[y]>0. && I[y]>0.) {
+    if(Ipred[y]>0. && I[y]>0. && !ISNA(Ipred[y]) && !ISNA(I[y])) {
       nLogLk += log(sigma) + 0.5 * pow(log(I[y]/Ipred[y])/sigma,2.);
     }
-    if(H[y]==1.) nLogLk += 100.;
   }
-
+  // :: add penalty
+  nLogLk += lpen;
+  
+  
   ////////////
   // Output //
   ////////////
@@ -137,14 +127,12 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   delete[] mat;
   delete[] wght;
   delete[] sel;
-  delete[] H;
   delete[] M;
   delete[] C;
   delete[] I;
-  delete[] B;
-  delete[] Bexp;
   delete[] Ipred;
-
+  delete[] Bexp;
+  
   UNPROTECT(1);
   //return out;
   return _nLogLk;
@@ -155,7 +143,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 // FUNCTIONS //
 ///////////////
 
-void pop_dyn(double B0) { 
+double* pop_dyn(double B0,double hh,double* M,double* mat,double* wght,double* sel,double* C) { 
 
   int a,y;
   
@@ -169,6 +157,10 @@ void pop_dyn(double B0) {
   for(a=0;a<nag;a++) {
     N[a] = new double[nyr];
   }
+  
+  double* B    = new double[nyr];
+  double* Bexp = new double[nyr];
+  double* H    = new double[nyr];
 
   // set up eqm population
   P[0]=1;
@@ -228,6 +220,10 @@ void pop_dyn(double B0) {
   // current H
   H[nyr-1] = 0.;
   
+  // ll penalty
+  for(y=0;y<nyr;y++)
+    if(H[y]==1.) lpen += 100.;
+  
   // clean up
   delete[] P;
 
@@ -235,12 +231,18 @@ void pop_dyn(double B0) {
     delete[] N[a];
   }
   delete[] N;
+  delete[] H;
+  delete[] B;
+  
+  return(Bexp);
 
 }
 
-double* index_calc(double q) {
+double* index_calc(double q,double* Bexp) {
 
   int y;
+  
+  double* Ipred = new double[nyr];
 
   for(y=0;y<nyr;y++) {
     Ipred[y] = q*Bexp[y];
@@ -248,14 +250,12 @@ double* index_calc(double q) {
   return(Ipred);
 }
 
-double q_calc(double B0) {
+double q_calc(double* I,double* Bexp) {
 
   int y;
   int n = 0;
 
   double tmp = 0.;
-  
-  pop_dyn(B0);
 
   for(y=0;y<(nyr-1);y++) {
     if(I[y]>0. && Bexp[y]>0. && !ISNA(I[y])) {
