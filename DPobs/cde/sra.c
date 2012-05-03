@@ -14,10 +14,10 @@
 using namespace std;
 
 // global functions
-double* pop_dyn(double,double,double*,double*,double*,double*,double*);
-double  q_calc(double*,double*);
-double* index_calc(double,double*);
-double  sigma_calc(double*,double*);
+void pop_dyn(double*,double,double,double*,double*,double*,double*,double*);
+double q_calc(double*,double*);
+void index_calc(double*,double,double*);
+double sigma_calc(double*,double*);
 
 // global variables
 int ymin,ymax,amin,amax,nyr,nag,lpen;
@@ -54,15 +54,18 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 
   ymin = INTEGER_VALUE(R_ymin);
   ymax = INTEGER_VALUE(R_ymax);
-  nyr  = ymax - ymin + 2;
+  nyr  = ymax - ymin + 1;
   
   ///////////////////
   // PRELIMINARIES //
   ///////////////////
- 
+  
+  // initialise SSB
+  double B0 = NUMERIC_VALUE(R_B0);
+  
   // catch
   double* C = REAL(R_catch);
-
+  
   // index
   double* I = REAL(R_index);
 
@@ -81,36 +84,43 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   // selectivity
   double* sel = REAL(R_sel);
   
+  UNPROTECT(12);
+  
   ///////////////
   // RUN MODEL //
   ///////////////
-
-  // initialise SSB
-  double B0 = NUMERIC_VALUE(R_B0);
   
   // run model
   lpen = 0.;
-  double* Bexp = pop_dyn(B0,hh,M,mat,wght,sel,C);
-  
+  double* Bexp = new double[nyr];
+  pop_dyn(Bexp,B0,hh,M,mat,wght,sel,C);
+  //Rprintf("Bexp: ");
+  //for(y=0;y<nyr;y++) Rprintf("%f; ",Bexp[y]);
+  //Rprintf("\n");
   // :: catchability
   double q = q_calc(I,Bexp);
-  
+  //Rprintf("q: %f\n",q);
   // :: predicted index
-  double* Ipred = index_calc(q,Bexp);
-  
+  double* Ipred = new double[nyr];
+  index_calc(Ipred,q,Bexp);
+  //Rprintf("Ipred: ");
+  //for(y=0;y<nyr;y++) Rprintf("%f; ",Ipred[y]);
+  //Rprintf("\n");
   // :: calculate sigma
   double sigma = sigma_calc(I,Ipred);
-
+  //Rprintf("sigma: %f\n",q);
   // :: calculate negative log-likelihood
   double nLogLk = 0.;
-  for(y=0;y<(nyr-1);y++) {
+  for(y=0;y<nyr;y++) {
     if(Ipred[y]>0. && I[y]>0. && !ISNA(Ipred[y]) && !ISNA(I[y])) {
       nLogLk += log(sigma) + 0.5 * pow(log(I[y]/Ipred[y])/sigma,2.);
+      //Rprintf("%i: %f; %f; %f\n",y,I[y],Ipred[y],nLogLk);
     }
   }
   // :: add penalty
   nLogLk += lpen;
   
+  //Rprintf("lengths\n C:%i;\n I:%i;\n M:%i;\n mat:%i;\n wght:%i;\n sel:%i;\n\n nag:%i;\n nyr:%i\n",LENGTH(R_catch),LENGTH(R_index),LENGTH(R_M),LENGTH(R_mat),LENGTH(R_wght),LENGTH(R_sel),nag,nyr);
   
   ////////////
   // Output //
@@ -120,8 +130,6 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
   SEXP _nLogLk;
   PROTECT(_nLogLk = allocVector(REALSXP,1));
   REAL(_nLogLk)[0] = nLogLk;
-
-  UNPROTECT(12);
 
   // clean up
   delete[] mat;
@@ -143,7 +151,7 @@ extern "C" SEXP fit(SEXP R_B0,SEXP R_catch,SEXP R_index,SEXP R_hh,SEXP R_M,SEXP 
 // FUNCTIONS //
 ///////////////
 
-double* pop_dyn(double B0,double hh,double* M,double* mat,double* wght,double* sel,double* C) { 
+void pop_dyn(double* Bexp,double B0,double hh,double* M,double* mat,double* wght,double* sel,double* C) { 
 
   int a,y;
   
@@ -159,7 +167,6 @@ double* pop_dyn(double B0,double hh,double* M,double* mat,double* wght,double* s
   }
   
   double* B    = new double[nyr];
-  double* Bexp = new double[nyr];
   double* H    = new double[nyr];
 
   // set up eqm population
@@ -178,52 +185,52 @@ double* pop_dyn(double B0,double hh,double* M,double* mat,double* wght,double* s
   alp = (4*hh*R0)/(5*hh-1);
   bet = B0*(1-hh)/(5*hh-1);
   
-  // Loop through the years
+  // Initial biomass
+  B[0] = 0.;
+  Bexp[0] = 0.;
+  for(a=0;a<nag;a++) {
+    B[0] += N[a][0] * mat[a] * wght[a];
+    Bexp[0] += N[a][0] * sel[a] * wght[a] * exp(-M[a]/2.);
+  }
 
+  // Initial harvest
+  H[0] = 1.;
+  if(Bexp[0]>0.) H[0]    = C[0] / Bexp[0];
+  if(H[0]<0.)    H[0]    = 0.;
+  if(H[0]>1.)    H[0]    = 1.;
+  if(H[0]>0.)    Bexp[0] = C[0] / H[0];
+
+  
+  // Loop through the years
   for(y=1;y<nyr;y++) {
   
-    // biomass
-    B[y-1] = 0.;
-    Bexp[y-1] = 0.;
-    for(a=0;a<nag;a++) {
-      B[y-1] += N[a][y-1] * mat[a] * wght[a];
-      Bexp[y-1] += N[a][y-1] * sel[a] * wght[a] * exp(-M[a]/2.);
-    }
-
-    // harvest
-    H[y-1] = 1.;
-    if(Bexp[y-1]>0.) H[y-1] = C[y-1] / Bexp[y-1];
-    if(H[y-1]<0.)    H[y-1] = 0.;
-    if(H[y-1]>1.)    H[y-1] = 1.;
-    if(H[y-1]>0.)    Bexp[y-1] = C[y-1] / H[y-1];
-
     // recruitment
-
     N[0][y] = alp * B[y-1]/(bet + B[y-1]);
 
     // adult dynamics
-
     for(a=1;a<nag;a++)
       N[a][y] = N[a-1][y-1]*exp(-M[a-1])*(1-sel[a-1]*H[y-1]);
     N[nag-1][y] = N[nag-1][y] + N[nag-1][y-1]*exp(-M[nag-1])*(1-sel[nag-1]*H[y-1]);
-    //Rprintf("%i,%f\n",y-1,B[y-1]);
-  }
-  
-  // current biomass
-  B[nyr-1] = 0.;
-  Bexp[nyr-1] = 0.;
-  for(a=0;a<nag;a++) {
-    B[nyr-1] += N[a][nyr-1] * mat[a] * wght[a];
-    Bexp[nyr-1] += N[a][nyr-1] * sel[a] * wght[a] * exp(-M[a]/2.);
-  }
-  
-  // current H
-  H[nyr-1] = 0.;
-  
-  // ll penalty
-  for(y=0;y<nyr;y++)
+    
+    // biomass
+    B[y] = 0.;
+    Bexp[y] = 0.;
+    for(a=0;a<nag;a++) {
+      B[y] += N[a][y] * mat[a] * wght[a];
+      Bexp[y] += N[a][y] * sel[a] * wght[a] * exp(-M[a]/2.);
+    }
+    
+    // harvest
+    H[y] = 1.;
+    if(Bexp[y]>0.) H[y]    = C[y] / Bexp[y];
+    if(H[y]<0.)    H[y]    = 0.;
+    if(H[y]>1.)    H[y]    = 1.;
+    if(H[y]>0.)    Bexp[y] = C[y] / H[y];
+    
+    // ll penalty
     if(H[y]==1.) lpen += 100.;
-  
+  }
+
   // clean up
   delete[] P;
 
@@ -233,21 +240,16 @@ double* pop_dyn(double B0,double hh,double* M,double* mat,double* wght,double* s
   delete[] N;
   delete[] H;
   delete[] B;
-  
-  return(Bexp);
 
 }
 
-double* index_calc(double q,double* Bexp) {
+void index_calc(double* Ipred,double q,double* Bexp) {
 
   int y;
-  
-  double* Ipred = new double[nyr];
 
   for(y=0;y<nyr;y++) {
     Ipred[y] = q*Bexp[y];
   }
-  return(Ipred);
 }
 
 double q_calc(double* I,double* Bexp) {
@@ -257,7 +259,7 @@ double q_calc(double* I,double* Bexp) {
 
   double tmp = 0.;
 
-  for(y=0;y<(nyr-1);y++) {
+  for(y=0;y<nyr;y++) {
     if(I[y]>0. && Bexp[y]>0. && !ISNA(I[y])) {
       tmp += log(I[y]/Bexp[y]);
       n++;
@@ -277,7 +279,7 @@ double sigma_calc(double *I,double *Ipred) {
 
   double tmp = 0.;
   
-  for(y=0;y<(nyr-1);y++) {
+  for(y=0;y<nyr;y++) {
     if(I[y]>0. && Ipred[y]>0. && !ISNA(I[y]) && !ISNA(Ipred[y])) {
       tmp += pow(log(I[y]/Ipred[y]),2);
       n++;
