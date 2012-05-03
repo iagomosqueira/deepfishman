@@ -27,12 +27,11 @@ pdyn <- function(B0,catch,hh,M,mat,sel,wght,amin,amax,srr) {
   return(out)
 }
 
-fit.func <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
-  
-  #browser()
+logl <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
+    
   ymin     <- 1
   ymax     <- length(catch)
-  #browser()
+
   B0     <- as.numeric(B0)
   catch  <- as.vector(catch)
   index  <- as.vector(index)
@@ -43,26 +42,32 @@ fit.func <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
   wght   <- as.vector(wght)
   amin   <- as.numeric(amin)
   amax   <- as.numeric(amax)
-  #browser()
-  out <- .Call('fit',B0,catch,index,hh,M,mat,sel,wght,amin,amax,ymin,ymax)
-  
-  return(out)
-}
 
-logl <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
-    
-  fit.func(B0,catch,index,hh,M,mat,sel,wght,amin,amax)[['nLogLk']] #- dnorm(B0,SSB0,0.1)
+  ll <- .Call('fit',B0,catch,index,hh,M,mat,sel,wght,amin,amax,ymin,ymax)
+  
+  return(ll)
+
 }
   
 fit.sra <- function(catch,index,hh,M,mat,sel,wght,amin,amax) {
-  #browser()
-  fit <- optim(SSB0,fn = logl,catch=catch,index=index,hh=hh,M=M,mat=mat,sel=sel,wght=wght,amin=amin,amax=amax,method = "L-BFGS-B",lower = c(500),upper = c(2000))
-  return(fit)
+  
+  fit <- DEoptim(fn = logl,catch=catch,index=index,hh=hh,M=M,mat=mat,sel=sel,wght=wght,amin=amin,amax=amax,lower = 500,upper = 2000,control = DEoptim.control(itermax=100,trace=F))
+  return(fit$optim$bestmem[[1]])
+}
+
+ipred.sra <- function(catch,index,hh,M,mat,sel,wght,amin,amax) {
+
+  B0 <- fit.sra(catch,index,hh,M,mat,sel,wght,amin,amax)
+  ipred <- pdyn(B0,matrix(catch,ncol=1),hh,M,mat,sel,wght,amin,amax,matrix(1,length(catch),1))$bexp * catchability
+  
+  if(isTRUE(all.equal(B0,500))  || isTRUE(all.equal(B0,2000)) ) { return(stop(simpleError('opt failure'))) #ipred[] <- as.numeric(NA)}
+  } else { return(ipred)
+  }
 }  
 
-msy.sra <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
+msy.sra <- function(B0,catch,hh,M,mat,sel,wght,amin,amax) {
 
-  tmp <- fit.func(B0,catch,index,hh,M,mat,sel,wght,amin,amax)
+  tmp <- pdyn(B0,catch,hh,M,mat,sel,wght,amin,amax,matrix(1,nrow=nrow(catch),ncol=ncol(catch)))
   alp <- tmp$srpar['alpha']
   bet <- tmp$srpar['beta']
   
@@ -99,12 +104,32 @@ msy.sra <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
 #  }
 #)
 
-MSE <- function(stk) {
+# efficiency: 1/MSE
+efficiency <- function(stk) {
   
-  tmp <- stk[['theta']][(proj_strt+1):(proj_end-1),] - stk[['catch']][(proj_strt+1):(proj_end-1),]
-  apply(tmp,2,function(x) 1/mean(x^2))
+  xx <- stk[['theta']][(proj_strt+1):(proj_end-1),] - stk[['catch']][(proj_strt+1):(proj_end-1),]
+  yy <- stk[['bexp']][(proj_strt+1):(proj_end-1),]
+  xx[yy<1e-3] <- NA
+  apply(xx,2,function(x) 1/mean(x^2,na.rm=T))
 
 }
+
+# data entropy                                                       
+H <- function(stk,year,ryr,cv) {
+
+  # residual error
+  xx <- exp(stk[['index']][(year-ryr-1):(year-1),] - stk[['bexp']][(year-ryr-1):(year-1),] * catchability)
+  yy <- stk[['bexp']][(year-ryr-1):(year-1),]
+  xx[yy<1e-3] <- NA
+  apply(xx,2,function(x) -sum(dlnorm(x,0,sqrt(log(cv+1)))*log2(dlnorm(x,0,sqrt(log(cv+1)))),na.rm=T))
+}
+
+entropy <- function(stk) {
+
+  xx <- stk[['entropy']][(proj_strt+1):(proj_end-1),]
+  apply(xx,2,mean,na.rm=T)
+}
+
 
 
 
