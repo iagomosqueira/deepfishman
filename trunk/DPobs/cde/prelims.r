@@ -2,9 +2,9 @@
 library(FLAssess)
 library(FLH)
 #library(ggplot2)
-library(xtable)
-library(mvtnorm)
-library(DEoptim)
+#library(xtable)
+#library(mvtnorm)
+#library(DEoptim)
 
 source("sra.r")
 
@@ -27,7 +27,7 @@ gen <- genBRP(age=1:maxage, Linf=Linf, k=k, a1=a1, sL=sL, sR=sR, mat95=mat95, s=
 # run historic dynamics
 hist_nyr <- 40
 nit <- 20
-cv.sr <- 0.2
+cv.sr <- 0.01
 fmsy <- c(refpts(gen)[,'harvest'])[4]
 maxFfactor <- 2
 maxF <- maxFfactor * fmsy
@@ -44,8 +44,8 @@ wt <- as.vector(stock.wt(gen))
 M <- as.vector(m(gen))
 mat <- as.vector(mat(gen))
 sel <- as.vector(catch.sel(gen))
-amin <- range(gen)['min']
-amax <- range(gen)['max']
+amin <- range(gen)[['min']]
+amax <- range(gen)[['max']]
 
 # Now we set up for management simulation
 proj_nyr  <- 60

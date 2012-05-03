@@ -270,7 +270,8 @@ hcr_mdl <- function(catch,index,year,ryr=1) {
   #cat('off we go\n')
   # get predicted CPUE from SRA
   for(i in 1:length(GB)) {
-      GB[i] <- tryCatch(ipred.sra(catch[1:(year-1),i],index[1:(year-1),i],slope,M,mat,sel,wt,amin,amax)[year],error = function(e) return(catch[year-1,i] * ITAR/CTAR))
+      #GB[i] <- tryCatch(ipred.sra(catch[1:(year-1),i],index[1:(year-1),i],slope,M,mat,sel,wt,amin,amax)[year],error = function(e) return(catch[year-1,i] * ITAR/CTAR))
+      GB[i] <- ipred.sra(catch[1:(year-1),i],index[1:(year-1),i],slope,M,mat,sel,wt,amin,amax,year)
       #cat(i,'ok\n')
       #browser()
   }
@@ -290,7 +291,7 @@ for(e in 1:length(eff_seq)) {
     stk$index[1:(proj_strt+1),] <- stk$index[1:(proj_strt+1),] * index_epsilon[e,1:(proj_strt+1),]
     
     cat(eff_seq[e],ryr_seq[r],'\n')
-    
+
     for(y in (proj_strt+1):(proj_end-1)) {
     
       # control rule
@@ -309,8 +310,9 @@ for(e in 1:length(eff_seq)) {
 
     }
     
-    rarr[e,r,] <- efficiency(stk_mdl)
-    earr[e,r,] <- entropy(stk_mdl)
+    rarr[e,r,] <- efficiency(stk)
+    earr[e,r,] <- entropy(stk)
+    save(earr,rarr,file='../res/hcr_mdl.Rdata')
   }  
 }
 

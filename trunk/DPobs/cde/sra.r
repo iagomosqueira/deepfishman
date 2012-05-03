@@ -1,8 +1,8 @@
 
 # Population dynamics
-dyn.load('../cde/sra.dll')
-dyn.load('../cde/sra_iter.dll')
-#dyn.unload('../cde/sra.dll')
+dyn.load('sra.dll')
+dyn.load('sra_iter.dll')
+#dyn.unload('sra.dll')
 
 pdyn <- function(B0,catch,hh,M,mat,sel,wght,amin,amax,srr) {
   
@@ -19,7 +19,7 @@ pdyn <- function(B0,catch,hh,M,mat,sel,wght,amin,amax,srr) {
   wght   <- as.vector(wght)
   amin   <- as.numeric(amin)
   amax   <- as.numeric(amax)
-  
+  srr    <- srr[ymin:ymax,]
   srr    <- as.vector(srr)
 
   out <- .Call('run',B0,catch,hh,M,mat,sel,wght,amin,amax,ymin,ymax,nit,srr)
@@ -42,7 +42,7 @@ logl <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
   wght   <- as.vector(wght)
   amin   <- as.numeric(amin)
   amax   <- as.numeric(amax)
-
+  
   ll <- .Call('fit',B0,catch,index,hh,M,mat,sel,wght,amin,amax,ymin,ymax)
   
   return(ll)
@@ -51,17 +51,17 @@ logl <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
   
 fit.sra <- function(catch,index,hh,M,mat,sel,wght,amin,amax) {
   
-  fit <- DEoptim(fn = logl,catch=catch,index=index,hh=hh,M=M,mat=mat,sel=sel,wght=wght,amin=amin,amax=amax,lower = 500,upper = 2000,control = DEoptim.control(itermax=100,trace=F))
-  return(fit$optim$bestmem[[1]])
+  fit <- optim(SSB0,fn = logl,catch=catch,index=index,hh=hh,M=M,mat=mat,sel=sel,wght=wght,amin=amin,amax=amax,method="L-BFGS-B",lower = 500,upper = 2000)
+  return(fit$par)
 }
 
-ipred.sra <- function(catch,index,hh,M,mat,sel,wght,amin,amax) {
+ipred.sra <- function(catch,index,hh,M,mat,sel,wght,amin,amax,year) {
 
   B0 <- fit.sra(catch,index,hh,M,mat,sel,wght,amin,amax)
   ipred <- pdyn(B0,matrix(catch,ncol=1),hh,M,mat,sel,wght,amin,amax,matrix(1,length(catch),1))$bexp * catchability
   
-  if(isTRUE(all.equal(B0,500))  || isTRUE(all.equal(B0,2000)) ) { return(stop(simpleError('opt failure'))) #ipred[] <- as.numeric(NA)}
-  } else { return(ipred)
+  if(isTRUE(all.equal(B0,500)) || isTRUE(all.equal(B0,SSB0))  || isTRUE(all.equal(B0,2000)) ) { return(catch[year-1] * ITAR/CTAR) #return(stop(simpleError('opt failure'))) #ipred[] <- as.numeric(NA)}
+  } else { return(ipred[year])
   }
 }  
 

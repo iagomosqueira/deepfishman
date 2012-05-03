@@ -14,13 +14,10 @@
 using namespace std;
 
 // global functions
-void pop_dyn(double);
+void pop_dyn(double**,double**,double**,double,double** C,double,double*,double*,double*,double*,double**);
 
 // global variables
 int ymin,ymax,amin,amax,nyr,nag,nit;
-double hh,*M;
-double *mat,*wght,*sel;
-double **C,**B,**Bexp,**H,**srr;
 double alp,bet;
 
 extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_sel,SEXP R_wght,SEXP R_amin,SEXP R_amax,SEXP R_ymin,SEXP R_ymax,SEXP R_nit,SEXP R_srr) {
@@ -68,7 +65,7 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   double B0 = NUMERIC_VALUE(R_B0);
  
   // catch
-  C = new double*[nyr];
+  double** C = new double*[nyr];
   for(y=0;y<nyr;y++)
     C[y] =  new double[nit];
     
@@ -76,11 +73,11 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   for(i=0;i<nit;i++) {
     for(y=0;y<(nyr-1);y++)
       C[y][i] = REAL(R_catch)[p++];
-    C[nyr-1][i] = NA_REAL;
+    C[nyr-1][i] = 0.;
   }
 
   // srr
-  srr = new double*[nyr];
+  double** srr = new double*[nyr];
   for(y=0;y<nyr;y++)
     srr[y] =  new double[nit];
     
@@ -88,31 +85,31 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   for(i=0;i<nit;i++) {
     for(y=0;y<(nyr-1);y++)
       srr[y][i] = REAL(R_srr)[p++];
-    srr[nyr-1][i] = NA_REAL;
+    srr[nyr-1][i] = 1.;
   }
   
   // steepness
-  hh = NUMERIC_VALUE(R_hh);
+  double hh = NUMERIC_VALUE(R_hh);
  
   // natural mortality
-  M = REAL(R_M);
+  double* M = REAL(R_M);
 
   // maturity-at-age
-  mat = REAL(R_mat);
+  double* mat = REAL(R_mat);
 
   // weight-at-age
-  wght = REAL(R_wght);
+  double* wght = REAL(R_wght);
 
   // selectivity
-  sel = REAL(R_sel);
+  double* sel = REAL(R_sel);
   
   ///////////////
   // RUN MODEL //
   ///////////////
   
-  B    = new double*[nyr];
-  Bexp = new double*[nyr];
-  H    = new double*[nyr];
+  double** B    = new double*[nyr];
+  double** Bexp = new double*[nyr];
+  double** H    = new double*[nyr];
   for(y=0;y<nyr;y++) {
     B[y]    =  new double[nit];
     Bexp[y] =  new double[nit];
@@ -120,7 +117,7 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   }    
   
   // run model
-  pop_dyn(B0);
+  pop_dyn(B,Bexp,H,B0,C,hh,M,mat,sel,wght,srr);
 
   ////////////
   // Output //
@@ -212,6 +209,10 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
   delete[] H;
   delete[] C;
   delete[] srr;
+  delete[] wght;
+  delete[] sel;
+  delete[] M;
+  delete[] mat;
 
   UNPROTECT(1);
   return out;
@@ -222,7 +223,7 @@ extern "C" SEXP run(SEXP R_B0,SEXP R_catch,SEXP R_hh,SEXP R_M,SEXP R_mat,SEXP R_
 // FUNCTIONS //
 ///////////////
 
-void pop_dyn(double B0) { 
+void pop_dyn(double** B,double** Bexp,double** H,double B0,double** C,double hh,double* M,double* mat,double* sel,double* wght,double** srr) { 
 
   int a,y,i;
 
@@ -252,52 +253,53 @@ void pop_dyn(double B0) {
       N[a][0][i] = R0 * P[a];
   
   // set up S-R parameters
-
   alp = (4*hh*R0)/(5*hh-1);
   bet = B0*(1-hh)/(5*hh-1);
   
   // Loop through the iters and years
   for(i=0;i<nit;i++) {
-  for(y=1;y<nyr;y++) {
   
-    // biomass
-    B[y-1][i] = 0.;
-    Bexp[y-1][i] = 0.;
+    // initial biomass
+    B[0][i] = 0.;
+    Bexp[0][i] = 0.;
     for(a=0;a<nag;a++) {
-      B[y-1][i] += N[a][y-1][i] * mat[a] * wght[a];
-      Bexp[y-1][i] += N[a][y-1][i] * sel[a] * wght[a] * exp(-M[a]/2.);
+      B[0][i] += N[a][0][i] * mat[a] * wght[a];
+      Bexp[0][i] += N[a][0][i] * sel[a] * wght[a] * exp(-M[a]/2.);
     }
 
-    // harvest
-    H[y-1][i] = 1.;
-    if(Bexp[y-1][i]>0.) H[y-1][i]    = C[y-1][i] / Bexp[y-1][i];
-    if(H[y-1][i]<0.)    H[y-1][i]    = 0.;
-    if(H[y-1][i]>1.)    H[y-1][i]    = 1.;
-    if(H[y-1][i]>0.)    Bexp[y-1][i] = C[y-1][i] / H[y-1][i];
+    // initial harvest
+    H[0][i] = 1.;
+    if(Bexp[0][i]>0.) H[0][i]    = C[0][i] / Bexp[0][i];
+    if(H[0][i]<0.)    H[0][i]    = 0.;
+    if(H[0][i]>1.)    H[0][i]    = 1.;
+    if(H[0][i]>0.)    Bexp[0][i] = C[0][i] / H[0][i];
 
-    // recruitment
+    for(y=1;y<nyr;y++) {
 
-    N[0][y][i] = alp * B[y-1][i]/(bet + B[y-1][i]) * srr[y-1][i];
+      // recruitment
+      N[0][y][i] = alp * B[y-1][i]/(bet + B[y-1][i]) * srr[y-1][i];
 
-    // adult dynamics
+      // adult dynamics
+      for(a=1;a<nag;a++)
+        N[a][y][i] = N[a-1][y-1][i]*exp(-M[a-1])*(1-sel[a-1]*H[y-1][i]);
+      N[nag-1][y][i] = N[nag-1][y][i] + N[nag-1][y-1][i]*exp(-M[nag-1])*(1-sel[nag-1]*H[y-1][i]);
+      
+      // biomass
+      B[y][i] = 0.;
+      Bexp[y][i] = 0.;
+      for(a=0;a<nag;a++) {
+        B[y][i] += N[a][y][i] * mat[a] * wght[a];
+        Bexp[y][i] += N[a][y][i] * sel[a] * wght[a] * exp(-M[a]/2.);
+      }
+      
+      // harvest
+      H[y][i] = 1.;
+      if(Bexp[y][i]>0.) H[y][i]    = C[y][i] / Bexp[y][i];
+      if(H[y][i]<0.)    H[y][i]    = 0.;
+      if(H[y][i]>1.)    H[y][i]    = 1.;
+      if(H[y][i]>0.)    Bexp[y][i] = C[y][i] / H[y][i];
 
-    for(a=1;a<nag;a++)
-      N[a][y][i] = N[a-1][y-1][i]*exp(-M[a-1])*(1-sel[a-1]*H[y-1][i]);
-    N[nag-1][y][i] = N[nag-1][y][i] + N[nag-1][y-1][i]*exp(-M[nag-1])*(1-sel[nag-1]*H[y-1][i]);
-
-  }
-  
-  // current biomass
-  B[nyr-1][i] = 0.;
-  Bexp[nyr-1][i] = 0.;
-  for(a=0;a<nag;a++) {
-    B[nyr-1][i] += N[a][nyr-1][i] * mat[a] * wght[a];
-    Bexp[nyr-1][i] += N[a][nyr-1][i] * sel[a] * wght[a] * exp(-M[a]/2.);
-  }
-  
-  // current H
-  H[nyr-1][i] = NA_REAL;
-  
+    }
   }
   
   // clean up
