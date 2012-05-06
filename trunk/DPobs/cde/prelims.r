@@ -53,7 +53,8 @@ proj_strt <- dims(stk_hist)$maxyear
 #stk_init  <- stf(stk_hist,proj_nyr)
 proj_end  <- proj_strt + proj_nyr
 sr_resid <- window(sr_resid,start=1,end=proj_end)
-sr_resid[,(proj_strt+1):proj_end] <- rlnorm(nit*proj_nyr,0,sqrt(log(cv.sr+1)))
+sigma <- sqrt(log(cv.sr+1))
+sr_resid[,(proj_strt+1):proj_end] <- rlnorm(nit*proj_nyr,0,sigma) * exp(-(sigma^2)/2)
 
 # set catchability
 catchability <- 1e-4
@@ -118,8 +119,8 @@ ITAR <- BTAR * catchability
 #
 # PERFORMANCE SIMULATIONS
 
-eff_seq <- seq(1000,10000,1000)#10^(2:6)
-ryr_seq <- c(5,10,15,20,25,30)
+eff_seq <- seq(200,1200,100)#10^(2:6)
+ryr_seq <- c(5,10,15,20,25,30,35,40) - 1
 
 # simulate observation error
 load('../dat/cv_pred_func.Rdata')
@@ -129,10 +130,11 @@ index_epsilon <- array(dim=c(length(eff_seq),hist_nyr+proj_nyr,nit))
 for(e in 1:length(eff_seq)) {
 
   cv.index <- cv.pred(eff_seq[e])
-
+  sigma <- sqrt(log(cv.index+1))
+  
   for(y in 1:(hist_nyr+proj_nyr)) {
     for(i in 1:nit) {
-      index_epsilon[e,y,i] <- rlnorm(1,0,sqrt(log(cv.index+1)))
+      index_epsilon[e,y,i] <- rlnorm(1,0,sigma) * exp(-(sigma^2)/2)
     }
   }
 }

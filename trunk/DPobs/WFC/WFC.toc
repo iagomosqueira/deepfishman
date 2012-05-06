@@ -1,0 +1,5 @@
+\beamer@endinputifotherversion {3.12pt}
+\beamer@sectionintoc {1}{Overview}{2}{0}{1}
+\beamer@sectionintoc {2}{Efficiency}{3}{0}{2}
+\beamer@sectionintoc {3}{Data uncertainty}{4}{0}{3}
+\beamer@sectionintoc {4}{Simulations}{7}{0}{4}

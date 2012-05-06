@@ -52,6 +52,9 @@ logl <- function(B0,catch,index,hh,M,mat,sel,wght,amin,amax) {
 fit.sra <- function(catch,index,hh,M,mat,sel,wght,amin,amax) {
   
   fit <- optim(SSB0,fn = logl,catch=catch,index=index,hh=hh,M=M,mat=mat,sel=sel,wght=wght,amin=amin,amax=amax,method="L-BFGS-B",lower = 500,upper = 2000)
+  #fit <- DEoptim(fn = logl,catch=catch,index=index,hh=hh,M=M,mat=mat,sel=sel,wght=wght,amin=amin,amax=amax,lower = 500,upper = 2000,control=DEoptim.control(itermax=100,trace=F))
+
+  #return(fit$optim$bestmem)
   return(fit$par)
 }
 
@@ -120,13 +123,27 @@ H <- function(stk,year,ryr,cv) {
   # residual error
   xx <- exp(stk[['index']][(year-ryr-1):(year-1),] - stk[['bexp']][(year-ryr-1):(year-1),] * catchability)
   yy <- stk[['bexp']][(year-ryr-1):(year-1),]
-  xx[yy<1e-3] <- NA
-  apply(xx,2,function(x) -sum(dlnorm(x,0,sqrt(log(cv+1)))*log2(dlnorm(x,0,sqrt(log(cv+1)))),na.rm=T))
+  xx[yy<1e-3] <- NA   
+  sigma <- sqrt(log(cv+1))
+  apply(xx,2,function(x) {
+    #px <- dlnorm(mean(x),0,sigma/sqrt(length(x))) * 1e-3
+    #mu <- mean(x)
+    #px <- tryCatch(integrate(function(y) dlnorm(y,0,sigma/length(x)),mu-1e-3,mu+1e-3)$value,error=function(e) 0.)
+    #if(!is.na(mu)) {
+    #  if(mu>1) px <- plnorm(mu,0,sigma/length(x),lower.tail=F) 
+    #  if(mu<1) px <- plnorm(mu,0,sigma/length(x),lower.tail=T)
+    #  return(-log2(px))
+    #} else {
+    #  return(as.numeric(NA))
+    #}
+    sigma/sqrt(length(x))
+    })
 }
+# take probability from area under the curve between mean zero and residual value mean(x)
 
-entropy <- function(stk) {
+uncertainty <- function(stk) {
 
-  xx <- stk[['entropy']][(proj_strt+1):(proj_end-1),]
+  xx <- stk[['uncertainty']][(proj_strt+1):(proj_end-1),]
   apply(xx,2,mean,na.rm=T)
 }
 
