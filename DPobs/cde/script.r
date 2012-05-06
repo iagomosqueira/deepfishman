@@ -1,21 +1,21 @@
 
 
 # efficiency of estimators
-library(DEoptim)
+#library(DEoptim)
 load('prelims_short.Rdata')
 source('sra.r')
 load('../dat/cv_pred_func.Rdata')
 
 # results array; dim=c(eff,ryr,iter)
 rarr <- array(dim=c(length(eff_seq),length(ryr_seq),nit))
-dimnames(rarr) <- list(effort=eff_seq,ryr=ryr_seq,iter=1:nit)
+dimnames(rarr) <- list(effort=eff_seq,ryr=ryr_seq+1,iter=1:nit)
 
 earr <- array(dim=c(length(eff_seq),length(ryr_seq),nit))
-dimnames(earr) <- list(effort=eff_seq,ryr=ryr_seq,iter=1:nit)
+dimnames(earr) <- list(effort=eff_seq,ryr=ryr_seq+1,iter=1:nit)
 
 # get historic dynamics over iterations
 stk_init <- vector('list',5)
-names(stk_init) <- c('catch','index','bexp','theta','entropy')
+names(stk_init) <- c('catch','index','bexp','theta','uncertainty')
 stk_init[[1]] <- matrix(NA,hist_nyr+proj_nyr,nit)
 stk_init[[2]] <- matrix(NA,hist_nyr+proj_nyr,nit)
 stk_init[[3]] <- matrix(NA,hist_nyr+proj_nyr,nit)
@@ -49,9 +49,9 @@ for(y in (proj_strt+1):(proj_end-1)) {
   stk$index[y+1,]  <- out$bexp[y+1,] * catchability
   stk$bexp[y+1,]   <- out$bexp[y+1,]
   
-  plot(1:(y+1),out$bexp[1:(y+1),1] * catchability,xlim=c(0,100),type='l')
-  points(1:(y+1),stk$index[1:(y+1),1])
-  points((proj_strt+1):y,stk$catch[(proj_strt+1):y,1] * ITAR/CTAR,pch=19,col=2,type='b')
+  #plot(1:(y+1),out$bexp[1:(y+1),1] * catchability,xlim=c(0,100),type='l')
+  #points(1:(y+1),stk$index[1:(y+1),1])
+  #points((proj_strt+1):y,stk$catch[(proj_strt+1):y,1] * ITAR/CTAR,pch=19,col=2,type='b')
 
 }
 
@@ -75,31 +75,32 @@ for(e in 1:length(eff_seq)) {
     stk <- stk_init
     stk$index[1:(proj_strt+1),] <- stk$index[1:(proj_strt+1),] * index_epsilon[e,1:(proj_strt+1),]
     
-    #cat(eff_seq[e],ryr_seq[r],'\n')
+    cat(eff_seq[e],ryr_seq[r],'\n')
    
     for(y in (proj_strt+1):(proj_end-1)) {  
   
       # control rule
       stk$catch[y,]   <- hcr_mav(stk$index,y,ryr_seq[r])
       stk$theta[y,]   <- hcr_opt(stk$catch,sr_epsilon,y)
-      stk$entropy[y,] <- H(stk,y,ryr_seq[r],cv.pred(eff_seq[e]))
+      stk$uncertainty[y,] <- H(stk,y,ryr_seq[r],cv.pred(eff_seq[e]))
     
       # project
       out <- pdyn(SSB0,stk$catch[1:y,],slope,M,mat,sel,wt,amin,amax,sr_epsilon[1:y,])
       stk$index[y+1,] <- out$bexp[y+1,] * catchability * index_epsilon[e,y+1,]
       stk$bexp[y+1,]  <- out$bexp[y+1,]
       
-      #plot(1:(y+1),out$bexp[1:(y+1),1] * catchability,xlim=c(0,100),type='l')
-      #points((y+1-ryr_seq[r]):(y+1),stk_emp$index[(y+1-ryr_seq[r]):(y+1),1])
+      #plot(1:(y+1),out$bexp[1:(y+1),10] * catchability,xlim=c(0,100),type='l')
+      #points((y+1-ryr_seq[r]):(y+1),stk$index[(y+1-ryr_seq[r]):(y+1),10])
+      #points(proj_strt:y,stk$catch[proj_strt:y,10] * ITAR/CTAR,pch=19,col=2,type='b')
       
     }
   
     rarr[e,r,] <- efficiency(stk)
-    earr[e,r,] <- entropy(stk)
+    earr[e,r,] <- uncertainty(stk)
   }  
 }
 
-res<-data.frame(effort=rep(eff_seq,length(ryr_seq*nit)),ryr=rep(rep(ryr_seq,each=length(eff_seq)),nit),efficiency=as.vector(rarr),entropy=as.vector(earr))
+res<-data.frame(effort=rep(eff_seq,length(ryr_seq*nit)),ryr=rep(rep(ryr_seq+1,each=length(eff_seq)),nit),efficiency=as.vector(rarr),uncertainty=as.vector(earr))
 save(res,earr,rarr,stk,hcr_mav,file='../res/hcr_mav.Rdata')
 
 # HCR II: regression of historic survey index
@@ -130,7 +131,7 @@ for(e in 1:length(eff_seq)) {
       # control rule
       stk$catch[y,] <- hcr_reg(stk$index,y,ryr_seq[r])
       stk$theta[y,] <- hcr_opt(stk$catch,sr_epsilon,y)
-      stk$entropy[y,] <- H(stk,y,ryr_seq[r],cv.pred(eff_seq[e]))
+      stk$uncertainty[y,] <- H(stk,y,ryr_seq[r],cv.pred(eff_seq[e]))
     
       # project
       out <- pdyn(SSB0,stk$catch[1:y,],slope,M,mat,sel,wt,amin,amax,sr_epsilon[1:y,])
@@ -139,12 +140,12 @@ for(e in 1:length(eff_seq)) {
     }
   
     rarr[e,r,] <- efficiency(stk)
-    earr[e,r,] <- entropy(stk)
+    earr[e,r,] <- uncertainty(stk)
 
   }  
 }
 
-res<-data.frame(effort=rep(eff_seq,length(ryr_seq*nit)),ryr=rep(rep(ryr_seq,each=length(eff_seq)),nit),efficiency=as.vector(rarr),entropy=as.vector(earr))
+res<-data.frame(effort=rep(eff_seq,length(ryr_seq*nit)),ryr=rep(rep(ryr_seq+1,each=length(eff_seq)),nit),efficiency=as.vector(rarr),uncertainty=as.vector(earr))
 save(res,earr,rarr,stk,hcr_reg,file='../res/hcr_reg.Rdata')
 
 # HCR III: smoothed historic index (exponential)
@@ -175,7 +176,7 @@ for(e in 1:length(eff_seq)) {
       # control rule
       stk$catch[y,] <- hcr_smt(stk$index,y,ryr_seq[r])
       stk$theta[y,] <- hcr_opt(stk$catch,sr_epsilon,y)
-      stk$entropy[y,] <- H(stk,y,ryr_seq[r],cv.pred(eff_seq[e]))
+      stk$uncertainty[y,] <- H(stk,y,ryr_seq[r],cv.pred(eff_seq[e]))
     
       # project
       out <- pdyn(SSB0,stk$catch[1:y,],slope,M,mat,sel,wt,amin,amax,sr_epsilon[1:y,])
@@ -188,20 +189,20 @@ for(e in 1:length(eff_seq)) {
     }
   
     rarr[e,r,] <- efficiency(stk)
-    earr[e,r,] <- entropy(stk)
+    earr[e,r,] <- uncertainty(stk)
 
   }  
 }
 
-res<-data.frame(effort=rep(eff_seq,length(ryr_seq*nit)),ryr=rep(rep(ryr_seq,each=length(eff_seq)),nit),efficiency=as.vector(rarr),entropy=as.vector(earr))
+res<-data.frame(effort=rep(eff_seq,length(ryr_seq*nit)),ryr=rep(rep(ryr_seq+1,each=length(eff_seq)),nit),efficiency=as.vector(rarr),uncertainty=as.vector(earr))
 save(res,earr,rarr,stk,hcr_smt,file='../res/hcr_smt.Rdata')
 
 # HCR IV: smoothed historic index (double exponential)
 hcr_dex <- function(index,year,ryr=1) {
 
    xx <- index[(year-ryr-1):(year-1),]
-   alp <- 0.5
-   bet <- 0.5
+   alp <- 0.9
+   bet <- 0.1
    
    s <- numeric(ryr+1)
    b <- numeric(ryr+1)
@@ -213,7 +214,7 @@ hcr_dex <- function(index,year,ryr=1) {
                     s[t] <- alp*x[t] + (1-alp)*(s[t-1] + b[t-1])
                     b[t] <- bet*(s[t] - s[t-1]) + (1-bet)*b[t-1]
                   }
-                  return(s[ryr+1]+b[ryr+1])
+                  return(max(s[ryr+1]+b[ryr+1],0))
                   })
    
    TAC <- (CTAR * GB)/ITAR
@@ -236,25 +237,29 @@ for(e in 1:length(eff_seq)) {
       # control rule
       stk$catch[y,] <- hcr_dex(stk$index,y,ryr_seq[r])
       stk$theta[y,] <- hcr_opt(stk$catch,sr_epsilon,y)
-      stk$entropy[y,] <- H(stk,y,ryr_seq[r],cv.pred(eff_seq[e]))
+      stk$uncertainty[y,] <- H(stk,y,ryr_seq[r],cv.pred(eff_seq[e]))
     
       # project
       out <- pdyn(SSB0,stk$catch[1:y,],slope,M,mat,sel,wt,amin,amax,sr_epsilon[1:y,])
       stk$index[y+1,] <- out$bexp[y+1,] * catchability * index_epsilon[e,y,]
       stk$bexp[y+1,]  <- out$bexp[y+1,]
       
-      #plot(1:(y+1),out$bexp[1:(y+1),10] * catchability,xlim=c(0,100),type='l')
-      #points((y+1-ryr_seq[r]):(y+1),stk$index[(y+1-ryr_seq[r]):(y+1),10])
-      #points(proj_strt:y,stk$catch[proj_strt:y,10] * ITAR/CTAR,pch=19,col=2,type='b')
+      #plot(1:(y+1),out$bexp[1:(y+1),2] * catchability,xlim=c(0,100),type='l',ylab='Index',xlab='Time',ylim=c(0,0.12),main='Smoothed HCR')
+      #points((y+1-ryr_seq[r]):(y+1),stk$index[(y+1-ryr_seq[r]):(y+1),1])
+      #points((proj_strt+1):y,stk$catch[(proj_strt+1):y,2] * ITAR/CTAR,pch=19,col=2,type='b')
     }
+    
+    #plot(1:(y+1),out$bexp[1:(y+1),2] * catchability,xlim=c(0,100),type='l',ylab='Index',xlab='Time',ylim=c(0,0.12),main='Low data uncertainty')
+    #points((proj_strt+1):y,stk$catch[(proj_strt+1):y,2] * ITAR/CTAR,pch=19,col=2,type='b')
+
   
     rarr[e,r,] <- efficiency(stk)
-    earr[e,r,] <- entropy(stk)
+    earr[e,r,] <- uncertainty(stk)
 
   }  
 }
 
-res<-data.frame(effort=rep(eff_seq,length(ryr_seq*nit)),ryr=rep(rep(ryr_seq,each=length(eff_seq)),nit),efficiency=as.vector(rarr),entropy=as.vector(earr))
+res<-data.frame(effort=rep(eff_seq,length(ryr_seq*nit)),ryr=rep(rep(ryr_seq+1,each=length(eff_seq)),nit),efficiency=as.vector(rarr),uncertainty=as.vector(earr))
 save(res,earr,rarr,stk,hcr_dex,file='../res/hcr_dex.Rdata')
 
 
@@ -262,11 +267,11 @@ save(res,earr,rarr,stk,hcr_dex,file='../res/hcr_dex.Rdata')
 hcr_mdl <- function(catch,index,year,ryr=1) {
 
   GB <- numeric(dim(catch)[2])
-  
+
   #plot(1:(100-1),index[1:(100-1),10])
   index[1:(year-ryr-2),] <- NA
   #points((year-ryr-1):(year-1),index[(year-ryr-1):(year-1),10],pch=19,col=2)
-  #lines(1:(year),tryCatch(ipred.sra(catch[1:(year-1),10],index[1:(year-1),10],slope,M,mat,sel,wt,amin,amax),error = function(e) return(index[1:year,10])))
+  #lines(1:(year),ipred.sra(catch[1:(year-1),10],index[1:(year-1),10],slope,M,mat,sel,wt,amin,amax,1:(year)))
   #cat('off we go\n')
   # get predicted CPUE from SRA
   for(i in 1:length(GB)) {
@@ -275,11 +280,11 @@ hcr_mdl <- function(catch,index,year,ryr=1) {
       #cat(i,'ok\n')
       #browser()
   }
-  
+
   TAC <- (CTAR * GB)/ITAR
 
   return(TAC)
-  
+
 }
 
 
@@ -297,27 +302,40 @@ for(e in 1:length(eff_seq)) {
       # control rule
       stk$catch[y,]   <- hcr_mdl(stk$catch,stk$index,y,ryr_seq[r])
       stk$theta[y,]   <- hcr_opt(stk$catch,sr_epsilon,y)
-      stk$entropy[y,] <- H(stk,y,ryr_seq[r],cv.pred(eff_seq[e]))
+      stk$uncertainty[y,] <- H(stk,y,ryr_seq[r],cv.pred(eff_seq[e]))
     
       # project
       out <- pdyn(SSB0,stk$catch[1:y,],slope,M,mat,sel,wt,amin,amax,sr_epsilon[1:y,])
       stk$index[y+1,] <- out$bexp[y+1,] * catchability * index_epsilon[e,y+1,]
       stk$bexp[y+1,]  <- out$bexp[y+1,]
     
-      #plot(1:(y+1),out$bexp[1:(y+1),10] * catchability,xlim=c(0,100),type='l')
-      #points((y+1-ryr_seq[r]):(y+1),stk$index[(y+1-ryr_seq[r]):(y+1),10])
-      #points(proj_strt:y,stk$catch[proj_strt:y,10] * ITAR/CTAR,pch=19,col=2,type='b')
+      #plot(1:(y+1),out$bexp[1:(y+1),1] * catchability,xlim=c(0,100),type='l',ylab='Index',xlab='Time',ylim=c(0,0.12),main='Model-based HCR')
+      #points((y+1-ryr_seq[r]):(y+1),stk$index[(y+1-ryr_seq[r]):(y+1),1])
+      #points((proj_strt+1):y,stk$catch[(proj_strt+1):y,1] * ITAR/CTAR,pch=19,col=2,type='b')
 
-    }
+    }                                                                                                                                       
     
     rarr[e,r,] <- efficiency(stk)
-    earr[e,r,] <- entropy(stk)
-    save(earr,rarr,file='../res/hcr_mdl.Rdata')
+    earr[e,r,] <- uncertainty(stk)
   }  
 }
 
-res<-data.frame(effort=rep(eff_seq,length(ryr_seq*nit)),ryr=rep(rep(ryr_seq,each=length(eff_seq)),nit),efficiency=as.vector(rarr),entropy=as.vector(earr))
+res<-data.frame(effort=rep(eff_seq,length(ryr_seq*nit)),ryr=rep(rep(ryr_seq+1,each=length(eff_seq)),nit),efficiency=as.vector(rarr),uncertainty=as.vector(earr))
 save(res,earr,rarr,stk,hcr_mdl,file='../res/hcr_mdl.Rdata')
+
+
+############
+# END
+
+
+
+
+
+
+
+
+
+
 
 windows();boxplot(t(stk_emp$bexp),main='empirical')
 windows();boxplot(t(stk_reg$bexp),main='regression')
