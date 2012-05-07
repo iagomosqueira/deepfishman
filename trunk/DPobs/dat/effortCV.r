@@ -47,3 +47,8 @@ dev.off()
 cv.pred <- function(effort) predict(fit,data.frame(effort))
 
 save(fit,cv.pred,file='cv_pred_func.Rdata')
+
+#windows(width=10)
+#par(mar=c(5,6,2,1))
+#plot(eff.seq,predict(fit,data.frame(effort=eff.seq)),col=2,lwd=3,type='l',ylab=expression(paste('CV [',italic(bar(I)),']')),xlab='Survey effort (annual no. of tows)',cex.lab=2,cex.axis=1.5,main='')
+
