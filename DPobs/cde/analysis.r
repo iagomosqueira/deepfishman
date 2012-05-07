@@ -51,7 +51,7 @@ savePlot('../res/hcr_dex_plot2.pdf',type='pdf')
 xyplot(log(efficiency)~uncertainty,res,panel=function(x,y) {panel.xyplot(x,y);panel.loess(x,y,col=2,lwd=3)},main='Double exponential HCR')
 savePlot('../res/hcr_dex_plot3.pdf',type='pdf')
 
-res     <- data.frame(res,hcr='Smoothed (Double exponential)')
+res     <- data.frame(res,hcr='Smoothed')
 res_all <- rbind(res_all,res)
 
 load('../res/hcr_mdl.Rdata')
@@ -70,7 +70,7 @@ res_all <- rbind(res_all,res)
 res <- res_all
 
 windows()
-xyplot(log(efficiency)~uncertainty|hcr,res,panel=function(x,y) {panel.xyplot(x,y);panel.loess(x,y,col=2,lwd=3)},main='HCR comparison',par.strip.text = list(cex = 1.75))
+xyplot(log(efficiency)~uncertainty|hcr,res,panel=function(x,y) {panel.xyplot(x,y);panel.loess(x,y,col=2,lwd=3)},main='',par.strip.text = list(cex = 1.75))
 savePlot('../res/hcr_all_plot.pdf',type='pdf')
 
 
