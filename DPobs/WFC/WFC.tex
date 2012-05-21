@@ -41,7 +41,7 @@ Finding efficient harvest control rules for data limited management
 \begin{itemize}
 \item Introduce a measure of \alert{control rule performance}
 \item Define control rules
-\item Compare performance under different data scenarios
+\item Define different data scenarios
 \item Quantify \alert{data uncertainty}
 \item Compare performance relative to data uncertainty
 \end{itemize}
@@ -99,6 +99,32 @@ Tested four methods of predicting $\hat{I}_{y+1}\longrightarrow \hat{C}_{y+1}$:
 \structure{Experimental design:} by changing the \alert{years of data} available to the control rule ($n$) and the \alert{observation error} ($\sigma$) we can modify the data uncertainty.
 \end{frame}
 
+\section{Data uncertainty}
+\begin{frame}
+\frametitle{Data uncertainty}
+\framesubtitle{Quantifying the information available to the control rule}
+\only<1>{
+If $\varepsilon$ is the observation error residual, then the probability distribution of the mean residual is:
+\begin{equation}
+E[ln(\varepsilon)] \sim N\left(0,\sigma^2/n\right) \nonumber
+\end{equation}
+\vspace{20pt}\\
+From this observation we obtain our measure of data uncertainty.
+\begin{block}{}
+\textcolor{blue}{Data uncertainty:}
+\vspace{5pt}
+\begin{equation}
+u(D) := \frac{\sigma}{\sqrt{n}} \nonumber
+\end{equation}
+\vspace{5pt}
+\end{block}
+}
+\only<2>{\begin{figure}
+\includegraphics[width=1\textwidth]{../res/uncertainty.pdf}
+\end{figure}
+}
+\end{frame}
+
 \section{Simulation results}
 \begin{frame}
 \frametitle{Simulation results}
@@ -107,6 +133,17 @@ Tested four methods of predicting $\hat{I}_{y+1}\longrightarrow \hat{C}_{y+1}$:
 \includegraphics[width=0.9\textwidth]{../res/uncertainty_index.pdf}
 \end{figure}
 \end{frame}
+
+\section{Comparitive results}
+\begin{frame}
+\frametitle{Simulation results}
+\framesubtitle{Efficiency against uncertainty}
+\begin{figure}
+\includegraphics[width=0.6\textwidth]{../res/hcr_all_plot.pdf}
+\end{figure}
+\end{frame}
+
+\frame{\titlepage}
 
 \begin{frame}
 \frametitle{Simulation results}
@@ -136,41 +173,5 @@ Tested four methods of predicting $\hat{I}_{y+1}\longrightarrow \hat{C}_{y+1}$:
 }
 \end{frame}
 
-\section{Data uncertainty}
-\begin{frame}
-\frametitle{Data uncertainty}
-\framesubtitle{Quantifying the information available to the control rule}
-\only<1>{
-If $\varepsilon$ is the observation error residual, then the probability distribution of the mean residual is:
-\begin{equation}
-E[ln(\varepsilon)] \sim N\left(0,\sigma^2/n\right) \nonumber
-\end{equation}
-\vspace{20pt}\\
-From this observation we obtain our measure of data uncertainty.
-\begin{block}{}
-\textcolor{blue}{Data uncertainty:}
-\vspace{5pt}
-\begin{equation}
-u(D) := \frac{\sigma}{\sqrt{n}} \nonumber
-\end{equation}
-\vspace{5pt}
-\end{block}
-}
-\only<2>{\begin{figure}
-\includegraphics[width=1\textwidth]{../res/uncertainty.pdf}
-\end{figure}
-}
-\end{frame}
-
-\section{Comparitive results}
-\begin{frame}
-\frametitle{Simulation results}
-\framesubtitle{Efficiency against uncertainty}
-\begin{figure}
-\includegraphics[width=0.6\textwidth]{../res/hcr_all_plot.pdf}
-\end{figure}
-\end{frame}
-
-\frame{\titlepage}
 
 \end{document}
